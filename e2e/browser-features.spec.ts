@@ -72,11 +72,11 @@ test('open all as a tab group, then replace the window tabs', async () => {
       tabs: await app.worker.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.url ?? t.pendingUrl)),
       pages: app.context.pages().map((x) => x.url()),
     });
-  await expect
-    .poll(async () => app.worker.evaluate(async () => (await chrome.tabs.query({})).filter((t) => (t.url ?? t.pendingUrl ?? '').includes('docs-')).length), {
-      message: `after Open all: ${await diagnostics()}`,
-    })
-    .toBe(2);
+  await p.waitForTimeout(2500);
+  const opened = await app.worker.evaluate(
+    async () => (await chrome.tabs.query({})).filter((t) => (t.url ?? t.pendingUrl ?? '').includes('docs-')).length,
+  );
+  expect(opened, `after Open all: ${await diagnostics()}`).toBe(2);
   const groups = await app.worker.evaluate(() => chrome.tabGroups.query({ title: 'Docs' }));
   expect(groups).toHaveLength(1);
 
