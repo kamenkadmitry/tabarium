@@ -12,7 +12,8 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Area | What you can do |
 | --- | --- |
 | Library | Spaces → collections → tabs; create, rename, recolour, delete; add links by hand |
-| Saving | Save session (all tabs of a window, keep or close them), toolbar popup, side panel, right-click menu |
+| Open tabs panel | A panel beside the library lists every browser window and its tabs, live. Drag tabs (or a selection) into a collection, between cards, onto a space, or onto empty space for a new collection; merge windows; close tabs after adding |
+| Saving | Save session (all tabs of a window, keep or close them), right-click menu, and a popup/side panel with Save tab (spaces → collections), Group tabs (one collection or AI-organised) and Next |
 | Organising | Drag and drop tabs and collections (also between spaces), move via dialog, tags with colours, filter by tag |
 | Notes and stars | Edit a tab's title, address and note; star tabs; Starred view |
 | Next | A queue of tabs to look at: reorder, mark done |

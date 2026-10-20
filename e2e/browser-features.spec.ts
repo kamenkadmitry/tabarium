@@ -201,23 +201,33 @@ test('right-click menu: items are registered and saving goes to the Inbox', asyn
   await p.close();
 });
 
-test('popup saves every tab of the window into the Inbox', async () => {
+test('popup: Group tabs saves the window into a collection picked space by space', async () => {
   const a = await app.context.newPage();
   await a.goto(web('popup-a'));
   const b = await app.context.newPage();
   await b.goto(web('popup-b'));
 
+  const lib = await openLibraryWithSpace('Quick');
+  await addCollectionWithLinks(lib, 'Quick target', []);
+
   const popup = await app.context.newPage();
   await popup.goto(`chrome-extension://${app.extensionId}/popup.html`);
-  await popup.getByRole('button', { name: 'Save all tabs in this window' }).click();
-  await expect(popup.getByRole('status')).toContainText(/Saved \d+ of \d+ tabs/);
+  // Save tab: a popup opened as a page is not a web page, so there is nothing to save, and it says so.
+  await expect(popup.getByText('This page cannot be saved')).toBeVisible();
 
-  const library = await app.context.newPage();
-  await library.goto(`chrome-extension://${app.extensionId}/newtab.html`);
-  await library.getByRole('button', { name: 'I Inbox', exact: true }).click();
-  const saved = library.locator('section[aria-label="Saved tabs"]');
-  await expect(saved.getByText('Page popup-a')).toBeVisible();
-  await expect(saved.getByText('Page popup-b')).toBeVisible();
+  await popup.getByRole('tab', { name: 'Group tabs' }).click();
+  await popup.getByRole('button', { name: 'Show tabs of this window' }).click();
+  await expect(popup.getByText('Page popup-a')).toBeVisible();
+  await expect(popup.getByText('Page popup-b')).toBeVisible();
+  await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
+  await popup.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).click(); // space row
+  await popup.getByRole('button', { name: 'Quick target' }).click(); // collection row
+  await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
+
+  await lib.reload();
+  const target = lib.locator('section[aria-label="Quick target"]');
+  await expect(target.getByText('Page popup-a')).toBeVisible();
+  await expect(target.getByText('Page popup-b')).toBeVisible();
 });
 
 test('AI: connection test, naming and grouping through a provider', async () => {
