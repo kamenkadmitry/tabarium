@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 /** The `e2e` build declares every optional permission up front so prompts never block the tests. */
-const extensionPath = path.resolve('.output/chrome-mv3-e2e');
+export const E2E_BUILD = '.output/chrome-mv3-e2e';
+export const PRODUCTION_BUILD = '.output/chrome-mv3';
 
 export interface Launched {
   context: BrowserContext;
@@ -13,7 +14,8 @@ export interface Launched {
   workerErrors: string[];
 }
 
-export async function launchExtension(): Promise<Launched> {
+export async function launchExtension(build: string = E2E_BUILD): Promise<Launched> {
+  const extensionPath = path.resolve(build);
   const context = await chromium.launchPersistentContext(mkdtempSync(path.join(tmpdir(), 'tabarium-e2e-')), {
     headless: false,
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--headless=new'],
