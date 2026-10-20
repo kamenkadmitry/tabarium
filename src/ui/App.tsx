@@ -161,6 +161,7 @@ export function App() {
     <div className="flex h-full">
       <Sidebar
         spaces={spaces}
+        profile={settings?.profile ?? { name: '', avatar: null }}
         view={view}
         nextCount={nexts.filter((n) => n.state === 'todo').length}
         duplicateCount={data.duplicates.length}

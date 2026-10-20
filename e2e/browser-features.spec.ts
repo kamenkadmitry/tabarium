@@ -164,6 +164,19 @@ test('open tabs panel: width is adjustable by dragging its edge and is remembere
   await p.close();
 });
 
+test('profile: the sidebar shows a Local badge and the name set in Settings', async () => {
+  const p = await openLibraryWithSpace('Profile');
+  const profile = p.getByRole('button', { name: 'Profile: change in Settings' });
+  await expect(profile).toContainText('My library');
+  await expect(profile).toContainText('Local');
+
+  await p.getByRole('button', { name: 'Settings' }).click();
+  await p.getByLabel('Name', { exact: true }).fill('Alex');
+  await p.getByLabel('Name', { exact: true }).blur();
+  await expect(profile).toContainText('Alex');
+  await p.close();
+});
+
 test('open tabs panel: shows browser tab groups, groups a selection, finds open tabs in search', async () => {
   const x = await app.context.newPage();
   await x.goto(web('grp-x'));

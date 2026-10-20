@@ -11,6 +11,7 @@ import { backupFilename, downloadTextFile } from '../platform/files';
 import { detectProviderFromKey } from '../core/ai/client';
 import { testConnection } from '../core/ai/tasks';
 import { isAiConfigured, withProviderAccess } from './ai';
+import { avatarFromFile } from './avatar';
 import { inputClass } from './Dialog';
 
 const PROVIDER_LABELS: Record<(typeof AI_PROVIDERS)[number], string> = {
@@ -74,6 +75,7 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const settings = useLiveQuery(() => loadSettings(db), []);
   const fileInput = useRef<HTMLInputElement>(null);
   const bookmarksInput = useRef<HTMLInputElement>(null);
+  const avatarInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
@@ -311,6 +313,65 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
           </div>
           <Switch checked={settings.tabGroups} label="Open collections as tab groups" onChange={setTabGroups} />
         </div>
+      </Section>
+
+      <Section title="Profile" description="Shown at the bottom of the sidebar. Everything stays on this device.">
+        <div className="flex items-center gap-4">
+          {settings.profile.avatar ? (
+            <img src={settings.profile.avatar} alt="Your avatar" className="size-16 rounded-full object-cover" />
+          ) : (
+            <span className="grid size-16 place-items-center rounded-full bg-surface-2 text-xl font-bold text-primary">
+              {settings.profile.name[0]?.toUpperCase() ?? '?'}
+            </span>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={buttonClass} onClick={() => avatarInput.current?.click()}>
+              <Upload size={16} aria-hidden /> Choose avatar
+            </button>
+            {settings.profile.avatar && (
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={guard('Removing the avatar', async () => void (await updateSettings(db, { profile: { ...settings.profile, avatar: null } })))}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <input
+            ref={avatarInput}
+            type="file"
+            accept="image/*"
+            hidden
+            aria-label="Avatar image"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) {
+                guard('Setting the avatar', async () => {
+                  const avatar = await avatarFromFile(file);
+                  await updateSettings(db, { profile: { ...settings.profile, avatar } });
+                })();
+              }
+            }}
+          />
+        </div>
+        <label className="flex flex-col gap-1.5 text-sm font-semibold">
+          Name
+          <input
+            key={settings.profile.name}
+            defaultValue={settings.profile.name}
+            maxLength={40}
+            placeholder="My library"
+            className={inputClass}
+            onBlur={(e) => {
+              const name = e.target.value.trim();
+              if (name !== settings.profile.name) {
+                guard('Saving the name', async () => void (await updateSettings(db, { profile: { ...settings.profile, name } })))();
+              }
+            }}
+          />
+        </label>
       </Section>
 
       <Section title="Appearance" description="Follows your system by default.">

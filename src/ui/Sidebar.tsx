@@ -1,5 +1,6 @@
-import { Clock, Copy, Layers, Pencil, Plus, Settings, Star, Tag, Trash2 } from 'lucide-react';
+import { Clock, Copy, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
+import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
 import { endDrag, getDragPayload } from './dnd';
 
@@ -12,6 +13,7 @@ export type View =
 
 interface Props {
   spaces: readonly Space[];
+  profile: AppSettings['profile'];
   view: View | null;
   nextCount: number;
   duplicateCount: number;
@@ -154,6 +156,23 @@ export function Sidebar(props: Props) {
           Settings
         </NavButton>
       </div>
+
+      <button
+        type="button"
+        aria-label="Profile: change in Settings"
+        onClick={() => props.onSelect({ kind: 'settings' })}
+        className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface-2"
+      >
+        {props.profile.avatar ? (
+          <img src={props.profile.avatar} alt="" className="size-9 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-primary">
+            {props.profile.name ? <span className="text-sm font-bold">{props.profile.name[0]?.toUpperCase()}</span> : <User size={18} aria-hidden />}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{props.profile.name || 'My library'}</span>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Local</span>
+      </button>
     </aside>
   );
 }

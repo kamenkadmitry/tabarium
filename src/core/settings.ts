@@ -29,6 +29,13 @@ export const SettingsSchema = z.object({
   openTabsPanel: z.boolean().default(true),
   /** Close browser tabs after they are added to a collection from the Open tabs panel. */
   autoCloseTabs: z.boolean().default(false),
+  /** Shown at the bottom of the library sidebar; the avatar is a small image stored as a data URL. */
+  profile: z
+    .object({
+      name: z.string().max(40),
+      avatar: z.string().startsWith('data:image/').nullable(),
+    })
+    .default({ name: '', avatar: null }),
   ai: z.object({
     provider: z.enum(AI_PROVIDERS).nullable(),
     model: z.string(),
@@ -52,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openTabsWidth: 288,
   openTabsPanel: true,
   autoCloseTabs: false,
+  profile: { name: '', avatar: null },
   ai: { provider: null, model: '', baseUrl: '', apiKey: '' },
 };
 
