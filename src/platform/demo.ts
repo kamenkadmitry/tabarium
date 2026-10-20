@@ -28,6 +28,21 @@ export function createDemoPlatform(): Platform {
         tabs = tabs.filter((t) => !ids.includes(t.id));
       },
       openUrls: async () => undefined,
+      listWindows: async () => [
+        { id: 1, current: true, tabs: [...tabs] },
+        {
+          id: 2,
+          current: false,
+          tabs: [
+            { id: 11, title: 'Rust by Example', url: 'https://doc.rust-lang.org/rust-by-example/', favIconUrl: null },
+            { id: 12, title: 'crates.io', url: 'https://crates.io/', favIconUrl: null },
+          ],
+        },
+      ],
+      focusTab: async () => undefined,
+      closeWindow: async () => undefined,
+      mergeWindows: async () => undefined,
+      watch: () => () => undefined,
       replaceWindowTabs: async () => undefined,
       getActiveTab: async () => DEMO_TABS[2] ?? null,
       openLibrary: async () => undefined,

@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { Capability, OpenOptions, OpenTab, Platform } from './ports';
+import type { Capability, OpenOptions, OpenTab, OpenWindow, Platform } from './ports';
 
 function requireExtension(): typeof browser {
   if (!browser?.runtime?.id) {
@@ -23,6 +23,13 @@ async function openInBackground(urls: readonly string[], options?: OpenOptions):
     const groupId = await api.tabs.group({ tabIds: ids as [number, ...number[]] });
     await api.tabGroups.update(groupId, { title: options.groupTitle });
   }
+}
+
+const isWebUrl = (url: string | undefined): url is string => url !== undefined && /^https?:\/\//.test(url);
+
+function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string }): OpenTab | null {
+  if (t.id === undefined || !isWebUrl(t.url)) return null;
+  return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null };
 }
 
 export function createChromePlatform(): Platform {
@@ -55,6 +62,63 @@ export function createChromePlatform(): Platform {
       async openLibrary() {
         const api = requireExtension();
         await api.tabs.create({ url: api.runtime.getURL('/newtab.html') });
+      },
+      async listWindows() {
+        const api = requireExtension();
+        const [windows, here] = await Promise.all([api.windows.getAll({ populate: true, windowTypes: ['normal'] }), api.windows.getCurrent()]);
+        const result: OpenWindow[] = [];
+        for (const w of windows) {
+          if (w.id === undefined) continue;
+          const tabs = (w.tabs ?? []).flatMap((t) => {
+            const tab = toOpenTab(t);
+            return tab ? [tab] : [];
+          });
+          result.push({ id: w.id, current: w.id === here.id, tabs });
+        }
+        // Windows that hold nothing saveable (only the library, settings pages, ...) are not worth showing.
+        return result.filter((w) => w.tabs.length > 0 || w.current);
+      },
+      async focusTab(tabId) {
+        const api = requireExtension();
+        const tab = await api.tabs.update(tabId, { active: true });
+        if (!tab) throw new Error(`Tab ${tabId} no longer exists`);
+        if (tab.windowId !== undefined) await api.windows.update(tab.windowId, { focused: true });
+      },
+      async closeWindow(windowId) {
+        await requireExtension().windows.remove(windowId);
+      },
+      async mergeWindows() {
+        const api = requireExtension();
+        const here = await api.windows.getCurrent();
+        if (here.id === undefined) throw new Error('The current window has no id');
+        const others = (await api.windows.getAll({ populate: true, windowTypes: ['normal'] })).filter((w) => w.id !== here.id);
+        for (const w of others) {
+          const ids = (w.tabs ?? []).flatMap((t) => (t.id === undefined ? [] : [t.id]));
+          if (ids.length > 0) await api.tabs.move(ids, { windowId: here.id, index: -1 });
+        }
+      },
+      watch(listener) {
+        const api = requireExtension();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        // Bursts (restoring a session opens many tabs) are collapsed into one refresh.
+        const fire = () => {
+          clearTimeout(timer);
+          timer = setTimeout(listener, 150);
+        };
+        const events = [
+          api.tabs.onCreated,
+          api.tabs.onRemoved,
+          api.tabs.onUpdated,
+          api.tabs.onMoved,
+          api.tabs.onAttached,
+          api.tabs.onDetached,
+          api.windows.onRemoved,
+        ];
+        for (const e of events) e.addListener(fire);
+        return () => {
+          clearTimeout(timer);
+          for (const e of events) e.removeListener(fire);
+        };
       },
       async closeTabs(ids) {
         await requireExtension().tabs.remove([...ids]);

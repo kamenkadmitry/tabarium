@@ -100,6 +100,41 @@ test('open all as a tab group, then replace the window tabs', async () => {
   await p.close();
 });
 
+test('open tabs panel: live list, drag into a collection, auto-close and merge windows', async () => {
+  const one = await app.context.newPage();
+  await one.goto(web('panel-one'));
+  const two = await app.context.newPage();
+  await two.goto(web('panel-two'));
+
+  const p = await openLibraryWithSpace('Panel');
+  await addCollectionWithLinks(p, 'Target', []);
+  const panel = p.getByRole('complementary', { name: 'Open tabs' });
+
+  // The list comes from the real browser and follows it.
+  await expect(panel.getByRole('button', { name: 'Page panel-one' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Page panel-two' })).toBeVisible();
+
+  // Drag a real tab into the collection; the tab stays open by default.
+  await panel.locator('[data-open-tab-id]', { hasText: 'Page panel-one' }).dragTo(p.locator('section[aria-label="Target"]'));
+  await expect(p.locator('section[aria-label="Target"] a[href="https://example.test/panel-one"]')).toBeVisible();
+  expect(one.isClosed()).toBe(false);
+
+  // With "close tabs after adding" the dragged tab is closed and leaves the panel.
+  await panel.getByLabel('Close tabs after adding them').check();
+  await panel.locator('[data-open-tab-id]', { hasText: 'Page panel-two' }).dragTo(p.locator('section[aria-label="Target"]'));
+  await expect(p.locator('section[aria-label="Target"] a[href="https://example.test/panel-two"]')).toBeVisible();
+  await expect.poll(() => two.isClosed()).toBe(true);
+  await expect(panel.getByRole('button', { name: 'Page panel-two' })).toHaveCount(0);
+
+  // A second window shows up as its own block; "Merge windows" pulls its tabs into this one.
+  await app.worker.evaluate(() => chrome.windows.create({ url: 'https://example.test/other-window' }));
+  await expect(panel.locator('section')).toHaveCount(2);
+  await panel.getByRole('button', { name: 'Merge windows' }).click();
+  await expect(panel.locator('section')).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: 'Page other-window' })).toBeVisible();
+  await p.close();
+});
+
 test('scheduled backup writes a file and records the time', async () => {
   const p = await app.context.newPage();
   await p.goto(library(app.extensionId));

@@ -1,17 +1,18 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { FolderPlus, Plus, Search, X } from 'lucide-react';
+import { FolderPlus, PanelRightOpen, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db, repo } from '../core/instance';
 import { groupTabs, suggestCollectionNames } from '../core/ai/tasks';
-import { loadSettings } from '../core/settings';
+import { loadSettings, updateSettings } from '../core/settings';
 import type { Card, Collection, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
 import { isAiConfigured, withProviderAccess } from './ai';
 import type { OpenTab } from '../platform/ports';
 import type { CardRowActions } from './CardRow';
 import { CardRow } from './CardRow';
-import { CollectionCard, type CollectionActions } from './CollectionCard';
+import type { CollectionActions } from './CollectionCard';
 import { AddLinkDialog } from './dialogs/AddLinkDialog';
+import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
 import { CardDialog } from './dialogs/CardDialog';
 import { MoveCardDialog } from './dialogs/MoveCardDialog';
@@ -19,9 +20,12 @@ import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
 import { DuplicatesView, NextView, SearchResults } from './LibraryViews';
+import { OpenTabsPanel } from './OpenTabsPanel';
 import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
+import { SpaceBoard } from './SpaceBoard';
 import { useLibraryData } from './useLibraryData';
+import { useOpenTabsController } from './useOpenTabsController';
 
 type DialogState =
   | { kind: 'space' }
@@ -33,6 +37,7 @@ type DialogState =
   | { kind: 'move'; card: Card }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
+  | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
 const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', settings: 'Settings' } as const;
@@ -72,6 +77,17 @@ export function App() {
     }
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
+
+  const panelEnabled = settings?.openTabsPanel !== false && view?.kind !== 'settings';
+  const tabsCtl = useOpenTabsController({
+    enabled: panelEnabled,
+    settings,
+    spaceId: view?.kind === 'space' ? view.spaceId : undefined,
+    run,
+  });
+  const newCollectionTitle = () => `Saved ${new Date().toLocaleDateString()}`;
+  const saveSetting = (what: string, patch: Parameters<typeof updateSettings>[1]) =>
+    void run(what, async () => void (await updateSettings(db, patch)));
 
   if (!data) return null;
   const { spaces, collections, cards, tags, nexts, cardsByCollection, cardById, collectionById } = data;
@@ -137,6 +153,7 @@ export function App() {
     }),
     card: cardActions,
     dropCard: (cardId, before) => void run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
+    dropTabs: (tabIds, before) => void tabsCtl.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),
     dropCollection: (id) => void run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
   });
 
@@ -196,6 +213,9 @@ export function App() {
         }}
         onManageTags={() => setDialog({ kind: 'tags' })}
         onDropCollection={(id, targetSpaceId) => void run('Moving collection', () => repo.moveCollection(id, targetSpaceId))}
+        onDropTabs={(tabIds, targetSpaceId) =>
+          void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId: targetSpaceId, title: newCollectionTitle() })
+        }
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
@@ -214,6 +234,16 @@ export function App() {
           )}
           {view?.kind === 'space' && (
             <div className="ml-auto flex items-center gap-2">
+              {settings?.openTabsPanel === false && (
+                <button
+                  type="button"
+                  aria-label="Show open tabs"
+                  onClick={() => saveSetting('Showing open tabs', { openTabsPanel: true })}
+                  className="grid size-10 place-items-center rounded-lg border border-line text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+                >
+                  <PanelRightOpen size={17} aria-hidden />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setDialog({ kind: 'collection' })}
@@ -274,41 +304,18 @@ export function App() {
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 
           {!searching && view?.kind === 'space' && (
-            <>
-              {spaceTags.length > 0 && (
-                <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by tag">
-                  {spaceTags.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      aria-pressed={tagFilter === t.id}
-                      onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
-                      className="flex h-8 items-center gap-2 rounded-full border border-line px-3 text-xs font-semibold aria-pressed:border-primary aria-pressed:bg-surface-2"
-                    >
-                      <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
-                      {t.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="columns-1 gap-5 space-y-5 md:columns-2 xl:columns-3">
-                {visibleCollections.map((col) => {
-                  const list = cardsByCollection.get(col.id) ?? [];
-                  return (
-                    <CollectionCard
-                      key={col.id}
-                      collection={col}
-                      cards={list}
-                      tags={tags.filter((t) => col.tagIds.includes(t.id))}
-                      actions={collectionActions(col, list)}
-                    />
-                  );
-                })}
-              </div>
-              {visibleCollections.length === 0 && (
-                <p className="mt-16 text-center text-muted">No collections here yet. Create one or save your open tabs.</p>
-              )}
-            </>
+            <SpaceBoard
+              collections={visibleCollections}
+              cardsByCollection={cardsByCollection}
+              tags={tags}
+              spaceTags={spaceTags}
+              tagFilter={tagFilter}
+              onTagFilter={setTagFilter}
+              collectionActions={collectionActions}
+              onDropTabsAsCollection={(tabIds) => {
+                if (spaceId) void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
+              }}
+            />
           )}
 
           {view === null && (
@@ -326,6 +333,29 @@ export function App() {
           )}
         </div>
       </main>
+
+      {panelEnabled && settings?.openTabsPanel !== false && (
+        <OpenTabsPanel
+          access={tabsCtl.access}
+          windows={tabsCtl.windows}
+          error={tabsCtl.error}
+          selected={tabsCtl.selected}
+          autoClose={settings?.autoCloseTabs ?? false}
+          aiReady={aiReady}
+          onGrant={() => void tabsCtl.grant()}
+          onHide={() => saveSetting('Hiding open tabs', { openTabsPanel: false })}
+          onMerge={tabsCtl.merge}
+          onFocus={tabsCtl.focus}
+          onCloseTab={tabsCtl.closeTab}
+          onCloseWindow={tabsCtl.closeWindow}
+          onToggle={tabsCtl.toggle}
+          onSaveWindow={tabsCtl.saveWindow}
+          onOrganiseWindow={tabsCtl.organiseWindow}
+          onAddSelected={() => setDialog({ kind: 'add-tabs', tabIds: [...tabsCtl.selected] })}
+          onClearSelection={tabsCtl.clear}
+          onAutoClose={(v) => saveSetting('Saving setting', { autoCloseTabs: v })}
+        />
+      )}
 
       {dialog?.kind === 'space' && (
         <PromptDialog
@@ -387,6 +417,23 @@ export function App() {
           currentCollectionId={dialog.card.collectionId}
           onClose={() => setDialog(null)}
           onSubmit={(target) => run('Moving tab', () => repo.moveCard(dialog.card.id, target))}
+        />
+      )}
+      {dialog?.kind === 'add-tabs' && (
+        <AddToCollectionDialog
+          count={dialog.tabIds.length}
+          spaces={spaces}
+          collections={collections}
+          newCollectionSpaceId={spaceId}
+          onClose={() => setDialog(null)}
+          onSubmit={(target) =>
+            tabsCtl.addTabs(
+              dialog.tabIds,
+              'collectionId' in target
+                ? { kind: 'collection', collectionId: target.collectionId, before: null }
+                : { kind: 'new', spaceId: spaceId as string, title: target.newTitle },
+            )
+          }
         />
       )}
       {dialog?.kind === 'ai-names' && (

@@ -19,6 +19,14 @@ export interface OpenOptions {
   groupTitle?: string;
 }
 
+export interface OpenWindow {
+  id: number;
+  /** The window that shows the library. */
+  current: boolean;
+  /** Saveable (http/https) tabs only, in tab-strip order. */
+  tabs: OpenTab[];
+}
+
 export interface PermissionsPort {
   has(capability: Capability): Promise<boolean>;
   /** Must be called from a user gesture (click handler). Resolves to whether the user granted it. */
@@ -37,6 +45,15 @@ export interface TabsPort {
   replaceWindowTabs(urls: readonly string[], options?: OpenOptions): Promise<void>;
   /** The focused tab of the current window, or null if it is not a web page. Works via `activeTab` when the popup opens. */
   getActiveTab(): Promise<OpenTab | null>;
+  /** All normal browser windows with their saveable tabs. Requires the `tabs` permission. */
+  listWindows(): Promise<OpenWindow[]>;
+  /** Brings a tab (and its window) to the front. */
+  focusTab(tabId: number): Promise<void>;
+  closeWindow(windowId: number): Promise<void>;
+  /** Moves the tabs of every other window into the current one and closes the emptied windows. */
+  mergeWindows(): Promise<void>;
+  /** Calls `listener` whenever tabs or windows change; returns an unsubscribe function. */
+  watch(listener: () => void): () => void;
   /** Opens (or focuses) the full Tabarium page. */
   openLibrary(): Promise<void>;
 }

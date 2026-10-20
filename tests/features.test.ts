@@ -83,6 +83,33 @@ describe('drag and drop moves', () => {
   });
 });
 
+describe('adding cards at a position', () => {
+  it('inserts several cards before an anchor in order and skips duplicates', async () => {
+    const { col, cards } = await seed();
+    const added = await repo.addCardsBefore(
+      col.id,
+      [
+        { title: 'N1', url: 'https://n1.dev' },
+        { title: 'dup of A', url: 'https://a.dev' },
+        { title: 'N2', url: 'https://n2.dev' },
+      ],
+      cards[1]!.id, // before B
+    );
+    expect(added.map((c) => c.title)).toEqual(['N1', 'N2']);
+    const order = (await db.cards.where('collectionId').equals(col.id).sortBy('position')).map((c) => c.title);
+    expect(order).toEqual(['A', 'N1', 'N2', 'B & <C>', 'C']);
+  });
+  it('appends when there is no anchor and rejects an anchor from another collection', async () => {
+    const { space, col } = await seed();
+    const other = await repo.createCollection(space.id, 'Other');
+    const [foreign] = await repo.addCards(other.id, [{ title: 'F', url: 'https://f.dev' }]);
+    await repo.addCardsBefore(col.id, [{ title: 'Z', url: 'https://z.dev' }], null);
+    expect((await db.cards.where('collectionId').equals(col.id).sortBy('position')).at(-1)?.title).toBe('Z');
+    await expect(repo.addCardsBefore(col.id, [{ title: 'Y', url: 'https://y.dev' }], foreign!.id)).rejects.toThrow(/not in collection/);
+    await expect(repo.addCardsBefore(col.id, [], 'missing')).rejects.toThrow(/not in collection/);
+  });
+});
+
 describe('tags', () => {
   it('assigns, validates and cleans up on delete', async () => {
     const { col } = await seed();

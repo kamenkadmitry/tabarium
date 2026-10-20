@@ -3,10 +3,15 @@ import type { DragEvent } from 'react';
 export type DragPayload =
   | { type: 'card'; id: string }
   | { type: 'collection'; id: string }
-  | { type: 'next'; id: string };
+  | { type: 'next'; id: string }
+  /** Browser tabs dragged out of the Open tabs panel (ids are browser tab ids). */
+  | { type: 'tabs'; tabIds: number[] };
 
 /** dataTransfer contents are unreadable during dragover, so the payload is kept here for the drag's duration. */
 let current: DragPayload | null = null;
+
+/** True while browser tabs from the Open tabs panel are being dragged. */
+export const isDraggingTabs = (): boolean => current?.type === 'tabs';
 
 export const getDragPayload = (): DragPayload | null => current;
 
@@ -17,7 +22,7 @@ export function dragSourceProps(payload: DragPayload) {
       e.stopPropagation();
       current = payload;
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', payload.id);
+      e.dataTransfer.setData('text/plain', payload.type === 'tabs' ? payload.tabIds.join(',') : payload.id);
     },
     onDragEnd: () => {
       current = null;

@@ -15,6 +15,10 @@ export const SettingsSchema = z.object({
   contextMenu: z.boolean().default(false),
   /** Open collections as browser tab groups (needs the optional `tabGroups` permission). */
   tabGroups: z.boolean().default(false),
+  /** Show the "Open tabs" side panel in the library. */
+  openTabsPanel: z.boolean().default(true),
+  /** Close browser tabs after they are added to a collection from the Open tabs panel. */
+  autoCloseTabs: z.boolean().default(false),
   ai: z.object({
     provider: z.enum(AI_PROVIDERS).nullable(),
     model: z.string(),
@@ -32,6 +36,8 @@ export const DEFAULT_SETTINGS: Settings = {
   quickSaveCollectionId: null,
   contextMenu: false,
   tabGroups: false,
+  openTabsPanel: true,
+  autoCloseTabs: false,
   ai: { provider: null, model: '', baseUrl: '', apiKey: '' },
 };
 

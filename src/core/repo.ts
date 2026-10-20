@@ -262,6 +262,24 @@ export class Repository {
     return [...groups.values()].filter((g) => g.length > 1);
   }
 
+  /**
+   * Adds cards and places them directly before `beforeCardId` (at the end when null), keeping their order.
+   * Used when tabs are dropped between two cards.
+   */
+  async addCardsBefore(collectionId: string, items: readonly NewCard[], beforeCardId: string | null): Promise<Card[]> {
+    if (beforeCardId !== null) {
+      const anchor = await this.db.cards.get(beforeCardId);
+      if (!anchor || anchor.collectionId !== collectionId) {
+        throw new Error(`Card ${beforeCardId} is not in collection ${collectionId}`);
+      }
+    }
+    const added = await this.addCards(collectionId, items);
+    if (beforeCardId !== null) {
+      for (const card of added) await this.moveCard(card.id, collectionId, beforeCardId);
+    }
+    return added;
+  }
+
   async deleteCollection(collectionId: string): Promise<void> {
     await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, async () => {
       const cardIds = await this.db.cards.where('collectionId').equals(collectionId).primaryKeys();

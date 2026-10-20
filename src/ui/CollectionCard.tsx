@@ -19,6 +19,8 @@ export interface CollectionActions {
   addAllToNext: () => void;
   card: (card: Card) => CardRowActions;
   dropCard: (cardId: string, beforeCardId: string | null) => void;
+  /** Browser tabs were dropped on this collection: add them before `beforeCardId` (end when null). */
+  dropTabs: (tabIds: number[], beforeCardId: string | null) => void;
   /** A collection was dropped onto this one: place it before this one. */
   dropCollection: (collectionId: string) => void;
 }
@@ -137,6 +139,7 @@ export function CollectionCard({ collection, cards, tags, actions }: Props) {
     clear();
     if (!payload) return;
     if (payload.type === 'card') actions.dropCard(payload.id, before);
+    else if (payload.type === 'tabs') actions.dropTabs(payload.tabIds, before);
     else if (payload.type === 'collection' && payload.id !== collection.id) actions.dropCollection(payload.id);
   };
 
