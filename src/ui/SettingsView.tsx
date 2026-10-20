@@ -2,7 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Eye, EyeOff, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
-import { db } from '../core/instance';
+import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
+import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
@@ -59,6 +60,7 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const platform = usePlatform();
   const settings = useLiveQuery(() => loadSettings(db), []);
   const fileInput = useRef<HTMLInputElement>(null);
+  const bookmarksInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
@@ -77,6 +79,21 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     await updateSettings(db, { lastBackupAt: Date.now() });
     setStatus(`Exported ${backup.cards.length} tabs in ${backup.collections.length} collections.`);
   });
+
+  const exportAs = (format: 'html' | 'txt') =>
+    guard('Export', async () => {
+      const backup = await exportBackup(db);
+      const base = backupFilename().replace(/\.json$/, '');
+      if (format === 'html') downloadTextFile(`${base}.html`, toBookmarksHtml(backup), 'text/html');
+      else downloadTextFile(`${base}.txt`, toPlainText(backup), 'text/plain');
+      setStatus(`Exported ${backup.cards.length} tabs as ${format.toUpperCase()}.`);
+    })();
+
+  const importBookmarks = async (file: File) => {
+    const imported = parseBookmarksHtml(await file.text());
+    const result = await repo.importStructure(imported);
+    setStatus(`Imported ${result.cards} tabs into ${result.collections} collections from ${file.name}.`);
+  };
 
   const importFile = async (file: File) => {
     const backup = parseBackup(await file.text());
@@ -132,6 +149,30 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
               const file = e.target.files?.[0];
               e.target.value = '';
               if (file) guard('Import', () => importFile(file))();
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+          <span className="mr-2 text-sm font-semibold">Other formats</span>
+          <button type="button" className={buttonClass} onClick={() => exportAs('html')}>
+            <Download size={16} aria-hidden /> Bookmarks (HTML)
+          </button>
+          <button type="button" className={buttonClass} onClick={() => exportAs('txt')}>
+            <Download size={16} aria-hidden /> Text
+          </button>
+          <button type="button" className={buttonClass} onClick={() => bookmarksInput.current?.click()}>
+            <Upload size={16} aria-hidden /> Import bookmarks (HTML)
+          </button>
+          <input
+            ref={bookmarksInput}
+            type="file"
+            accept="text/html,.html,.htm"
+            className="hidden"
+            aria-label="Bookmarks file"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) guard('Import', () => importBookmarks(file))();
             }}
           />
         </div>

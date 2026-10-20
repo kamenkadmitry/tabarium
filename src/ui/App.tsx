@@ -3,34 +3,46 @@ import { FolderPlus, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db, repo } from '../core/instance';
 import { loadSettings } from '../core/settings';
-import type { Card } from '../core/types';
+import type { Card, Collection, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
 import type { OpenTab } from '../platform/ports';
-import { CardRow, CollectionCard } from './CollectionCard';
+import type { CardRowActions } from './CardRow';
+import { CardRow } from './CardRow';
+import { CollectionCard, type CollectionActions } from './CollectionCard';
 import { AddLinkDialog } from './dialogs/AddLinkDialog';
+import { CardDialog } from './dialogs/CardDialog';
+import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
+import { TagsDialog } from './dialogs/TagsDialog';
+import { DuplicatesView, NextView, SearchResults } from './LibraryViews';
 import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
+import { useLibraryData } from './useLibraryData';
 
 type DialogState =
   | { kind: 'space' }
+  | { kind: 'rename-space'; space: Space }
   | { kind: 'collection' }
   | { kind: 'rename-collection'; id: string; title: string }
   | { kind: 'link'; collectionId: string; title: string }
+  | { kind: 'card'; card: Card }
+  | { kind: 'move'; card: Card }
+  | { kind: 'tags'; collectionId?: string }
   | { kind: 'session'; tabs: OpenTab[] };
+
+const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', settings: 'Settings' } as const;
 
 export function App() {
   const platform = usePlatform();
-  const spaces = useLiveQuery(() => db.spaces.orderBy('position').toArray(), []);
-  const collections = useLiveQuery(() => db.collections.orderBy('position').toArray(), []);
-  const cards = useLiveQuery(() => db.cards.orderBy('position').toArray(), []);
+  const data = useLibraryData();
+  const settings = useLiveQuery(() => loadSettings(db), []);
   const [view, setView] = useState<View | null>(null);
   const [query, setQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const settings = useLiveQuery(() => loadSettings(db), []);
   const theme = settings?.theme;
   useEffect(() => {
     if (theme === undefined) return;
@@ -38,16 +50,16 @@ export function App() {
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  const firstSpaceId = data?.spaces[0]?.id;
   useEffect(() => {
-    const first = spaces?.[0];
-    if (view === null && first) setView({ kind: 'space', spaceId: first.id });
-  }, [spaces, view]);
+    if (view === null && firstSpaceId) setView({ kind: 'space', spaceId: firstSpaceId });
+  }, [firstSpaceId, view]);
 
-  /** Runs a user-triggered action; expected failures are logged with context and shown to the user. */
   const reportError = (what: string, e: unknown) => {
     console.error(`Tabarium: ${what} failed`, e);
     setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
   };
+  /** Runs a user-triggered action; failures are logged with context and shown to the user. */
   const run = async (what: string, action: () => Promise<void>) => {
     try {
       setError(null);
@@ -56,27 +68,41 @@ export function App() {
       reportError(what, e);
     }
   };
+  const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
 
-  if (!spaces || !collections || !cards) return null;
+  if (!data) return null;
+  const { spaces, collections, cards, tags, nexts, cardsByCollection, cardById, collectionById } = data;
 
-  const cardsByCollection = new Map<string, Card[]>();
-  for (const c of cards) {
-    const list = cardsByCollection.get(c.collectionId) ?? [];
-    list.push(c);
-    cardsByCollection.set(c.collectionId, list);
-  }
-
-  const q = query.trim().toLowerCase();
   const activeSpace = view?.kind === 'space' ? spaces.find((s) => s.id === view.spaceId) : undefined;
-  const visible = collections
-    .filter((c) => activeSpace !== undefined && c.spaceId === activeSpace.id)
-    .map((c) => {
-      const all = cardsByCollection.get(c.id) ?? [];
-      const matching = q ? all.filter((x) => `${x.title} ${x.url}`.toLowerCase().includes(q)) : all;
-      return { collection: c, cards: matching, hit: q === '' || c.title.toLowerCase().includes(q) || matching.length > 0 };
-    })
-    .filter((x) => x.hit);
-  const starred = cards.filter((c) => c.starred);
+  const spaceId = activeSpace?.id;
+  const q = query.trim().toLowerCase();
+
+  const cardActions = (c: Card): CardRowActions => ({
+    onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
+    onDelete: act('Deleting tab', () => repo.deleteCard(c.id)),
+    onEdit: () => setDialog({ kind: 'card', card: c }),
+    onMove: () => setDialog({ kind: 'move', card: c }),
+    onNext: act('Adding to Next', async () => void (await repo.addToNext(c.id))),
+  });
+
+  const collectionActions = (col: Collection, list: readonly Card[]): CollectionActions => ({
+    addLink: () => setDialog({ kind: 'link', collectionId: col.id, title: col.title }),
+    openAll: act('Opening tabs', () => platform.tabs.openUrls(list.map((c) => c.url))),
+    rename: () => setDialog({ kind: 'rename-collection', id: col.id, title: col.title }),
+    remove: () => {
+      if (confirm(`Delete “${col.title}” and its ${list.length} tabs?`)) {
+        void run('Deleting collection', () => repo.deleteCollection(col.id));
+      }
+    },
+    editTags: () => setDialog({ kind: 'tags', collectionId: col.id }),
+    setColor: (color) => void run('Setting colour', () => repo.updateCollection(col.id, { color })),
+    addAllToNext: act('Adding to Next', async () => {
+      for (const c of list) await repo.addToNext(c.id);
+    }),
+    card: cardActions,
+    dropCard: (cardId, before) => void run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
+    dropCollection: (id) => void run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
+  });
 
   const openSaveSession = () =>
     run('Opening Save session', async () => {
@@ -86,50 +112,87 @@ export function App() {
       setDialog({ kind: 'session', tabs: await platform.tabs.listWindowTabs() });
     });
 
-  const openAll = (list: readonly Card[]) =>
-    run('Opening tabs', () => platform.tabs.openUrls(list.map((c) => c.url)));
+  const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''}`.toLowerCase().includes(q);
+  const searchGroups = collections
+    .map((col) => ({
+      collection: col,
+      space: spaces.find((s) => s.id === col.spaceId),
+      cards: (cardsByCollection.get(col.id) ?? []).filter(matching),
+    }))
+    .filter((g) => g.cards.length > 0);
 
-  const spaceId = activeSpace?.id;
-  const titleByKind = { starred: 'Starred', next: 'Next', settings: 'Settings' } as const;
-  const titleText = view && view.kind !== 'space' ? titleByKind[view.kind] : (activeSpace?.name ?? 'Library');
-  const showLibraryTools = view?.kind === 'space';
+  const visibleCollections = collections
+    .filter((c) => spaceId !== undefined && c.spaceId === spaceId)
+    .filter((c) => tagFilter === null || c.tagIds.includes(tagFilter));
+  const spaceTags = tags.filter((t) => collections.some((c) => c.spaceId === spaceId && c.tagIds.includes(t.id)));
+
+  const nextEntries = nexts.flatMap((item) => {
+    const card = cardById.get(item.cardId);
+    return card ? [{ item, card }] : [];
+  });
+
+  const title = view && view.kind !== 'space' ? TITLES[view.kind] : (activeSpace?.name ?? 'Library');
+  const searching = q !== '' && view?.kind !== 'settings';
+  const tagsDialogCollection = dialog?.kind === 'tags' && dialog.collectionId ? collectionById.get(dialog.collectionId) : undefined;
 
   return (
     <div className="flex h-full">
-      <Sidebar spaces={spaces} view={view} onSelect={setView} onCreateSpace={() => setDialog({ kind: 'space' })} />
+      <Sidebar
+        spaces={spaces}
+        view={view}
+        nextCount={nexts.filter((n) => n.state === 'todo').length}
+        duplicateCount={data.duplicates.length}
+        onSelect={(v) => {
+          setView(v);
+          setQuery('');
+          setTagFilter(null);
+        }}
+        onCreateSpace={() => setDialog({ kind: 'space' })}
+        onRenameSpace={(space) => setDialog({ kind: 'rename-space', space })}
+        onDeleteSpace={(space) => {
+          const n = collections.filter((c) => c.spaceId === space.id).length;
+          if (confirm(`Delete the space “${space.name}” with its ${n} collections and all their tabs?`)) {
+            void run('Deleting space', async () => {
+              await repo.deleteSpace(space.id);
+              if (view?.kind === 'space' && view.spaceId === space.id) setView(null);
+            });
+          }
+        }}
+        onManageTags={() => setDialog({ kind: 'tags' })}
+        onDropCollection={(id, targetSpaceId) => void run('Moving collection', () => repo.moveCollection(id, targetSpaceId))}
+      />
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
-          <h1 className="text-xl font-bold tracking-tight">{titleText}</h1>
-          {showLibraryTools && (
-          <label className="relative ml-4 max-w-md flex-1">
-            <span className="sr-only">Search tabs</span>
-            <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tabs and collections"
-              className="h-10 w-full rounded-lg border border-line bg-bg pl-9 pr-3 text-sm placeholder:text-muted"
-            />
-          </label>
+          <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+          {view?.kind !== 'settings' && (
+            <label className="relative ml-4 max-w-md flex-1">
+              <span className="sr-only">Search all tabs</span>
+              <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search all tabs, notes and links"
+                className="h-10 w-full rounded-lg border border-line bg-bg pl-9 pr-3 text-sm placeholder:text-muted"
+              />
+            </label>
           )}
-          {showLibraryTools && (
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              disabled={spaceId === undefined}
-              onClick={() => setDialog({ kind: 'collection' })}
-              className="flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2 disabled:opacity-50"
-            >
-              <FolderPlus size={16} aria-hidden /> New collection
-            </button>
-            <button
-              type="button"
-              onClick={() => void openSaveSession()}
-              className="flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90"
-            >
-              <Plus size={16} aria-hidden /> Save session
-            </button>
-          </div>
+          {view?.kind === 'space' && (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: 'collection' })}
+                className="flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
+              >
+                <FolderPlus size={16} aria-hidden /> New collection
+              </button>
+              <button
+                type="button"
+                onClick={() => void openSaveSession()}
+                className="flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90"
+              >
+                <Plus size={16} aria-hidden /> Save session
+              </button>
+            </div>
           )}
         </header>
 
@@ -143,46 +206,70 @@ export function App() {
         )}
 
         <div className="flex-1 overflow-y-auto p-6">
-          {view?.kind === 'starred' && (
+          {searching && <SearchResults groups={searchGroups} query={query.trim()} cardActions={cardActions} />}
+
+          {!searching && view?.kind === 'starred' && (
             <ul className="max-w-xl rounded-2xl border border-line bg-surface p-2">
-              {starred.map((c) => (
-                <CardRow
-                  key={c.id}
-                  card={c}
-                  onToggleStar={() => void run('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred }))}
-                  onDelete={() => void run('Deleting tab', () => repo.deleteCard(c.id))}
-                />
-              ))}
-              {starred.length === 0 && <li className="p-6 text-center text-sm text-muted">Star a tab to find it here.</li>}
+              {cards
+                .filter((c) => c.starred)
+                .map((c) => (
+                  <CardRow key={c.id} card={c} draggable={false} {...cardActions(c)} />
+                ))}
+              {!cards.some((c) => c.starred) && <li className="p-6 text-center text-sm text-muted">Star a tab to find it here.</li>}
             </ul>
+          )}
+
+          {!searching && view?.kind === 'next' && (
+            <NextView
+              entries={nextEntries}
+              onToggle={(item) => void run('Updating Next', () => repo.setNextState(item.id, item.state === 'done' ? 'todo' : 'done'))}
+              onRemove={(item) => void run('Updating Next', () => repo.removeFromNext(item.id))}
+              onMove={(id, before) => void run('Reordering Next', () => repo.moveNext(id, before))}
+            />
+          )}
+
+          {!searching && view?.kind === 'duplicates' && (
+            <DuplicatesView
+              groups={data.duplicates.map((g) => ({ ...g, collections: collectionById }))}
+              cardActions={cardActions}
+            />
           )}
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 
-          {view?.kind === 'next' &&<p className="mt-16 text-center text-muted">The Next queue is coming soon.</p>}
-
-          {view?.kind === 'space' && (
+          {!searching && view?.kind === 'space' && (
             <>
+              {spaceTags.length > 0 && (
+                <div className="mb-5 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by tag">
+                  {spaceTags.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      aria-pressed={tagFilter === t.id}
+                      onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
+                      className="flex h-8 items-center gap-2 rounded-full border border-line px-3 text-xs font-semibold aria-pressed:border-primary aria-pressed:bg-surface-2"
+                    >
+                      <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
+                      {t.title}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="columns-1 gap-5 space-y-5 md:columns-2 xl:columns-3">
-                {visible.map(({ collection, cards: list }) => (
-                  <CollectionCard
-                    key={collection.id}
-                    collection={collection}
-                    cards={list}
-                    onAddLink={() => setDialog({ kind: 'link', collectionId: collection.id, title: collection.title })}
-                    onOpenAll={() => void openAll(list)}
-                    onRename={() => setDialog({ kind: 'rename-collection', id: collection.id, title: collection.title })}
-                    onDelete={() => {
-                      if (confirm(`Delete “${collection.title}” and its ${list.length} tabs?`)) {
-                        void run('Deleting collection', () => repo.deleteCollection(collection.id));
-                      }
-                    }}
-                    onToggleStar={(c) => void run('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred }))}
-                    onDeleteCard={(c) => void run('Deleting tab', () => repo.deleteCard(c.id))}
-                  />
-                ))}
+                {visibleCollections.map((col) => {
+                  const list = cardsByCollection.get(col.id) ?? [];
+                  return (
+                    <CollectionCard
+                      key={col.id}
+                      collection={col}
+                      cards={list}
+                      tags={tags.filter((t) => col.tagIds.includes(t.id))}
+                      actions={collectionActions(col, list)}
+                    />
+                  );
+                })}
               </div>
-              {visible.length === 0 && (
+              {visibleCollections.length === 0 && (
                 <p className="mt-16 text-center text-muted">No collections here yet. Create one or save your open tabs.</p>
               )}
             </>
@@ -218,13 +305,23 @@ export function App() {
           }
         />
       )}
+      {dialog?.kind === 'rename-space' && (
+        <PromptDialog
+          title="Rename space"
+          label="Space name"
+          submitLabel="Save"
+          initialValue={dialog.space.name}
+          onClose={() => setDialog(null)}
+          onSubmit={(name) => run('Renaming space', () => repo.renameSpace(dialog.space.id, name))}
+        />
+      )}
       {dialog?.kind === 'collection' && spaceId && (
         <PromptDialog
           title="New collection"
           label="Collection name"
           submitLabel="Create"
           onClose={() => setDialog(null)}
-          onSubmit={(title) => run('Creating collection', async () => void (await repo.createCollection(spaceId, title)))}
+          onSubmit={(t) => run('Creating collection', async () => void (await repo.createCollection(spaceId, t)))}
         />
       )}
       {dialog?.kind === 'rename-collection' && (
@@ -234,7 +331,7 @@ export function App() {
           submitLabel="Save"
           initialValue={dialog.title}
           onClose={() => setDialog(null)}
-          onSubmit={(title) => run('Renaming collection', () => repo.updateCollection(dialog.id, { title }))}
+          onSubmit={(t) => run('Renaming collection', () => repo.updateCollection(dialog.id, { title: t }))}
         />
       )}
       {dialog?.kind === 'link' && (
@@ -242,6 +339,28 @@ export function App() {
           collectionTitle={dialog.title}
           onClose={() => setDialog(null)}
           onSubmit={(link) => run('Adding link', async () => void (await repo.addCards(dialog.collectionId, [link])))}
+        />
+      )}
+      {dialog?.kind === 'card' && (
+        <CardDialog card={dialog.card} onClose={() => setDialog(null)} onSubmit={(patch) => run('Saving tab', () => repo.updateCard(dialog.card.id, patch))} />
+      )}
+      {dialog?.kind === 'move' && (
+        <MoveCardDialog
+          spaces={spaces}
+          collections={collections}
+          currentCollectionId={dialog.card.collectionId}
+          onClose={() => setDialog(null)}
+          onSubmit={(target) => run('Moving tab', () => repo.moveCard(dialog.card.id, target))}
+        />
+      )}
+      {dialog?.kind === 'tags' && (
+        <TagsDialog
+          tags={tags}
+          collection={tagsDialogCollection}
+          onClose={() => setDialog(null)}
+          onCreate={(t, color) => run('Creating tag', async () => void (await repo.createTag(t, color)))}
+          onDelete={(id) => run('Deleting tag', () => repo.deleteTag(id))}
+          onAssign={(id, tagIds) => run('Updating tags', () => repo.setCollectionTags(id, tagIds))}
         />
       )}
       {dialog?.kind === 'session' && spaceId && (

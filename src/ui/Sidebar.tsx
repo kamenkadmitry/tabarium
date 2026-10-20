@@ -1,19 +1,33 @@
-import { Clock, Layers, Plus, Settings, Star } from 'lucide-react';
+import { Clock, Copy, Layers, Pencil, Plus, Settings, Star, Tag, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import type { Space } from '../core/types';
+import { endDrag, getDragPayload } from './dnd';
 
-export type View = { kind: 'space'; spaceId: string } | { kind: 'starred' } | { kind: 'next' } | { kind: 'settings' };
+export type View =
+  | { kind: 'space'; spaceId: string }
+  | { kind: 'starred' }
+  | { kind: 'next' }
+  | { kind: 'duplicates' }
+  | { kind: 'settings' };
 
 interface Props {
   spaces: readonly Space[];
   view: View | null;
+  nextCount: number;
+  duplicateCount: number;
   onSelect: (view: View) => void;
   onCreateSpace: () => void;
+  onRenameSpace: (space: Space) => void;
+  onDeleteSpace: (space: Space) => void;
+  onManageTags: () => void;
+  onDropCollection: (collectionId: string, spaceId: string) => void;
 }
 
 function NavButton(props: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
+  badge?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -26,12 +40,60 @@ function NavButton(props: {
       }`}
     >
       {props.icon}
-      <span className="truncate">{props.children}</span>
+      <span className="min-w-0 flex-1 truncate">{props.children}</span>
+      {props.badge ? (
+        <span className={`rounded-full px-2 text-xs font-semibold ${props.active ? 'bg-primary-fg/20' : 'bg-surface-2 text-muted'}`}>
+          {props.badge}
+        </span>
+      ) : null}
     </button>
   );
 }
 
-export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
+function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection'>) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      className={`group relative rounded-lg ${over ? 'ring-2 ring-primary' : ''}`}
+      onDragOver={(e) => {
+        if (getDragPayload()?.type === 'collection') {
+          e.preventDefault();
+          setOver(true);
+        }
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        const payload = endDrag();
+        if (payload?.type === 'collection') p.onDropCollection(payload.id, space.id);
+      }}
+    >
+      <NavButton
+        active={active}
+        onClick={() => p.onSelect({ kind: 'space', spaceId: space.id })}
+        icon={
+          <span className="grid size-5 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">
+            {space.name[0]?.toUpperCase()}
+          </span>
+        }
+      >
+        {space.name}
+      </NavButton>
+      <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+        <button type="button" aria-label={`Rename space ${space.name}`} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
+          <Pencil size={14} aria-hidden />
+        </button>
+        <button type="button" aria-label={`Delete space ${space.name}`} onClick={() => p.onDeleteSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-danger">
+          <Trash2 size={14} aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function Sidebar(props: Props) {
+  const { spaces, view } = props;
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-6 border-r border-line bg-surface p-4">
       <div className="flex items-center gap-2 px-1">
@@ -42,19 +104,14 @@ export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
       </div>
 
       <nav aria-label="Library" className="flex flex-col gap-1">
-        <NavButton
-          active={view?.kind === 'starred'}
-          onClick={() => onSelect({ kind: 'starred' })}
-          icon={<Star size={18} aria-hidden />}
-        >
+        <NavButton active={view?.kind === 'starred'} onClick={() => props.onSelect({ kind: 'starred' })} icon={<Star size={18} aria-hidden />}>
           Starred
         </NavButton>
-        <NavButton
-          active={view?.kind === 'next'}
-          onClick={() => onSelect({ kind: 'next' })}
-          icon={<Clock size={18} aria-hidden />}
-        >
+        <NavButton active={view?.kind === 'next'} onClick={() => props.onSelect({ kind: 'next' })} icon={<Clock size={18} aria-hidden />} badge={props.nextCount}>
           Next
+        </NavButton>
+        <NavButton active={view?.kind === 'duplicates'} onClick={() => props.onSelect({ kind: 'duplicates' })} icon={<Copy size={18} aria-hidden />} badge={props.duplicateCount}>
+          Duplicates
         </NavButton>
       </nav>
 
@@ -64,7 +121,7 @@ export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
           <button
             type="button"
             aria-label="Create space"
-            onClick={onCreateSpace}
+            onClick={props.onCreateSpace}
             className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
           >
             <Plus size={16} aria-hidden />
@@ -72,29 +129,27 @@ export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
         </div>
         <div className="flex flex-col gap-1 overflow-y-auto">
           {spaces.map((s) => (
-            <NavButton
+            <SpaceItem
               key={s.id}
+              space={s}
               active={view?.kind === 'space' && view.spaceId === s.id}
-              onClick={() => onSelect({ kind: 'space', spaceId: s.id })}
-              icon={
-                <span className="grid size-5 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">
-                  {s.name[0]?.toUpperCase()}
-                </span>
-              }
-            >
-              {s.name}
-            </NavButton>
+              onSelect={props.onSelect}
+              onRenameSpace={props.onRenameSpace}
+              onDeleteSpace={props.onDeleteSpace}
+              onDropCollection={props.onDropCollection}
+            />
           ))}
         </div>
       </nav>
 
-      <NavButton
-        active={view?.kind === 'settings'}
-        onClick={() => onSelect({ kind: 'settings' })}
-        icon={<Settings size={18} aria-hidden />}
-      >
-        Settings
-      </NavButton>
+      <div className="flex flex-col gap-1">
+        <NavButton active={false} onClick={props.onManageTags} icon={<Tag size={18} aria-hidden />}>
+          Tags
+        </NavButton>
+        <NavButton active={view?.kind === 'settings'} onClick={() => props.onSelect({ kind: 'settings' })} icon={<Settings size={18} aria-hidden />}>
+          Settings
+        </NavButton>
+      </div>
     </aside>
   );
 }
