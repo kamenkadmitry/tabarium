@@ -9,11 +9,12 @@ export function hostOf(url: string): string {
   return new URL(url).hostname.replace(/^www\./, '');
 }
 
-export function Favicon({ card, size = 20 }: { card: Card; size?: number }) {
-  const host = hostOf(card.url);
+/** The site's own icon when the browser gave us one, otherwise a coloured letter for the host. */
+export function PageFavicon({ url, favIconUrl, size = 20 }: { url: string; favIconUrl: string | null | undefined; size?: number }) {
+  const host = hostOf(url);
   const box = { width: size, height: size };
-  if (card.favIconUrl) {
-    return <img src={card.favIconUrl} alt="" style={box} className="shrink-0 rounded" />;
+  if (favIconUrl) {
+    return <img src={favIconUrl} alt="" style={box} className="shrink-0 rounded" />;
   }
   let hash = 0;
   for (const ch of host) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -26,6 +27,10 @@ export function Favicon({ card, size = 20 }: { card: Card; size?: number }) {
       {host[0]?.toUpperCase()}
     </span>
   );
+}
+
+export function Favicon({ card, size = 20 }: { card: Card; size?: number }) {
+  return <PageFavicon url={card.url} favIconUrl={card.favIconUrl} size={size} />;
 }
 
 const iconButton = 'grid size-8 place-items-center rounded-md text-muted transition-colors duration-150';

@@ -3,6 +3,7 @@ import { Layers, LibraryBig, X } from 'lucide-react';
 import { useState } from 'react';
 import { db } from '../core/instance';
 import { loadSettings, updateSettings } from '../core/settings';
+import type { Card } from '../core/types';
 import { usePlatform } from '../platform/context';
 import { GroupTabsView } from './quick/GroupTabsView';
 import { NextQueueView } from './quick/NextQueueView';
@@ -31,8 +32,8 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
 
   if (!settings || !spaces || !collections || !cards || !nexts) return null;
 
-  const cardCounts = new Map<string, number>();
-  for (const c of cards) cardCounts.set(c.collectionId, (cardCounts.get(c.collectionId) ?? 0) + 1);
+  const cardsByCollection = new Map<string, Card[]>();
+  for (const c of cards) cardsByCollection.set(c.collectionId, [...(cardsByCollection.get(c.collectionId) ?? []), c]);
 
   const chooseToolbar = async (quickPanel: 'side' | 'popup') => {
     try {
@@ -49,8 +50,8 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   };
 
   return (
-    <div className="flex min-h-full flex-col gap-4 p-4">
-      <header className="flex items-center gap-2">
+    <div className="flex h-full flex-col gap-4 p-4">
+      <header className="flex shrink-0 items-center gap-2">
         <div className="grid size-8 place-items-center rounded-lg bg-primary text-primary-fg">
           <Layers size={18} aria-hidden />
         </div>
@@ -65,7 +66,7 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
       </header>
 
       {surface === 'sidepanel' && settings.quickPanel === 'side' && !bannerDismissed && (
-        <p className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
+        <p className="flex shrink-0 items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
           <span className="flex-1">
             Prefer the classic popup?{' '}
             <button type="button" className="font-bold text-primary underline" onClick={() => void chooseToolbar('popup')}>
@@ -78,7 +79,7 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
         </p>
       )}
 
-      <div role="tablist" aria-label="Quick actions" className="grid grid-cols-3 rounded-xl bg-surface-2 p-1">
+      <div role="tablist" aria-label="Quick actions" className="grid shrink-0 grid-cols-3 rounded-xl bg-surface-2 p-1">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -98,31 +99,31 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
         ))}
       </div>
 
-      <div role="tabpanel">
+      <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
         {tab === 'save' && (
           <SaveTabView
             spaces={spaces}
             collections={collections}
-            cardCounts={cardCounts}
+            cardsByCollection={cardsByCollection}
             autoClose={settings.autoCloseTabs}
             onAutoClose={(v) => void updateSettings(db, { autoCloseTabs: v })}
             onStatus={setStatus}
           />
         )}
         {tab === 'group' && (
-          <GroupTabsView spaces={spaces} collections={collections} cardCounts={cardCounts} settings={settings} onStatus={setStatus} />
+          <GroupTabsView spaces={spaces} collections={collections} cardsByCollection={cardsByCollection} settings={settings} onStatus={setStatus} />
         )}
         {tab === 'next' && <NextQueueView nexts={nexts} cards={cards} onStatus={setStatus} />}
       </div>
 
       {status && (
-        <p role="status" className={`text-sm font-medium ${status.tone === 'ok' ? 'text-primary' : 'text-danger'}`}>
+        <p role="status" className={`shrink-0 text-sm font-medium ${status.tone === 'ok' ? 'text-primary' : 'text-danger'}`}>
           {status.text}
         </p>
       )}
 
       {surface === 'popup' && (
-        <button type="button" className="mt-auto self-start text-xs font-semibold text-primary underline" onClick={() => void chooseToolbar('side')}>
+        <button type="button" className="shrink-0 self-start text-xs font-semibold text-primary underline" onClick={() => void chooseToolbar('side')}>
           Open the toolbar button in the side panel instead
         </button>
       )}

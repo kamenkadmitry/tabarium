@@ -1,27 +1,9 @@
 import { FolderInput, Group, PanelRightClose, Shrink, Sparkles, X } from 'lucide-react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
+import { TabPill } from './TabPill';
 import type { TabsAccess } from './useOpenTabs';
-import { hostOf } from './CardRow';
 import { dragSourceProps } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
-
-const AVATAR_COLORS = ['#0d9488', '#ea580c', '#6366f1', '#a855f7', '#0284c7', '#db2777', '#65a30d'];
-
-function TabFavicon({ tab }: { tab: OpenTab }) {
-  if (tab.favIconUrl) return <img src={tab.favIconUrl} alt="" className="size-4 shrink-0 rounded-sm" />;
-  const host = hostOf(tab.url);
-  let hash = 0;
-  for (const ch of host) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return (
-    <span
-      aria-hidden
-      className="grid size-4 shrink-0 place-items-center rounded-sm text-[9px] font-bold text-white"
-      style={{ background: AVATAR_COLORS[hash % AVATAR_COLORS.length] }}
-    >
-      {host[0]?.toUpperCase()}
-    </span>
-  );
-}
 
 const iconButton =
   'grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent';
@@ -154,39 +136,15 @@ export function OpenTabsPanel(props: Props) {
                           // Dragging a selected tab takes the whole selection with it.
                           const tabIds = isSelected ? [...selected] : [t.id];
                           return (
-                            <li
+                            <TabPill
                               key={t.id}
-                              {...dragSourceProps({ type: 'tabs', tabIds })}
-                              data-open-tab-id={t.id}
-                              className={`group flex min-h-9 items-center gap-2 rounded-lg border px-2 transition-colors duration-150 ${
-                                isSelected ? 'border-primary bg-surface-2' : 'border-transparent bg-bg hover:bg-surface-2'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                aria-label={`Select ${t.title}`}
-                                checked={isSelected}
-                                onChange={() => props.onToggle(t.id)}
-                                className="size-3.5 shrink-0 accent-[var(--primary)]"
-                              />
-                              <TabFavicon tab={t} />
-                              <button
-                                type="button"
-                                title={`${t.title}\n${t.url}`}
-                                onClick={() => props.onFocus(t.id)}
-                                className="min-w-0 flex-1 truncate py-1.5 text-left text-xs font-medium"
-                              >
-                                {t.title}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Close tab ${t.title}`}
-                                onClick={() => props.onCloseTab(t.id)}
-                                className="grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-0 transition-opacity duration-150 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                              >
-                                <X size={13} aria-hidden />
-                              </button>
-                            </li>
+                              tab={t}
+                              selected={isSelected}
+                              onToggleSelect={() => props.onToggle(t.id)}
+                              onActivate={() => props.onFocus(t.id)}
+                              onClose={() => props.onCloseTab(t.id)}
+                              itemProps={dragSourceProps({ type: 'tabs', tabIds })}
+                            />
                           );
                         })}
                       </ul>

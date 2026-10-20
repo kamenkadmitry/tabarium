@@ -1,6 +1,8 @@
-import { ChevronLeft, ChevronRight, FolderPlus, Layers } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers } from 'lucide-react';
 import { useState } from 'react';
-import type { Collection, Space } from '../../core/types';
+import type { Card, Collection, Space } from '../../core/types';
+import { normalizeUrl } from '../../core/url';
+import { Favicon } from '../CardRow';
 import { inputClass } from '../Dialog';
 
 export type Destination =
@@ -10,8 +12,10 @@ export type Destination =
 interface Props {
   spaces: readonly Space[];
   collections: readonly Collection[];
-  /** Number of saved tabs per collection id, shown next to the name. */
-  cardCounts?: ReadonlyMap<string, number>;
+  /** Saved tabs per collection id: shown as a count, and as a list when the collection is expanded. */
+  cardsByCollection?: ReadonlyMap<string, readonly Card[]>;
+  /** Address of the tab being saved; collections that already hold it get a check mark. */
+  currentUrl?: string | null;
   /** Filters collections across all spaces when not empty. */
   query: string;
   /** Offer "New collection…" inside a space. */
@@ -25,14 +29,27 @@ const row =
   'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors duration-150 hover:bg-surface-2';
 
 /** Spaces list that drills into a space's collections, or a flat search over all collections. */
-export function DestinationPicker({ spaces, collections, query, cardCounts, allowNew = true, pickSpace = false, onPick }: Props) {
+export function DestinationPicker({ spaces, collections, query, cardsByCollection, currentUrl, allowNew = true, pickSpace = false, onPick }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   const [title, setTitle] = useState('');
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const holdsCurrent = (id: string) => {
+    if (!currentUrl) return false;
+    const key = normalizeUrl(currentUrl);
+    return (cardsByCollection?.get(id) ?? []).some((c) => normalizeUrl(c.url) === key);
+  };
   const spaceName = (id: string) => spaces.find((s) => s.id === id)?.name ?? '';
   const q = query.trim().toLowerCase();
   const countOf = (id: string) => {
-    const n = cardCounts?.get(id);
+    const n = cardsByCollection?.get(id)?.length;
     return n === undefined ? '' : ` · ${n} tab${n === 1 ? '' : 's'}`;
   };
 
@@ -139,21 +156,55 @@ export function DestinationPicker({ spaces, collections, query, cardCounts, allo
           </li>
         )}
         {!pickSpace &&
-          inSpace.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                className={row}
-                onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${open.name} / ${c.title}` })}
-              >
-                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: c.color ?? 'var(--border)' }} />
-                <span className="min-w-0 flex-1 truncate">
-                  {c.title}
-                  <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
-                </span>
-              </button>
-            </li>
-          ))}
+          inSpace.map((c) => {
+            const isOpen = expanded.has(c.id);
+            const saved = holdsCurrent(c.id);
+            return (
+              <li key={c.id}>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    aria-label={isOpen ? `Hide tabs of ${c.title}` : `Show tabs of ${c.title}`}
+                    aria-expanded={isOpen}
+                    onClick={() => toggleExpanded(c.id)}
+                    className="grid size-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2"
+                  >
+                    {isOpen ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${row} min-w-0 flex-1 pl-1`}
+                    onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${open.name} / ${c.title}` })}
+                  >
+                    <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: c.color ?? 'var(--border)' }} />
+                    <span className="min-w-0 flex-1 truncate">
+                      {c.title}
+                      <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
+                    </span>
+                    {saved && <Check size={16} aria-label="This tab is already saved here" className="shrink-0 text-accent" />}
+                  </button>
+                </div>
+                {isOpen && (
+                  <ul aria-label={`Tabs in ${c.title}`} className="mb-1 ml-9 flex flex-col gap-1">
+                    {(cardsByCollection?.get(c.id) ?? []).map((card) => (
+                      <li key={card.id}>
+                        <a
+                          href={card.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex h-9 items-center gap-2 rounded-xl bg-surface-2 px-2.5 text-xs font-medium transition-colors duration-150 hover:bg-line"
+                        >
+                          <Favicon card={card} size={16} />
+                          <span className="min-w-0 flex-1 truncate">{card.customTitle ?? card.title}</span>
+                        </a>
+                      </li>
+                    ))}
+                    {(cardsByCollection?.get(c.id) ?? []).length === 0 && <li className="px-2 py-1 text-xs text-muted">Empty.</li>}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         {!pickSpace && inSpace.length === 0 && <li className="px-3 py-3 text-center text-sm text-muted">No collections in this space yet.</li>}
       </ul>
     </div>

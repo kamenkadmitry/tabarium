@@ -27,11 +27,11 @@ async function openInBackground(urls: readonly string[], options?: OpenOptions):
 
 const isWebUrl = (url: string | undefined): url is string => url !== undefined && /^https?:\/\//.test(url);
 
-function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string; groupId?: number }): OpenTab | null {
+function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string; groupId?: number; active?: boolean }): OpenTab | null {
   if (t.id === undefined || !isWebUrl(t.url)) return null;
   // Chrome reports -1 for tabs that are not in a group.
   const groupId = t.groupId !== undefined && t.groupId >= 0 ? t.groupId : undefined;
-  return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null, ...(groupId !== undefined && { groupId }) };
+  return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null, active: t.active === true, ...(groupId !== undefined && { groupId }) };
 }
 
 export function createChromePlatform(): Platform {

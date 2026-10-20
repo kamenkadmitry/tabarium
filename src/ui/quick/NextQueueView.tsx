@@ -47,16 +47,16 @@ export function NextQueueView({ nexts, cards, onStatus }: Props) {
     });
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <button
         type="button"
         disabled={busy}
         onClick={() => void addCurrent()}
-        className="flex h-11 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+        className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
       >
         <Clock size={16} aria-hidden /> Add this tab to Next
       </button>
-      <ul aria-label="Next queue" className="flex flex-col gap-0.5">
+      <ul aria-label="Next queue" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {entries.map(({ item, card }) => (
           <li key={item.id} className="flex min-h-11 items-center gap-3 rounded-lg px-2 hover:bg-surface-2">
             <button

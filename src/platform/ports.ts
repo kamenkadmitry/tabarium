@@ -15,6 +15,8 @@ export interface OpenTab {
   favIconUrl: string | null;
   /** Browser tab group this tab belongs to, when it is in one. */
   groupId?: number;
+  /** The tab that is currently shown in its window. */
+  active?: boolean;
 }
 
 export interface TabGroupInfo {
