@@ -19,10 +19,12 @@ interface Props {
   onDropTabsAsCollection: (tabIds: number[]) => void;
 }
 
+// Columns have a minimum width instead of a fixed count: a collection header needs about 19rem for its
+// title, counter and buttons, and the Open tabs panel can take a lot of the page.
 const LAYOUT: Record<BoardView, string> = {
-  grid: 'columns-1 gap-5 space-y-5 md:columns-2 xl:columns-3',
-  compact: 'columns-1 gap-4 space-y-4 md:columns-2 2xl:columns-4',
-  card: 'grid grid-cols-1 gap-5 xl:grid-cols-2',
+  grid: 'columns-[19rem] gap-5 space-y-5',
+  compact: 'columns-[16rem] gap-4 space-y-4',
+  card: 'grid grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] gap-5',
   list: 'flex flex-col gap-3',
 };
 
