@@ -32,7 +32,7 @@ export async function suggestCollectionNames(config: AiConfig, pages: readonly P
     {
       system: 'You name bookmark collections. Reply with only a JSON array of 3 short names (max 4 words each), no commentary.',
       prompt: `Suggest names for a collection containing:\n${list(pages.slice(0, 40))}`,
-      maxTokens: 200,
+      maxTokens: 600,
     },
     fetchImpl,
   );
@@ -61,7 +61,7 @@ export async function groupTabs(config: AiConfig, pages: readonly PageRef[], fet
         'You organise browser tabs into topic groups. Reply with only JSON: [{"title":"Group name","tabs":[1,2]}]. ' +
         'Use the tab numbers given, put each tab in exactly one group, use 2 to 6 groups, keep names under 4 words.',
       prompt: `Group these tabs:\n${list(pages.slice(0, 80))}`,
-      maxTokens: 1200,
+      maxTokens: 2400,
     },
     fetchImpl,
   );
@@ -81,8 +81,12 @@ export async function groupTabs(config: AiConfig, pages: readonly PageRef[], fet
   return groups;
 }
 
-/** Cheap call used by the "Test connection" button. */
+/**
+ * Cheap call used by the "Test connection" button. A successful HTTP answer proves the key, model and network
+ * work, so a reply without text (a reasoning model that used its small budget) still counts as connected.
+ */
 export async function testConnection(config: AiConfig, fetchImpl?: FetchLike): Promise<void> {
-  const answer = await complete(config, { system: 'Reply with the single word: ok', prompt: 'ping', maxTokens: 16 }, fetchImpl);
-  if (answer.trim() === '') throw new AiError('The provider returned an empty answer.');
+  await complete(config, { system: 'Reply with the single word: ok', prompt: 'ping', maxTokens: 64 }, fetchImpl, {
+    allowEmpty: true,
+  });
 }

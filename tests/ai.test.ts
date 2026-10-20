@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AiError, assertConfigured, complete, detectProviderFromKey, type FetchLike, providerOrigin } from '../src/core/ai/client';
-import { extractJson, groupTabs, suggestCollectionNames } from '../src/core/ai/tasks';
+import { extractJson, groupTabs, suggestCollectionNames, testConnection } from '../src/core/ai/tasks';
 import type { Settings } from '../src/core/settings';
 
 type Ai = Settings['ai'];
@@ -64,9 +64,29 @@ describe('provider requests', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('rejects empty answers', async () => {
-    const { fetch } = fakeFetch(openaiReply('  '));
-    await expect(complete(cfg({}), { system: 's', prompt: 'p' }, fetch)).rejects.toThrow(/empty answer/);
+  it('rejects empty answers and explains why', async () => {
+    const { fetch } = fakeFetch({ choices: [{ message: { content: '' }, finish_reason: 'length' }] });
+    await expect(complete(cfg({}), { system: 's', prompt: 'p' }, fetch)).rejects.toThrow(/no text \(finish reason: length\).*non-reasoning/);
+  });
+
+  it('treats a null content (tool-style or reasoning replies) as empty, not a crash', async () => {
+    const { fetch } = fakeFetch({ choices: [{ message: { content: null }, finish_reason: 'stop' }] });
+    await expect(complete(cfg({}), { system: 's', prompt: 'p' }, fetch)).rejects.toThrow(/no text/);
+  });
+
+  it('can accept an empty answer when only the round trip matters', async () => {
+    const { fetch } = fakeFetch(openaiReply(''));
+    expect(await complete(cfg({}), { system: 's', prompt: 'p' }, fetch, { allowEmpty: true })).toBe('');
+  });
+
+  it('openai gets max_completion_tokens, other providers keep max_tokens', async () => {
+    const a = fakeFetch(openaiReply('x'));
+    await complete(cfg({ provider: 'openai' }), { system: 's', prompt: 'p', maxTokens: 50 }, a.fetch);
+    expect(a.calls[0]?.body).toMatchObject({ max_completion_tokens: 50 });
+    expect(a.calls[0]?.body).not.toHaveProperty('max_tokens');
+    const b = fakeFetch(openaiReply('x'));
+    await complete(cfg({ provider: 'openrouter' }), { system: 's', prompt: 'p', maxTokens: 50 }, b.fetch);
+    expect(b.calls[0]?.body).toMatchObject({ max_tokens: 50 });
   });
 });
 
@@ -123,6 +143,17 @@ describe('tasks', () => {
       { title: 'Second', indexes: [2] },
       { title: 'Other', indexes: [3] },
     ]);
+  });
+
+  it('connection test succeeds on a reply with no text', async () => {
+    const { fetch, calls } = fakeFetch({ choices: [{ message: { content: '' }, finish_reason: 'length' }] });
+    await expect(testConnection(cfg({ provider: 'openrouter' }), fetch)).resolves.toBeUndefined();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('connection test still fails on provider errors', async () => {
+    const { fetch } = fakeFetch('{"error":"bad key"}', 401);
+    await expect(testConnection(cfg({}), fetch)).rejects.toMatchObject({ status: 401 });
   });
 
   it('refuses to call the model for empty input', async () => {

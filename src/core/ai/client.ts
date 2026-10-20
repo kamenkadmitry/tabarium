@@ -111,7 +111,7 @@ function buildRequest(config: AiConfig & { provider: NonNullable<AiConfig['provi
         headers: { 'content-type': 'application/json', authorization: `Bearer ${config.apiKey}` },
         body: {
           model: config.model,
-          max_tokens: maxTokens,
+          ...(config.provider === 'openai' ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
           messages: [
             { role: 'system', content: req.system },
             { role: 'user', content: req.prompt },
@@ -121,25 +121,44 @@ function buildRequest(config: AiConfig & { provider: NonNullable<AiConfig['provi
   }
 }
 
-function extractText(provider: NonNullable<AiConfig['provider']>, data: unknown): string {
+interface Extracted {
+  text: string;
+  /** Why the model stopped (e.g. "stop" or "length"), when the provider says. */
+  finishReason: string | null;
+}
+
+function extractText(provider: NonNullable<AiConfig['provider']>, data: unknown): Extracted {
   const d = data as Record<string, unknown>;
   let text: unknown;
+  let finish: unknown;
   if (provider === 'anthropic') {
     const content = d.content as { type?: string; text?: string }[] | undefined;
     text = content?.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
+    finish = d.stop_reason;
   } else if (provider === 'google') {
-    const candidates = d.candidates as { content?: { parts?: { text?: string }[] } }[] | undefined;
+    const candidates = d.candidates as { content?: { parts?: { text?: string }[] }; finishReason?: string }[] | undefined;
     text = candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('');
+    finish = candidates?.[0]?.finishReason;
   } else {
-    const choices = d.choices as { message?: { content?: string } }[] | undefined;
-    text = choices?.[0]?.message?.content;
+    const choices = d.choices as { message?: { content?: string | null }; finish_reason?: string }[] | undefined;
+    text = choices?.[0]?.message?.content ?? '';
+    finish = choices?.[0]?.finish_reason;
   }
-  if (typeof text !== 'string' || text.trim() === '') throw new AiError('The provider returned an empty answer.');
-  return text;
+  return { text: typeof text === 'string' ? text : '', finishReason: typeof finish === 'string' ? finish : null };
+}
+
+export interface CompleteOptions {
+  /** Accept a reply with no text. Used by the connection test, where an answer arriving at all is the proof. */
+  allowEmpty?: boolean;
 }
 
 /** Sends one prompt to the configured provider. No retries: a failure is reported to the user as it is. */
-export async function complete(config: AiConfig, req: AiRequest, fetchImpl: FetchLike = fetch): Promise<string> {
+export async function complete(
+  config: AiConfig,
+  req: AiRequest,
+  fetchImpl: FetchLike = fetch,
+  options: CompleteOptions = {},
+): Promise<string> {
   assertConfigured(config);
   const { url, headers, body } = buildRequest(config, req);
   const response = await fetchImpl(url, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -147,5 +166,12 @@ export async function complete(config: AiConfig, req: AiRequest, fetchImpl: Fetc
     const detail = (await response.text()).slice(0, 300);
     throw new AiError(`${config.provider} responded with ${response.status}${detail ? `: ${detail}` : ''}`, response.status);
   }
-  return extractText(config.provider, await response.json());
+  const { text, finishReason } = extractText(config.provider, await response.json());
+  if (text.trim() === '' && !options.allowEmpty) {
+    const why = finishReason ? ` (finish reason: ${finishReason})` : '';
+    throw new AiError(
+      `The model returned no text${why}. Reasoning models can spend their whole token budget thinking; try a non-reasoning model.`,
+    );
+  }
+  return text;
 }
