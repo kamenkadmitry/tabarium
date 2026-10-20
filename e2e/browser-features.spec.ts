@@ -16,7 +16,9 @@ const library = (id: string) => `chrome-extension://${id}/newtab.html`;
 async function openLibraryWithSpace(name: string): Promise<Page> {
   const p = await app.context.newPage();
   await p.goto(library(app.extensionId));
-  await p.getByRole('button', { name: 'Create your first space' }).click();
+  const first = p.getByRole('button', { name: 'Create your first space' });
+  if ((await first.count()) > 0) await first.click();
+  else await p.getByRole('button', { name: 'Create space' }).click();
   await p.getByLabel('Space name').fill(name);
   await p.getByRole('button', { name: 'Create', exact: true }).click();
   return p;
@@ -90,8 +92,16 @@ test('scheduled backup writes a file and records the time', async () => {
   await app.worker.evaluate(() => chrome.alarms.create('tabarium-auto-backup', { when: Date.now() + 300 }));
   await expect(p.getByText(/Last backup:/)).toBeVisible({ timeout: 20_000 });
 
-  const downloads = await app.worker.evaluate(() => chrome.downloads.search({}));
-  expect(downloads.some((d) => d.filename.includes('tabarium-backup-'))).toBe(true);
+  const summary = () =>
+    app.worker.evaluate(async () =>
+      (await chrome.downloads.search({})).map((d) => ({ url: d.url.slice(0, 40), file: d.filename, state: d.state, error: d.error })),
+    );
+  await expect
+    .poll(async () => (await summary()).some((d) => d.url.startsWith('data:application/json') && d.state !== 'interrupted'), {
+      message: `downloads seen: ${JSON.stringify(await summary())}`,
+      timeout: 15_000,
+    })
+    .toBe(true);
   await p.close();
 });
 
