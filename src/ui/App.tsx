@@ -85,9 +85,28 @@ export function App() {
     onNext: act('Adding to Next', async () => void (await repo.addToNext(c.id))),
   });
 
+  const groupOptions = (col: Collection) => (settings?.tabGroups ? { groupTitle: col.title } : undefined);
+
   const collectionActions = (col: Collection, list: readonly Card[]): CollectionActions => ({
     addLink: () => setDialog({ kind: 'link', collectionId: col.id, title: col.title }),
-    openAll: act('Opening tabs', () => platform.tabs.openUrls(list.map((c) => c.url))),
+    openAll: act('Opening tabs', () =>
+      platform.tabs.openUrls(
+        list.map((c) => c.url),
+        groupOptions(col),
+      ),
+    ),
+    replaceWindow: () => {
+      if (!confirm(`Close the other tabs in this window and open “${col.title}” instead?`)) return;
+      void run('Replacing window tabs', async () => {
+        if (!(await platform.permissions.request('tabs'))) {
+          throw new Error('Tabarium needs the "tabs" permission to replace the tabs of this window.');
+        }
+        await platform.tabs.replaceWindowTabs(
+          list.map((c) => c.url),
+          groupOptions(col),
+        );
+      });
+    },
     rename: () => setDialog({ kind: 'rename-collection', id: col.id, title: col.title }),
     remove: () => {
       if (confirm(`Delete “${col.title}” and its ${list.length} tabs?`)) {

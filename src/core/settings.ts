@@ -10,6 +10,11 @@ export const SettingsSchema = z.object({
     intervalHours: z.number().int().min(1).max(24 * 30),
   }),
   lastBackupAt: z.number().int().nullable(),
+  /** Collection used by the popup, side panel and context menu. Null until the first quick save. */
+  quickSaveCollectionId: z.string().nullable().default(null),
+  contextMenu: z.boolean().default(false),
+  /** Open collections as browser tab groups (needs the optional `tabGroups` permission). */
+  tabGroups: z.boolean().default(false),
   ai: z.object({
     provider: z.enum(AI_PROVIDERS).nullable(),
     model: z.string(),
@@ -24,6 +29,9 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   autoBackup: { enabled: false, intervalHours: 24 },
   lastBackupAt: null,
+  quickSaveCollectionId: null,
+  contextMenu: false,
+  tabGroups: false,
   ai: { provider: null, model: '', baseUrl: '', apiKey: '' },
 };
 

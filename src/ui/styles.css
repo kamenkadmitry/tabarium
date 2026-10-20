@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/manrope';
 
 /* Design tokens: flat, teal primary, orange action. Light by default, dark via prefers-color-scheme. */
 :root {
@@ -61,7 +61,7 @@
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-danger: var(--danger);
-  --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+  --font-sans: 'Manrope Variable', system-ui, sans-serif;
 }
 
 html,

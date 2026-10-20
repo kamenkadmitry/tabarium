@@ -27,6 +27,9 @@ export function createDemoPlatform(): Platform {
         tabs = tabs.filter((t) => !ids.includes(t.id));
       },
       openUrls: async () => undefined,
+      replaceWindowTabs: async () => undefined,
+      getActiveTab: async () => DEMO_TABS[2] ?? null,
+      openLibrary: async () => undefined,
     },
   };
 }

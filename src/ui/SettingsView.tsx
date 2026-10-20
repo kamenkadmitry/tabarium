@@ -116,6 +116,25 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       setStatus(enabled ? 'Auto-backup enabled. Files are saved to Downloads/Tabarium.' : 'Auto-backup disabled.');
     })();
 
+  const setContextMenu = (enabled: boolean) =>
+    guard('Right-click menu', async () => {
+      if (enabled && !(await platform.permissions.request('contextMenus'))) {
+        throw new Error('The right-click menu needs the "contextMenus" permission.');
+      }
+      await updateSettings(db, { contextMenu: enabled });
+      await platform.backupSchedule.resync();
+      setStatus(enabled ? 'Right-click menu enabled.' : 'Right-click menu disabled.');
+    })();
+
+  const setTabGroups = (enabled: boolean) =>
+    guard('Tab groups', async () => {
+      if (enabled && !(await platform.permissions.request('tabGroups'))) {
+        throw new Error('Tab groups need the "tabGroups" permission.');
+      }
+      await updateSettings(db, { tabGroups: enabled });
+      setStatus(enabled ? 'Collections will open as tab groups.' : 'Collections will open as plain tabs.');
+    })();
+
   const saveAi = guard('Saving AI settings', async () => {
     if (aiDraft === null) return;
     await updateSettings(db, { ai: aiDraft });
@@ -203,6 +222,23 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             label="Automatic backup"
             onChange={(v) => setAutoBackup(v, settings.autoBackup.intervalHours)}
           />
+        </div>
+      </Section>
+
+      <Section title="Browser integration" description="Save pages without opening the library. Each feature asks for its own permission.">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Right-click menu</p>
+            <p className="text-xs text-muted">Adds “Save page”, “Save link” and “Save all tabs” to the browser menu.</p>
+          </div>
+          <Switch checked={settings.contextMenu} label="Right-click menu" onChange={setContextMenu} />
+        </div>
+        <div className="flex items-center gap-4 border-t border-line pt-4">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Open collections as tab groups</p>
+            <p className="text-xs text-muted">“Open all” puts the tabs in a named browser tab group.</p>
+          </div>
+          <Switch checked={settings.tabGroups} label="Open collections as tab groups" onChange={setTabGroups} />
         </div>
       </Section>
 

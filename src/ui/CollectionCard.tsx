@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Tag } from '../core/types';
 import { CardRow, type CardRowActions } from './CardRow';
@@ -8,6 +8,8 @@ import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 export interface CollectionActions {
   addLink: () => void;
   openAll: () => void;
+  /** Close the other tabs of this window and open this collection instead. */
+  replaceWindow: () => void;
   rename: () => void;
   remove: () => void;
   editTags: () => void;
@@ -52,6 +54,9 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
     <div ref={ref} role="menu" className="absolute right-3 top-12 z-10 w-56 rounded-xl border border-line bg-surface p-1">
       <button role="menuitem" type="button" onClick={run(actions.rename)} className={menuItem}>
         <Pencil size={15} aria-hidden /> Rename
+      </button>
+      <button role="menuitem" type="button" onClick={run(actions.replaceWindow)} className={menuItem}>
+        <RefreshCw size={15} aria-hidden /> Replace window tabs
       </button>
       <button role="menuitem" type="button" onClick={run(actions.editTags)} className={menuItem}>
         <TagIcon size={15} aria-hidden /> Tags…
