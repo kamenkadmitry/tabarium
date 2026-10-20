@@ -19,6 +19,8 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Finding things | Search across all spaces including notes; Duplicates view |
 | Restoring | Open all, open as a browser tab group, or replace the current window's tabs |
 | Data | JSON backup/restore, Netscape bookmarks HTML export and import, plain-text export |
+| Toby files | Import Toby exports (.json v4 and older, .txt, .html) with notes, custom titles and tags; export a Toby-compatible .json |
+| AI (optional) | Suggest a collection name, group a session's tabs into collections, connection test; your provider and key |
 | Appearance | Light, dark or system theme |
 
 ## Install (from source)
@@ -39,6 +41,7 @@ Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked** 
 | `contextMenus` | Enabling the right-click menu in Settings | Save page, link or window from the browser menu |
 | `alarms`, `downloads` | Enabling automatic backup in Settings | Run on a schedule and write backup files |
 | `tabGroups` | Enabling "Open collections as tab groups" | Group the tabs of an opened collection |
+| One web origin (your AI provider) | First AI action or "Test connection" | Send the prompt to the provider you configured |
 
 ## Privacy
 
@@ -52,6 +55,7 @@ npm run typecheck
 npm run lint
 npm test            # unit tests (Vitest, fake-indexeddb)
 npm run test:e2e    # builds, then drives the real extension in Chromium (Playwright)
+                    # uses an `e2e` build that grants permissions up front so no prompt blocks the run
 ```
 
 Layout:
