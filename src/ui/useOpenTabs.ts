@@ -10,6 +10,8 @@ export function useOpenTabs(enabled: boolean) {
   const [access, setAccess] = useState<TabsAccess>('checking');
   const [windows, setWindows] = useState<OpenWindow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Whether the optional `tabGroups` permission is granted, which is what makes browser tab groups visible. */
+  const [groupsAccess, setGroupsAccess] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -24,9 +26,12 @@ export function useOpenTabs(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    platform.permissions
-      .has('tabs')
-      .then((has) => alive && setAccess(has ? 'granted' : 'needed'))
+    Promise.all([platform.permissions.has('tabs'), platform.permissions.has('tabGroups')])
+      .then(([has, groups]) => {
+        if (!alive) return;
+        setAccess(has ? 'granted' : 'needed');
+        setGroupsAccess(groups);
+      })
       .catch((e: unknown) => {
         console.error('Tabarium: checking the tabs permission failed', e);
         if (alive) setAccess('needed');
@@ -58,5 +63,18 @@ export function useOpenTabs(enabled: boolean) {
     }
   }, [platform]);
 
-  return { access, windows, error, grant, refresh };
+  /** Also needs a click. Shows the groups the user already made in the browser. */
+  const grantGroups = useCallback(async () => {
+    try {
+      if (await platform.permissions.request('tabGroups')) {
+        setGroupsAccess(true);
+        await refresh();
+      } else setError('Tabarium needs the "tabGroups" permission to show browser tab groups.');
+    } catch (e) {
+      console.error('Tabarium: requesting the tabGroups permission failed', e);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [platform, refresh]);
+
+  return { access, groupsAccess, windows, error, grant, grantGroups, refresh };
 }

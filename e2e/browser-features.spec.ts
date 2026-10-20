@@ -137,6 +137,33 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   await p.close();
 });
 
+test('open tabs panel: width is adjustable by dragging its edge and is remembered', async () => {
+  const p = await openLibraryWithSpace('Resize');
+  const panel = p.getByRole('complementary', { name: 'Open tabs' });
+  const handle = panel.getByRole('separator', { name: 'Resize the open tabs panel' });
+  const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
+
+  expect(await width()).toBe(288);
+  const box = await handle.boundingBox();
+  if (!box) throw new Error('The resize handle is not visible');
+  const y = box.y + box.height / 2;
+  await p.mouse.move(box.x + box.width / 2, y);
+  await p.mouse.down();
+  await p.mouse.move(box.x + box.width / 2 - 100, y, { steps: 5 });
+  await p.mouse.up();
+  await expect.poll(width).toBeGreaterThan(370);
+
+  // Keyboard: the arrow keys on the focused handle change it too, and the value is saved across reloads.
+  await handle.focus();
+  await p.keyboard.press('ArrowLeft');
+  const saved = await width();
+  await expect.poll(() => handle.getAttribute('aria-valuenow')).toBe(String(saved));
+  await p.reload();
+  await p.getByRole('button', { name: /^R\s*Resize/ }).first().click();
+  await expect.poll(async () => Math.round((await p.getByRole('complementary', { name: 'Open tabs' }).boundingBox())?.width ?? 0)).toBe(saved);
+  await p.close();
+});
+
 test('open tabs panel: shows browser tab groups, groups a selection, finds open tabs in search', async () => {
   const x = await app.context.newPage();
   await x.goto(web('grp-x'));
@@ -314,9 +341,12 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await expect(popup.getByText('This page cannot be saved')).toBeVisible();
 
   await popup.getByRole('tab', { name: 'Group tabs' }).click();
-  await popup.getByRole('button', { name: 'Show tabs of this window' }).click();
+  // The tabs are listed straight away, no button to press.
   await expect(popup.getByText('Page popup-a')).toBeVisible();
   await expect(popup.getByText('Page popup-b')).toBeVisible();
+  // Nothing is ticked by default; "Select all" ticks everything.
+  await expect(popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ })).toBeDisabled();
+  await popup.getByLabel('Select all').check();
   await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
   await popup.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).click(); // space row
   await popup.getByRole('button', { name: 'Quick target', exact: true }).click(); // collection row (not its expander)

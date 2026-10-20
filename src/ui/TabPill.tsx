@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
 import type { OpenTab } from '../platform/ports';
-import { PageFavicon } from './CardRow';
+import { hostOf, PageFavicon } from './CardRow';
 
 interface Props {
   tab: OpenTab;
@@ -11,6 +11,8 @@ interface Props {
   /** Click on the title, e.g. to switch to the tab. */
   onActivate?: () => void;
   onClose?: () => void;
+  /** "roomy" is the larger two-line chip used in the side panel and popup. */
+  size?: 'compact' | 'roomy';
   /** Extra props for the <li>, e.g. drag handlers. */
   itemProps?: HTMLAttributes<HTMLLIElement>;
 }
@@ -19,7 +21,8 @@ interface Props {
  * A browser tab as a rounded chip: the site's icon and the page title. The focused tab of a window is
  * highlighted, hovering reveals a selection checkbox (in place of the icon) and a close button.
  */
-export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, itemProps }: Props) {
+export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, size = 'compact', itemProps }: Props) {
+  const roomy = size === 'roomy';
   const selectable = selected !== undefined && onToggleSelect !== undefined;
   const title = tab.title || tab.url;
   return (
@@ -27,13 +30,15 @@ export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, it
       {...itemProps}
       data-open-tab-id={tab.id}
       aria-current={tab.active ? 'true' : undefined}
-      className={`group flex h-9 items-center gap-2 rounded-xl border px-2.5 text-xs font-medium transition-colors duration-150 ${
+      className={`group flex items-center gap-3 rounded-xl border font-medium transition-colors duration-150 ${
+        roomy ? 'min-h-12 px-3 py-1.5 text-sm' : 'h-9 gap-2 px-2.5 text-xs'
+      } ${
         selected ? 'border-primary bg-surface-2' : tab.active ? 'border-line bg-surface-2' : 'border-transparent bg-bg hover:bg-surface-2'
       }`}
     >
       <span className="relative grid size-5 shrink-0 place-items-center">
         <span className={selectable ? (selected ? 'opacity-0' : 'transition-opacity duration-100 group-hover:opacity-0') : ''}>
-          <PageFavicon url={tab.url} favIconUrl={tab.favIconUrl} size={16} />
+          <PageFavicon url={tab.url} favIconUrl={tab.favIconUrl} size={roomy ? 20 : 16} />
         </span>
         {selectable && (
           <input
@@ -48,12 +53,14 @@ export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, it
         )}
       </span>
       {onActivate ? (
-        <button type="button" title={`${title}\n${tab.url}`} onClick={onActivate} className={`min-w-0 flex-1 truncate py-1.5 text-left ${tab.active ? 'font-bold' : ''}`}>
-          {title}
+        <button type="button" title={`${title}\n${tab.url}`} onClick={onActivate} className={`min-w-0 flex-1 text-left ${roomy ? '' : 'py-1.5'} ${tab.active ? 'font-bold' : ''}`}>
+          <span className="block truncate">{title}</span>
+          {roomy && <span className="block truncate text-xs font-normal text-muted">{hostOf(tab.url)}</span>}
         </button>
       ) : (
-        <span title={`${title}\n${tab.url}`} className={`min-w-0 flex-1 truncate ${tab.active ? 'font-bold' : ''}`}>
-          {title}
+        <span title={`${title}\n${tab.url}`} className={`min-w-0 flex-1 ${tab.active ? 'font-bold' : ''}`}>
+          <span className="block truncate">{title}</span>
+          {roomy && <span className="block truncate text-xs font-normal text-muted">{hostOf(tab.url)}</span>}
         </span>
       )}
       {onClose && (

@@ -1,14 +1,19 @@
-import { FolderInput, Group, PanelRightClose, Shrink, Sparkles, X } from 'lucide-react';
+import { Group, PanelRightClose, Shrink } from 'lucide-react';
+import { useRef } from 'react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
-import { TabPill } from './TabPill';
+import { TabsByWindow } from './TabsByWindow';
 import type { TabsAccess } from './useOpenTabs';
-import { dragSourceProps } from './dnd';
-import { GROUP_COLORS, segmentTabs } from './openTabsModel';
 
 const iconButton =
   'grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent';
 
 interface Props {
+  /** Current width in pixels. */
+  width: number;
+  /** Called continuously while the edge is dragged. */
+  onResize: (width: number) => void;
+  /** Called once when dragging ends, with the final width, so it can be saved. */
+  onResizeEnd: (width: number) => void;
   access: TabsAccess;
   windows: readonly OpenWindow[];
   error: string | null;
@@ -31,16 +36,49 @@ interface Props {
   onAutoClose: (value: boolean) => void;
 }
 
-function windowName(w: OpenWindow, index: number, total: number): string {
-  if (w.current) return total > 1 ? 'This window' : 'Open tabs';
-  return `Window ${index + 1}`;
-}
+export const PANEL_MIN_WIDTH = 220;
+export const PANEL_MAX_WIDTH = 640;
+const clampWidth = (w: number) => Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(w)));
 
 export function OpenTabsPanel(props: Props) {
   const { windows, selected } = props;
+  const dragging = useRef(false);
+
+  const keyResize = (e: React.KeyboardEvent) => {
+    // The panel is on the right, so moving its left edge to the left makes it wider.
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === 'ArrowLeft') props.onResizeEnd(clampWidth(props.width + step));
+    else if (e.key === 'ArrowRight') props.onResizeEnd(clampWidth(props.width - step));
+    else return;
+    e.preventDefault();
+  };
 
   return (
-    <aside aria-label="Open tabs" className="hidden w-72 shrink-0 flex-col border-l border-line bg-surface lg:flex">
+    <aside aria-label="Open tabs" style={{ width: props.width }} className="relative hidden shrink-0 flex-col border-l border-line bg-surface lg:flex">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the open tabs panel"
+        aria-valuemin={PANEL_MIN_WIDTH}
+        aria-valuemax={PANEL_MAX_WIDTH}
+        aria-valuenow={props.width}
+        tabIndex={0}
+        onKeyDown={keyResize}
+        onPointerDown={(e) => {
+          dragging.current = true;
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (dragging.current) props.onResize(clampWidth(window.innerWidth - e.clientX));
+        }}
+        onPointerUp={(e) => {
+          if (!dragging.current) return;
+          dragging.current = false;
+          e.currentTarget.releasePointerCapture(e.pointerId);
+          props.onResizeEnd(clampWidth(window.innerWidth - e.clientX));
+        }}
+        className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize transition-colors duration-150 hover:bg-primary/30 focus-visible:bg-primary/40"
+      />
       <header className="flex items-center gap-1 border-b border-line px-3 py-3">
         <button type="button" aria-label="Hide open tabs" onClick={props.onHide} className={iconButton}>
           <PanelRightClose size={17} aria-hidden />
@@ -74,86 +112,20 @@ export function OpenTabsPanel(props: Props) {
           <p className="px-2 py-6 text-center text-sm text-muted">No open tabs. Tabs you open will show up here.</p>
         )}
 
-        {props.access === 'granted' &&
-          windows.map((w, index) => {
-            const name = windowName(w, index, windows.length);
-            return (
-              <section key={w.id} aria-label={name} className="mb-5">
-                <div className="flex items-center gap-1 px-2">
-                  <h3 className="flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted">{name}</h3>
-                  {!w.current && (
-                    <button type="button" aria-label={`Close ${name}`} onClick={() => props.onCloseWindow(w.id)} className={`${iconButton} size-6`}>
-                      <X size={14} aria-hidden />
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 px-2 pb-1.5">
-                  <span className="flex-1 text-xs text-muted">
-                    {w.tabs.length} tab{w.tabs.length === 1 ? '' : 's'}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Save ${name} as a collection`}
-                    disabled={w.tabs.length === 0}
-                    onClick={() => props.onSaveWindow(w, name)}
-                    className={`${iconButton} size-7`}
-                  >
-                    <FolderInput size={15} aria-hidden />
-                  </button>
-                  {props.aiReady && (
-                    <button
-                      type="button"
-                      aria-label={`Organise ${name} with AI`}
-                      disabled={w.tabs.length === 0}
-                      onClick={() => props.onOrganiseWindow(w)}
-                      className={`${iconButton} size-7`}
-                    >
-                      <Sparkles size={15} aria-hidden />
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  {segmentTabs(w).map((run, runIndex) => (
-                    <div key={`${run.group?.id ?? 'none'}-${runIndex}`} role={run.group ? 'group' : undefined} aria-label={run.group ? `Tab group ${run.group.title || 'untitled'}` : undefined}>
-                      {run.group && (
-                        <div className="mb-1 flex items-center gap-2 px-2 pt-1">
-                          <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: GROUP_COLORS[run.group.color] ?? GROUP_COLORS.grey }} />
-                          <span className="min-w-0 flex-1 truncate text-xs font-semibold">{run.group.title || 'Group'}</span>
-                          <span className="text-xs text-muted">{run.tabs.length}</span>
-                          <button
-                            type="button"
-                            aria-label={`Save group ${run.group.title || 'untitled'} as a collection`}
-                            onClick={() => props.onSaveGroup(run.tabs, run.group?.title || 'Group')}
-                            className={`${iconButton} size-6`}
-                          >
-                            <FolderInput size={13} aria-hidden />
-                          </button>
-                        </div>
-                      )}
-                      <ul className={`flex flex-col gap-1 ${run.group ? 'ml-2 border-l-2 pl-1.5' : ''}`} style={run.group ? { borderColor: GROUP_COLORS[run.group.color] ?? GROUP_COLORS.grey } : undefined}>
-                        {run.tabs.map((t) => {
-                          const isSelected = selected.has(t.id);
-                          // Dragging a selected tab takes the whole selection with it.
-                          const tabIds = isSelected ? [...selected] : [t.id];
-                          return (
-                            <TabPill
-                              key={t.id}
-                              tab={t}
-                              selected={isSelected}
-                              onToggleSelect={() => props.onToggle(t.id)}
-                              onActivate={() => props.onFocus(t.id)}
-                              onClose={() => props.onCloseTab(t.id)}
-                              itemProps={dragSourceProps({ type: 'tabs', tabIds })}
-                            />
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+        {props.access === 'granted' && (
+          <TabsByWindow
+            windows={windows}
+            selected={selected}
+            draggable
+            onToggle={props.onToggle}
+            onFocus={props.onFocus}
+            onCloseTab={props.onCloseTab}
+            onCloseWindow={props.onCloseWindow}
+            onSaveWindow={props.onSaveWindow}
+            onSaveGroup={props.onSaveGroup}
+            onOrganiseWindow={props.aiReady ? props.onOrganiseWindow : undefined}
+          />
+        )}
       </div>
 
       {selected.size > 0 && (

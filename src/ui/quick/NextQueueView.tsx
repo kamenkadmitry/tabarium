@@ -5,6 +5,7 @@ import { quickSave } from '../../core/quicksave';
 import type { Card, NextItem } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { hostOf } from '../CardRow';
+import { useActiveTab } from './useActiveTab';
 
 interface Props {
   nexts: readonly NextItem[];
@@ -15,6 +16,7 @@ interface Props {
 /** The Next queue, plus a button that saves the current tab and queues it. */
 export function NextQueueView({ nexts, cards, onStatus }: Props) {
   const platform = usePlatform();
+  const { hasAccess, allow } = useActiveTab();
   const [busy, setBusy] = useState(false);
   const byId = new Map(cards.map((c) => [c.id, c]));
   const entries = nexts.flatMap((n) => {
@@ -37,6 +39,8 @@ export function NextQueueView({ nexts, cards, onStatus }: Props) {
 
   const addCurrent = () =>
     run('Adding to Next', async () => {
+      // Without the "tabs" permission the address of the current tab is hidden; ask first (this runs from a click).
+      if (!hasAccess && !(await allow())) throw new Error('Tabarium needs the "tabs" permission to see which page you are on.');
       const tab = await platform.tabs.getActiveTab();
       if (!tab) throw new Error('This page cannot be saved (only http and https pages can).');
       await quickSave(db, [{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);

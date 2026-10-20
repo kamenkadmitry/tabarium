@@ -7,7 +7,8 @@ import type { Settings } from '../../core/settings';
 import type { Card, Collection, Space } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import type { OpenTab } from '../../platform/ports';
-import { TabPill } from '../TabPill';
+import { TabsByWindow } from '../TabsByWindow';
+import { useOpenTabs } from '../useOpenTabs';
 import { isAiConfigured, withProviderAccess } from '../ai';
 import { type Destination, DestinationPicker } from './DestinationPicker';
 
@@ -24,7 +25,8 @@ type Mode = 'idle' | 'save' | 'ai';
 /** Saves the tabs of this window together: into one collection, or split into topic collections by AI. */
 export function GroupTabsView({ spaces, collections, cardsByCollection, settings, onStatus }: Props) {
   const platform = usePlatform();
-  const [tabs, setTabs] = useState<OpenTab[] | null>(null);
+  const { access, groupsAccess, windows, error, grant, grantGroups } = useOpenTabs(true);
+  // Nothing is selected until the user picks tabs (or ticks "Select all").
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const [mode, setMode] = useState<Mode>('idle');
   const [busy, setBusy] = useState(false);
@@ -35,21 +37,9 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
     onStatus({ tone: 'error', text: `${what} failed: ${e instanceof Error ? e.message : String(e)}` });
   };
 
-  const load = async () => {
-    onStatus(null);
-    try {
-      if (!(await platform.permissions.request('tabs'))) {
-        throw new Error('Tabarium needs the "tabs" permission to read the tabs of this window.');
-      }
-      const list = await platform.tabs.listWindowTabs();
-      setTabs(list);
-      setSelected(new Set(list.map((t) => t.id)));
-    } catch (e) {
-      fail('Reading tabs', e);
-    }
-  };
-
-  const chosen = (tabs ?? []).filter((t) => selected.has(t.id));
+  const allTabs = windows.flatMap((w) => w.tabs);
+  const chosen = allTabs.filter((t) => selected.has(t.id));
+  const allSelected = allTabs.length > 0 && chosen.length === allTabs.length;
   const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
 
   const finish = async (message: string) => {
@@ -93,41 +83,61 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
     }
   };
 
-  if (tabs === null) {
+  if (access !== 'granted') {
     return (
       <div className="px-2 py-6 text-center">
-        <p className="text-sm text-muted">Save all the tabs of this window at once.</p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="mt-4 h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
-        >
-          Show tabs of this window
-        </button>
+        <p className="text-sm text-muted">{access === 'checking' ? 'Reading your tabs…' : 'Save all the tabs of a window at once.'}</p>
+        {access === 'needed' && (
+          <button
+            type="button"
+            onClick={() => void grant()}
+            className="mt-4 h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
+          >
+            Allow Tabarium to see your open tabs
+          </button>
+        )}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </div>
     );
   }
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col gap-4 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
-      <ul aria-label="Tabs of this window" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        {tabs.map((t) => (
-          <TabPill
-            key={t.id}
-            tab={t}
-            selected={selected.has(t.id)}
-            onToggleSelect={() =>
-              setSelected((prev) => {
-                const next = new Set(prev);
-                if (next.has(t.id)) next.delete(t.id);
-                else next.add(t.id);
-                return next;
-              })
-            }
+      <div className="flex shrink-0 items-center justify-between gap-2 px-1">
+        <label className="flex min-h-9 items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            disabled={allTabs.length === 0}
+            onChange={() => setSelected(allSelected ? new Set() : new Set(allTabs.map((t) => t.id)))}
+            className="size-4 accent-[var(--primary)]"
           />
-        ))}
-        {tabs.length === 0 && <li className="p-4 text-center text-sm text-muted">No web pages are open in this window.</li>}
-      </ul>
+          Select all
+        </label>
+        {!groupsAccess && (
+          <button type="button" onClick={() => void grantGroups()} className="text-xs font-semibold text-primary underline">
+            Show browser tab groups
+          </button>
+        )}
+      </div>
+      <div aria-label="Tabs to save" className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <TabsByWindow
+          windows={windows}
+          selected={selected}
+          size="roomy"
+          onToggle={(id) =>
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            })
+          }
+        />
+        {chosen.length === 0 && windows.every((w) => w.tabs.length === 0) && (
+          <p className="p-4 text-center text-sm text-muted">No web pages are open.</p>
+        )}
+      </div>
 
       {mode === 'idle' ? (
         <div className="flex shrink-0 flex-col gap-2">

@@ -54,6 +54,8 @@ export function App() {
   const [selectedView, setView] = useState<View | null>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<BoardFilter>(NO_FILTER);
+  /** Width while (and after) the panel edge is dragged; falls back to the saved width. */
+  const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -326,6 +328,12 @@ export function App() {
 
       {panelEnabled && settings?.openTabsPanel !== false && (
         <OpenTabsPanel
+          width={liveWidth ?? settings?.openTabsWidth ?? 288}
+          onResize={setLiveWidth}
+          onResizeEnd={(w) => {
+            setLiveWidth(w);
+            saveSetting('Saving the panel width', { openTabsWidth: w });
+          }}
           access={tabsCtl.access}
           windows={tabsCtl.windows}
           error={tabsCtl.error}

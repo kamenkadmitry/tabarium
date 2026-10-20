@@ -23,6 +23,8 @@ export const SettingsSchema = z.object({
   /** How collections are laid out, remembered per space. A space without an entry uses "grid". */
   boardView: z.record(z.string(), z.enum(BOARD_VIEWS)).default({}),
   boardSort: z.enum(BOARD_SORTS).default('custom'),
+  /** Width in pixels of the Open tabs panel in the library; the user drags its left edge to change it. */
+  openTabsWidth: z.number().int().min(200).max(720).default(288),
   /** Show the "Open tabs" side panel in the library. */
   openTabsPanel: z.boolean().default(true),
   /** Close browser tabs after they are added to a collection from the Open tabs panel. */
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quickPanel: 'side',
   boardView: {},
   boardSort: 'custom',
+  openTabsWidth: 288,
   openTabsPanel: true,
   autoCloseTabs: false,
   ai: { provider: null, model: '', baseUrl: '', apiKey: '' },
