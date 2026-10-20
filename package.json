@@ -1,0 +1,32 @@
+{
+  "name": "tabarium",
+  "version": "0.1.0",
+  "description": "Local-first tab and session manager. No account, no server.",
+  "private": true,
+  "type": "module",
+  "license": "MPL-2.0",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "dexie": "4.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/chrome": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@wxt-dev/module-react": "1.2.2",
+    "fake-indexeddb": "6.2.6",
+    "typescript": "latest",
+    "vitest": "5.0.5",
+    "wxt": "0.21.4"
+  }
+}
