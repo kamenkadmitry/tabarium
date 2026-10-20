@@ -13,7 +13,8 @@ test.afterAll(async () => {
 
 test('the shipped build starts with only non-warning permissions', async () => {
   const granted = await app.worker.evaluate(() => chrome.permissions.getAll());
-  expect(new Set(granted.permissions)).toEqual(new Set(['activeTab', 'sidePanel']));
+  // `newTabPageOverride` is added by Chrome itself for the new tab page and shows no install warning.
+  expect(new Set(granted.permissions)).toEqual(new Set(['activeTab', 'sidePanel', 'newTabPageOverride']));
   expect(granted.origins ?? []).toEqual([]);
 
   for (const permission of ['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history']) {
