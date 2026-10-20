@@ -58,6 +58,16 @@ npm run test:e2e    # builds, then drives the real extension in Chromium (Playwr
                     # uses an `e2e` build that grants permissions up front so no prompt blocks the run
 ```
 
+### Manual checks that automation cannot do
+
+Automated tests cannot click browser permission prompts or native menus, and they never use a real AI key.
+Before a release, load `.output/chrome-mv3` as an unpacked extension and check once:
+
+1. **Prompts.** "Save session" asks for *Read your browsing history*/tabs access; Settings → Right-click menu, Automatic backup and Tab groups each ask for their permission. Declining shows a clear message and changes nothing.
+2. **Right-click menu.** Enable it in Settings, then right-click a page and a link: "Save page", "Save link" and "Save all tabs" appear, and saved items land in Inbox → Saved tabs.
+3. **Live AI.** Enter a real key in Settings, press "Test connection", then use "Suggest name (AI)" and "Organise with AI".
+4. **Scheduled backup.** Enable it; a file appears in `Downloads/Tabarium` after about a minute.
+
 Layout:
 
 - `src/core` — data model (Zod schemas), IndexedDB access (Dexie), repository, ordering, backup, formats. No browser-extension APIs.
