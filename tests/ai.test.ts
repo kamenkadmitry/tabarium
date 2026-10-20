@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AiError, assertConfigured, complete, type FetchLike, providerOrigin } from '../src/core/ai/client';
+import { AiError, assertConfigured, complete, detectProviderFromKey, type FetchLike, providerOrigin } from '../src/core/ai/client';
 import { extractJson, groupTabs, suggestCollectionNames } from '../src/core/ai/tasks';
 import type { Settings } from '../src/core/settings';
 
@@ -80,6 +80,18 @@ describe('configuration checks', () => {
   it('reports the origin to request access for', () => {
     expect(providerOrigin(cfg({ provider: 'anthropic' }))).toBe('https://api.anthropic.com');
     expect(providerOrigin(cfg({ provider: 'custom', baseUrl: 'https://llm.example.com/v1' }))).toBe('https://llm.example.com');
+  });
+});
+
+describe('key prefix detection', () => {
+  it('recognises well-known prefixes and stays silent otherwise', () => {
+    expect(detectProviderFromKey('sk-or-v1-abc')).toBe('openrouter');
+    expect(detectProviderFromKey('sk-ant-api03-abc')).toBe('anthropic');
+    expect(detectProviderFromKey('AIzaSyabc')).toBe('google');
+    expect(detectProviderFromKey('sk-proj-abc')).toBe('openai');
+    expect(detectProviderFromKey('  sk-or-x  ')).toBe('openrouter');
+    expect(detectProviderFromKey('custom-token')).toBeNull();
+    expect(detectProviderFromKey('')).toBeNull();
   });
 });
 

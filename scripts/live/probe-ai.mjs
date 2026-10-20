@@ -1,0 +1,20 @@
+// Reproduces "AI key saved but nothing works" in the live Chrome (profile with the extension loaded).
+import { chromium } from '@playwright/test';
+const id = process.argv[2];
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
+const [context] = browser.contexts();
+const page = await context.newPage();
+const logs = [];
+page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`));
+page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`));
+await page.goto(`chrome-extension://${id}/newtab.html`);
+await page.waitForTimeout(800);
+console.log('start text:', (await page.locator('body').innerText()).slice(0, 200).replace(/\n/g, ' | '));
+await page.getByRole('button', { name: 'Settings' }).click();
+const provider = page.locator('select:has(option:text("OpenAI"))');
+console.log('current provider value:', await provider.inputValue());
+console.log('model value:', await page.getByLabel('Model').inputValue().catch(() => '(field hidden)'));
+console.log('test button disabled:', await page.getByRole('button', { name: 'Test connection' }).isDisabled());
+await page.screenshot({ path: '../toby-clone/live-settings.png' });
+console.log(logs.join('\n') || 'no console output');
+await browser.close();

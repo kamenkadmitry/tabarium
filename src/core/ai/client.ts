@@ -29,6 +29,19 @@ const ENDPOINTS = {
 
 const GOOGLE_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/**
+ * Guesses which provider a key belongs to from its well-known prefix, or null when it is not recognisable.
+ * Used only to warn about a likely mismatch; the user's selection is never changed silently.
+ */
+export function detectProviderFromKey(key: string): Exclude<AiConfig['provider'], 'custom' | null> | null {
+  const k = key.trim();
+  if (k.startsWith('sk-ant-')) return 'anthropic';
+  if (k.startsWith('sk-or-')) return 'openrouter';
+  if (k.startsWith('AIza')) return 'google';
+  if (k.startsWith('sk-')) return 'openai';
+  return null;
+}
+
 /** A config is usable only when every field the chosen provider needs is filled in. */
 export function assertConfigured(config: AiConfig): asserts config is AiConfig & { provider: NonNullable<AiConfig['provider']> } {
   if (config.provider === null) throw new AiError('AI is turned off. Choose a provider in Settings.');

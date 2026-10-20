@@ -8,6 +8,7 @@ import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
+import { detectProviderFromKey } from '../core/ai/client';
 import { testConnection } from '../core/ai/tasks';
 import { isAiConfigured, withProviderAccess } from './ai';
 import { inputClass } from './Dialog';
@@ -18,6 +19,15 @@ const PROVIDER_LABELS: Record<(typeof AI_PROVIDERS)[number], string> = {
   google: 'Google (Gemini)',
   openrouter: 'OpenRouter',
   custom: 'Custom (OpenAI-compatible)',
+};
+
+/** Suggested model per provider, offered when the field is empty. The value stays visible and editable. */
+const SUGGESTED_MODELS: Record<(typeof AI_PROVIDERS)[number], string> = {
+  anthropic: 'claude-haiku-5-5',
+  openai: 'gpt-4o-mini',
+  google: 'gemini-2.0-flash',
+  openrouter: 'openrouter/auto',
+  custom: '',
 };
 
 const INTERVALS = [
@@ -70,6 +80,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
 
   if (!settings) return null;
   const ai = aiDraft ?? settings.ai;
+  const keyBelongsTo = detectProviderFromKey(ai.apiKey);
+  const keyMismatch = ai.provider !== null && ai.provider !== 'custom' && keyBelongsTo !== null && keyBelongsTo !== ai.provider;
+  const missing = [
+    ai.apiKey.trim() === '' ? 'API key' : null,
+    ai.model.trim() === '' ? 'model name' : null,
+    ai.provider === 'custom' && ai.baseUrl.trim() === '' ? 'base URL' : null,
+  ].filter((x): x is string => x !== null);
 
   const guard = (what: string, fn: () => Promise<void>) => () => {
     setStatus(null);
@@ -288,9 +305,10 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
           <span className="mb-1.5 block text-sm font-semibold">Provider</span>
           <select
             value={ai.provider ?? ''}
-            onChange={(e) =>
-              setAiDraft({ ...ai, provider: e.target.value === '' ? null : (e.target.value as (typeof AI_PROVIDERS)[number]) })
-            }
+            onChange={(e) => {
+              const provider = e.target.value === '' ? null : (e.target.value as (typeof AI_PROVIDERS)[number]);
+              setAiDraft({ ...ai, provider, model: ai.model.trim() === '' && provider ? SUGGESTED_MODELS[provider] : ai.model });
+            }}
             className={inputClass}
           >
             <option value="">Off</option>
@@ -337,12 +355,35 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
                   {showKey ? <EyeOff size={16} aria-hidden /> : <Eye size={16} aria-hidden />}
                 </button>
               </span>
+              {keyMismatch && keyBelongsTo && (
+                <span role="alert" className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-danger">
+                  This key looks like it belongs to {PROVIDER_LABELS[keyBelongsTo]}, but {PROVIDER_LABELS[ai.provider as keyof typeof PROVIDER_LABELS]} is selected.
+                  <button
+                    type="button"
+                    className="rounded-md border border-line px-2 py-1 text-fg"
+                    onClick={() =>
+                      setAiDraft({ ...ai, provider: keyBelongsTo, model: SUGGESTED_MODELS[keyBelongsTo] })
+                    }
+                  >
+                    Switch to {PROVIDER_LABELS[keyBelongsTo]}
+                  </button>
+                </span>
+              )}
               <span className="mt-1 block text-xs text-muted">
                 Stored only in this browser. It is never included in backups and never sent anywhere except your provider.
               </span>
             </label>
           </>
         )}
+        <p role="note" className={`text-sm font-medium ${missing.length === 0 ? 'text-primary' : 'text-muted'}`}>
+          {aiDraft !== null
+            ? 'You have unsaved changes. Press “Save AI settings”.'
+            : ai.provider === null
+              ? 'AI is off.'
+              : missing.length === 0
+                ? 'AI is ready. Use “Suggest name (AI)” in a collection menu and “Organise with AI” in Save session.'
+                : `AI is not ready yet. Missing: ${missing.join(', ')}.`}
+        </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={aiDraft === null} onClick={saveAi} className={buttonClass}>
             Save AI settings

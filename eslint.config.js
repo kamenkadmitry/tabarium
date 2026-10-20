@@ -7,6 +7,7 @@ export default tseslint.config(
   { ignores: ['.output/**', '.wxt/**', 'node_modules/**', 'test-results/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  { files: ['scripts/**/*.mjs'], languageOptions: { globals: globals.node } },
   {
     files: ['src/**/*.{ts,tsx}', 'tests/**/*.ts', 'e2e/**/*.ts'],
     languageOptions: { globals: { ...globals.browser, ...globals.serviceworker } },
