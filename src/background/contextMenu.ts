@@ -29,7 +29,7 @@ export async function syncContextMenu(): Promise<void> {
   }
 }
 
-async function handleClick(info: { menuItemId: string | number; linkUrl?: string; selectionText?: string }, tab?: { url?: string; title?: string; favIconUrl?: string; windowId?: number }): Promise<void> {
+export async function handleClick(info: { menuItemId: string | number; linkUrl?: string; selectionText?: string }, tab?: { url?: string; title?: string; favIconUrl?: string; windowId?: number }): Promise<void> {
   if (info.menuItemId === LINK && info.linkUrl) {
     const added = await quickSave(db, [{ title: info.selectionText?.trim() || info.linkUrl, url: info.linkUrl }]);
     await flashBadge(added > 0 ? '+1' : '=');

@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const extensionPath = path.resolve('.output/chrome-mv3');
+const extensionPath = path.resolve('.output/chrome-mv3-e2e');
 
 let context: BrowserContext;
 let extensionId: string;
