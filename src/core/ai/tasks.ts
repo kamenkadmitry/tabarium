@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeHashtag } from '../hashtag';
 import { AiError, type AiConfig, complete, type FetchLike } from './client';
 
 export interface PageRef {
@@ -45,39 +46,79 @@ export interface TabGroup {
   title: string;
   /** Indexes into the input array. */
   indexes: number[];
+  /** Titles of existing tags that fit this group (never invented). */
+  tags: string[];
+  /** Hashtags for the tabs of this group, without "#": existing ones when they fit, new ones otherwise. */
+  hashtags: string[];
+}
+
+/** What the library already holds, so the model reuses it instead of inventing near-duplicates. */
+export interface LibraryContext {
+  collections: readonly string[];
+  tags: readonly string[];
+  hashtags: readonly string[];
 }
 
 const GroupsSchema = z
-  .array(z.object({ title: z.string().trim().min(1).max(60), tabs: z.array(z.number().int().min(1)).min(1) }))
+  .array(
+    z.object({
+      title: z.string().trim().min(1).max(60),
+      tabs: z.array(z.number().int().min(1)).min(1),
+      tags: z.array(z.string()).optional(),
+      hashtags: z.array(z.string()).optional(),
+    }),
+  )
   .min(1);
 
-/** Splits pages into named groups. Every page ends up in exactly one group; unmentioned pages go to "Other". */
-export async function groupTabs(config: AiConfig, pages: readonly PageRef[], fetchImpl?: FetchLike): Promise<TabGroup[]> {
+const MAX_LISTED = 100;
+const named = (label: string, items: readonly string[]) =>
+  `${label}: ${items.length === 0 ? '(none)' : items.slice(0, MAX_LISTED).join(', ')}`;
+
+/**
+ * Splits pages into named groups. Every page ends up in exactly one group; unmentioned pages go to "Other".
+ * With a `context` the model is told which collections, tags and hashtags exist so it reuses them.
+ */
+export async function groupTabs(
+  config: AiConfig,
+  pages: readonly PageRef[],
+  fetchImpl?: FetchLike,
+  context: LibraryContext = { collections: [], tags: [], hashtags: [] },
+): Promise<TabGroup[]> {
   if (pages.length === 0) throw new AiError('There are no tabs to group.');
   const answer = await complete(
     config,
     {
       system:
-        'You organise browser tabs into topic groups. Reply with only JSON: [{"title":"Group name","tabs":[1,2]}]. ' +
-        'Use the tab numbers given, put each tab in exactly one group, use 2 to 6 groups, keep names under 4 words.',
-      prompt: `Group these tabs:\n${list(pages.slice(0, 80))}`,
-      maxTokens: 2400,
+        'You organise browser tabs into topic groups for a personal bookmark library. ' +
+        'Reply with only JSON: [{"title":"Group name","tabs":[1,2],"tags":["Existing tag"],"hashtags":["topic"]}]. ' +
+        'Rules: use the tab numbers given and put each tab in exactly one group; use 2 to 6 groups; keep names under 4 words. ' +
+        'When a group fits an EXISTING collection, use that collection\'s exact title instead of inventing a new one. ' +
+        '"tags" may contain only names from the existing tags list, and is empty when none fits; never invent tags. ' +
+        '"hashtags" holds 0 to 3 lowercase single-word topics; reuse an existing hashtag when one fits and create a new one only when none does. ' +
+        'No commentary.',
+      prompt: `${named('Existing collections', context.collections)}\n${named('Existing tags', context.tags)}\n${named('Existing hashtags', context.hashtags)}\n\nGroup these tabs:\n${list(pages.slice(0, 80))}`,
+      maxTokens: 2800,
     },
     fetchImpl,
   );
   const parsed = GroupsSchema.safeParse(extractJson(answer));
   if (!parsed.success) throw new AiError('The model did not return valid groups.');
 
+  const tagByLower = new Map(context.tags.map((t) => [t.toLowerCase(), t]));
+  const collectionByLower = new Map(context.collections.map((c) => [c.toLowerCase(), c]));
   const limit = Math.min(pages.length, 80);
   const assigned = new Set<number>();
   const groups: TabGroup[] = [];
   for (const g of parsed.data) {
     const indexes = g.tabs.map((n) => n - 1).filter((i) => i < limit && !assigned.has(i));
     indexes.forEach((i) => assigned.add(i));
-    if (indexes.length > 0) groups.push({ title: g.title, indexes });
+    if (indexes.length === 0) continue;
+    const tags = [...new Set((g.tags ?? []).flatMap((t) => tagByLower.get(t.trim().toLowerCase()) ?? []))];
+    const hashtags = [...new Set((g.hashtags ?? []).map(normalizeHashtag).filter((h) => h !== ''))].slice(0, 3);
+    groups.push({ title: collectionByLower.get(g.title.toLowerCase()) ?? g.title, indexes, tags, hashtags });
   }
   const rest = pages.map((_, i) => i).filter((i) => !assigned.has(i));
-  if (rest.length > 0) groups.push({ title: 'Other', indexes: rest });
+  if (rest.length > 0) groups.push({ title: 'Other', indexes: rest, tags: [], hashtags: [] });
   return groups;
 }
 

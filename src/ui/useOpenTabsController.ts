@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { groupTabs } from '../core/ai/tasks';
-import { repo } from '../core/instance';
+import { db, repo } from '../core/instance';
+import { applyGroups, loadLibraryContext } from '../core/organise';
 import type { Settings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import type { OpenTab, OpenWindow } from '../platform/ports';
@@ -93,19 +94,25 @@ export function useOpenTabsController({ enabled, settings, spaceId, run }: Args)
       void run('Organising with AI', async () => {
         if (!settings) throw new Error('Settings are not loaded yet.');
         const target = needSpaceOrThrow(spaceId);
-        const groups = await withProviderAccess(platform, settings.ai, () =>
+        const groups = await withProviderAccess(platform, settings.ai, async () =>
           groupTabs(
             settings.ai,
             w.tabs.map((t) => ({ title: t.title, url: t.url })),
+            undefined,
+            await loadLibraryContext(db, target),
           ),
         );
-        for (const g of groups) {
-          const col = await repo.createCollection(target, g.title);
-          await repo.addCards(
-            col.id,
-            g.indexes.map((i) => toCard(w.tabs[i] as OpenTab)),
-          );
-        }
+        await applyGroups(
+          db,
+          repo,
+          target,
+          groups.map((g) => ({
+            title: g.title,
+            cards: g.indexes.map((i) => toCard(w.tabs[i] as OpenTab)),
+            tags: g.tags,
+            hashtags: g.hashtags,
+          })),
+        );
         if (settings.autoCloseTabs) await platform.tabs.closeTabs(w.tabs.map((t) => t.id));
       }),
   };

@@ -2,6 +2,7 @@ import { ArrowRightLeft, Clock, NotebookText, Pencil, Star, Trash2 } from 'lucid
 import type { HTMLAttributes } from 'react';
 import type { Card } from '../core/types';
 import { dragSourceProps } from './dnd';
+import { CardLabels } from './labels';
 
 const AVATAR_COLORS = ['#0d9488', '#ea580c', '#6366f1', '#a855f7', '#0284c7', '#db2777', '#65a30d'];
 
@@ -84,6 +85,7 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
               {meta ? ` · ${meta}` : ''}
             </span>
           )}
+          {density !== 'compact' && <CardLabels card={card} />}
         </span>
         {density === 'wide' && <span className="hidden max-w-[30%] shrink-0 truncate text-xs text-muted sm:block">{hostOf(card.url)}</span>}
         {card.note && !tile && <NotebookText size={14} aria-label="Has a note" className="shrink-0 text-muted" />}

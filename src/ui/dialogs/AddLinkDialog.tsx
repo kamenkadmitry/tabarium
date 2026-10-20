@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Dialog, Field, inputClass, PrimaryButton, SecondaryButton } from '../Dialog';
+import { LabelFields, type LabelsApi } from '../labels';
 
 interface Props {
   collectionTitle: string;
-  onSubmit: (link: { url: string; title: string }) => Promise<void>;
+  labels: LabelsApi;
+  onSubmit: (link: { url: string; title: string; tagIds: string[]; hashtagIds: string[] }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -20,10 +22,12 @@ export function parseUserUrl(input: string): string | null {
   }
 }
 
-export function AddLinkDialog({ collectionTitle, onSubmit, onClose }: Props) {
+export function AddLinkDialog({ collectionTitle, labels, onSubmit, onClose }: Props) {
   const [rawUrl, setRawUrl] = useState('');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [hashtagIds, setHashtagIds] = useState<string[]>([]);
   const url = parseUserUrl(rawUrl);
   const showError = rawUrl.trim() !== '' && url === null;
 
@@ -35,7 +39,7 @@ export function AddLinkDialog({ collectionTitle, onSubmit, onClose }: Props) {
           if (url === null) return;
           setBusy(true);
           try {
-            await onSubmit({ url, title: title.trim() || new URL(url).hostname });
+            await onSubmit({ url, title: title.trim() || new URL(url).hostname, tagIds, hashtagIds });
             onClose();
           } finally {
             setBusy(false);
@@ -56,6 +60,7 @@ export function AddLinkDialog({ collectionTitle, onSubmit, onClose }: Props) {
         <Field label="Title" hint="Optional. Defaults to the site name.">
           <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
         </Field>
+        <LabelFields api={labels} tagIds={tagIds} hashtagIds={hashtagIds} onTags={setTagIds} onHashtags={setHashtagIds} />
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
           <PrimaryButton disabled={url === null || busy}>Add link</PrimaryButton>

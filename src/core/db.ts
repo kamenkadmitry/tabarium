@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Card, Collection, NextItem, Space, Tag } from './types';
+import type { Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
 
 export interface SettingRow {
   key: string;
@@ -11,6 +11,7 @@ export class TabariumDB extends Dexie {
   collections!: EntityTable<Collection, 'id'>;
   cards!: EntityTable<Card, 'id'>;
   tags!: EntityTable<Tag, 'id'>;
+  hashtags!: EntityTable<Hashtag, 'id'>;
   nexts!: EntityTable<NextItem, 'id'>;
   settings!: EntityTable<SettingRow, 'key'>;
 
@@ -26,5 +27,20 @@ export class TabariumDB extends Dexie {
     });
     // v2: multi-entry index so collections can be looked up by tag.
     this.version(2).stores({ collections: 'id, spaceId, position, *tagIds' });
+    // v3: tags and #hashtags on cards, and the hashtag table.
+    this.version(3)
+      .stores({
+        cards: 'id, collectionId, url, starred, position, *tagIds, *hashtagIds',
+        hashtags: 'id, &name',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('cards')
+          .toCollection()
+          .modify((card: { tagIds?: string[]; hashtagIds?: string[] }) => {
+            card.tagIds ??= [];
+            card.hashtagIds ??= [];
+          }),
+      );
   }
 }

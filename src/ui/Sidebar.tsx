@@ -1,4 +1,4 @@
-import { Clock, Copy, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Clock, Copy, Hash, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
@@ -9,6 +9,8 @@ export type View =
   | { kind: 'starred' }
   | { kind: 'next' }
   | { kind: 'duplicates' }
+  | { kind: 'tags' }
+  | { kind: 'hashtags' }
   | { kind: 'settings' };
 
 interface Props {
@@ -21,7 +23,6 @@ interface Props {
   onCreateSpace: () => void;
   onRenameSpace: (space: Space) => void;
   onDeleteSpace: (space: Space) => void;
-  onManageTags: () => void;
   onDropCollection: (collectionId: string, spaceId: string) => void;
   onDropTabs: (tabIds: number[], spaceId: string) => void;
 }
@@ -118,6 +119,12 @@ export function Sidebar(props: Props) {
         <NavButton active={view?.kind === 'duplicates'} onClick={() => props.onSelect({ kind: 'duplicates' })} icon={<Copy size={18} aria-hidden />} badge={props.duplicateCount}>
           Duplicates
         </NavButton>
+        <NavButton active={view?.kind === 'tags'} onClick={() => props.onSelect({ kind: 'tags' })} icon={<Tag size={18} aria-hidden />}>
+          Tags
+        </NavButton>
+        <NavButton active={view?.kind === 'hashtags'} onClick={() => props.onSelect({ kind: 'hashtags' })} icon={<Hash size={18} aria-hidden />}>
+          Hashtags
+        </NavButton>
       </nav>
 
       <nav aria-label="Spaces" className="flex min-h-0 flex-1 flex-col gap-1">
@@ -149,9 +156,6 @@ export function Sidebar(props: Props) {
       </nav>
 
       <div className="flex flex-col gap-1">
-        <NavButton active={false} onClick={props.onManageTags} icon={<Tag size={18} aria-hidden />}>
-          Tags
-        </NavButton>
         <NavButton active={view?.kind === 'settings'} onClick={() => props.onSelect({ kind: 'settings' })} icon={<Settings size={18} aria-hidden />}>
           Settings
         </NavButton>

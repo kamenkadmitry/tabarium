@@ -139,10 +139,27 @@ describe('tasks', () => {
     const reply = '[{"title":"First","tabs":[1,2,99]},{"title":"Second","tabs":[2,3]}]';
     const { fetch } = fakeFetch(openaiReply(reply));
     expect(await groupTabs(cfg({}), pages, fetch)).toEqual([
-      { title: 'First', indexes: [0, 1] },
-      { title: 'Second', indexes: [2] },
-      { title: 'Other', indexes: [3] },
+      { title: 'First', indexes: [0, 1], tags: [], hashtags: [] },
+      { title: 'Second', indexes: [2], tags: [], hashtags: [] },
+      { title: 'Other', indexes: [3], tags: [], hashtags: [] },
     ]);
+  });
+
+  it('groups tabs: tells the model what exists and keeps only existing tags and clean hashtags', async () => {
+    const pages = ['a', 'b'].map((t) => ({ title: t, url: `https://${t}.dev` }));
+    const reply = JSON.stringify([
+      { title: 'reading list', tabs: [1], tags: ['work', 'Invented'], hashtags: ['#Machine Learning', 'ai', 'ai', 'x y z', 'four'] },
+      { title: 'New one', tabs: [2] },
+    ]);
+    const { fetch, calls } = fakeFetch(openaiReply(reply));
+    const groups = await groupTabs(cfg({}), pages, fetch, { collections: ['Reading List'], tags: ['Work'], hashtags: ['ai', 'rust'] });
+
+    const prompt = JSON.stringify(calls[0]?.body);
+    expect(prompt).toContain('Existing collections: Reading List');
+    expect(prompt).toContain('Existing tags: Work');
+    expect(prompt).toContain('Existing hashtags: ai, rust');
+    expect(groups[0]).toEqual({ title: 'Reading List', indexes: [0], tags: ['Work'], hashtags: ['machine-learning', 'ai', 'x-y-z'] });
+    expect(groups[1]).toMatchObject({ title: 'New one', tags: [], hashtags: [] });
   });
 
   it('connection test succeeds on a reply with no text', async () => {

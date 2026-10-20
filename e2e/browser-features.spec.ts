@@ -177,6 +177,46 @@ test('profile: the sidebar shows a Local badge and the name set in Settings', as
   await p.close();
 });
 
+test('tags and hashtags: own pages, picked or created while adding and editing a link', async () => {
+  const p = await openLibraryWithSpace('Labels');
+  await addCollectionWithLinks(p, 'Reading', []);
+
+  // Tags page (in the top navigation): create a tag.
+  await p.getByRole('button', { name: 'Tags', exact: true }).click();
+  await p.getByLabel('Tag name').fill('Work');
+  await p.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(p.getByRole('list', { name: 'Tags' }).getByDisplayValue('Work')).toBeVisible();
+
+  // Hashtags page: create one, normalised.
+  await p.getByRole('button', { name: 'Hashtags', exact: true }).click();
+  await p.getByLabel('Hashtag name').fill('#Machine Learning');
+  await p.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(p.getByRole('list', { name: 'Hashtags' }).getByDisplayValue('machine-learning')).toBeVisible();
+
+  // Add a link: pick the existing tag and hashtag, and create a new hashtag right there.
+  await p.getByRole('button', { name: /^L\s*Labels/ }).first().click();
+  await p.locator('section[aria-label="Reading"]').getByRole('button', { name: 'Add link' }).click();
+  await p.getByLabel('Address').fill('https://example.test/labelled');
+  await p.getByLabel('Title', { exact: true }).fill('Labelled link');
+  await p.getByLabel('Tags', { exact: true }).fill('wor');
+  await p.getByRole('button', { name: 'Work', exact: true }).click();
+  await p.getByLabel('Hashtags', { exact: true }).fill('machine');
+  await p.getByRole('button', { name: '#machine-learning' }).click();
+  await p.getByLabel('Hashtags', { exact: true }).fill('rust');
+  await p.getByRole('button', { name: 'Create #rust' }).click();
+  await p.getByRole('button', { name: 'Add link', exact: true }).last().click();
+
+  const row = p.locator('section[aria-label="Reading"] li', { hasText: 'Labelled link' });
+  await expect(row).toContainText('Work');
+  await expect(row).toContainText('#machine-learning');
+  await expect(row).toContainText('#rust');
+
+  // Search finds the link by hashtag.
+  await p.getByPlaceholder('Search all tabs, notes and links').fill('#rust');
+  await expect(p.getByText('Labelled link').first()).toBeVisible();
+  await p.close();
+});
+
 test('open tabs panel: shows browser tab groups, groups a selection, finds open tabs in search', async () => {
   const x = await app.context.newPage();
   await x.goto(web('grp-x'));

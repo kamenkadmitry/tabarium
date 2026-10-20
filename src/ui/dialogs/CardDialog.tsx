@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import type { Card } from '../../core/types';
 import { Dialog, Field, inputClass, PrimaryButton, SecondaryButton } from '../Dialog';
+import { LabelFields, type LabelsApi } from '../labels';
 import { parseUserUrl } from './AddLinkDialog';
 
 interface Props {
   card: Card;
-  onSubmit: (patch: { customTitle: string | null; url: string; note: string | null }) => Promise<void>;
+  labels: LabelsApi;
+  onSubmit: (patch: { customTitle: string | null; url: string; note: string | null; tagIds: string[]; hashtagIds: string[] }) => Promise<void>;
   onClose: () => void;
 }
 
-export function CardDialog({ card, onSubmit, onClose }: Props) {
+export function CardDialog({ card, labels, onSubmit, onClose }: Props) {
   const [title, setTitle] = useState(card.customTitle ?? card.title);
   const [rawUrl, setRawUrl] = useState(card.url);
   const [note, setNote] = useState(card.note ?? '');
   const [busy, setBusy] = useState(false);
+  const [tagIds, setTagIds] = useState<string[]>([...card.tagIds]);
+  const [hashtagIds, setHashtagIds] = useState<string[]>([...card.hashtagIds]);
   const url = parseUserUrl(rawUrl);
 
   return (
@@ -29,6 +33,8 @@ export function CardDialog({ card, onSubmit, onClose }: Props) {
               customTitle: trimmed === '' || trimmed === card.title ? null : trimmed,
               url,
               note: note.trim() === '' ? null : note,
+              tagIds,
+              hashtagIds,
             });
             onClose();
           } finally {
@@ -51,6 +57,7 @@ export function CardDialog({ card, onSubmit, onClose }: Props) {
             className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm"
           />
         </Field>
+        <LabelFields api={labels} tagIds={tagIds} hashtagIds={hashtagIds} onTags={setTagIds} onHashtags={setHashtagIds} />
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
           <PrimaryButton disabled={url === null || busy}>Save</PrimaryButton>

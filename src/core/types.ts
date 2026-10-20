@@ -33,6 +33,10 @@ export const CardSchema = z.object({
   customTitle: z.string().nullable(),
   note: z.string().nullable(),
   starred: z.boolean(),
+  /** Coloured tags (the same tags collections use). */
+  tagIds: z.array(id).default([]),
+  /** Free-form #hashtags. */
+  hashtagIds: z.array(id).default([]),
   position: z.number(),
   createdAt: timestamp,
   updatedAt: timestamp,
@@ -43,6 +47,13 @@ export const TagSchema = z.object({
   title: z.string().min(1),
   color: z.string(),
   position: z.number(),
+});
+
+export const HashtagSchema = z.object({
+  id,
+  /** Lowercase, without the leading "#". */
+  name: z.string().min(1).max(40),
+  createdAt: timestamp,
 });
 
 export const NextItemSchema = z.object({
@@ -56,4 +67,5 @@ export type Space = z.infer<typeof SpaceSchema>;
 export type Collection = z.infer<typeof CollectionSchema>;
 export type Card = z.infer<typeof CardSchema>;
 export type Tag = z.infer<typeof TagSchema>;
+export type Hashtag = z.infer<typeof HashtagSchema>;
 export type NextItem = z.infer<typeof NextItemSchema>;

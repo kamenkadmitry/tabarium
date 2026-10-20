@@ -6,17 +6,25 @@ import { Dialog, Field, inputClass, PrimaryButton, SecondaryButton } from '../Di
 
 const NEW = '__new__';
 
+/** A group proposed by the AI: the tabs, plus existing tag titles and hashtag names to apply. */
+export interface ProposedGroup {
+  title: string;
+  tabs: OpenTab[];
+  tags?: string[];
+  hashtags?: string[];
+}
+
 interface Props {
   tabs: readonly OpenTab[];
   collections: readonly Collection[];
   /** Present only when an AI provider is configured. */
-  onOrganise?: (tabs: OpenTab[]) => Promise<{ title: string; tabs: OpenTab[] }[]>;
+  onOrganise?: (tabs: OpenTab[]) => Promise<ProposedGroup[]>;
   onSave: (args: {
     tabs: OpenTab[];
     collectionId: string | null;
     newTitle: string;
     closeTabs: boolean;
-    groups: { title: string; tabs: OpenTab[] }[] | null;
+    groups: ProposedGroup[] | null;
   }) => Promise<void>;
   onClose: () => void;
 }
@@ -26,7 +34,7 @@ export function SaveSessionDialog({ tabs, collections, onOrganise, onSave, onClo
   const [target, setTarget] = useState(NEW);
   const [newTitle, setNewTitle] = useState(`Session ${new Date().toLocaleDateString()}`);
   const [busy, setBusy] = useState(false);
-  const [groups, setGroups] = useState<{ title: string; tabs: OpenTab[] }[] | null>(null);
+  const [groups, setGroups] = useState<ProposedGroup[] | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
   const chosen = tabs.filter((t) => selected.has(t.id));
@@ -81,7 +89,14 @@ export function SaveSessionDialog({ tabs, collections, onOrganise, onSave, onClo
           <ul className="text-sm">
             {groups.map((g) => (
               <li key={g.title} className="flex justify-between py-0.5">
-                <span className="truncate font-medium">{g.title}</span>
+                <span className="min-w-0 truncate font-medium">
+                  {g.title}
+                  {(g.hashtags ?? []).map((h) => (
+                    <span key={h} className="ml-2 text-xs font-normal text-primary">
+                      #{h}
+                    </span>
+                  ))}
+                </span>
                 <span className="text-muted">{g.tabs.length}</span>
               </li>
             ))}

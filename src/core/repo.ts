@@ -2,7 +2,8 @@ import type { TabariumDB } from './db';
 import { dedupeLinks, type ImportedSpace } from './formats';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
-import type { Card, Collection, NextItem, Space, Tag } from './types';
+import { normalizeHashtag } from './hashtag';
+import type { Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
 import { normalizeUrl } from './url';
 
 export interface NewCard {
@@ -11,6 +12,8 @@ export interface NewCard {
   favIconUrl?: string | null;
   customTitle?: string | null;
   note?: string | null;
+  tagIds?: readonly string[];
+  hashtagIds?: readonly string[];
 }
 
 export { normalizeUrl };
@@ -73,6 +76,8 @@ export class Repository {
           customTitle: item.customTitle ?? null,
           note: item.note ?? null,
           starred: false,
+          tagIds: [...(item.tagIds ?? [])],
+          hashtagIds: [...(item.hashtagIds ?? [])],
           position,
           createdAt: now,
           updatedAt: now,
@@ -172,10 +177,57 @@ export class Repository {
   }
 
   async deleteTag(tagId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.tags, this.db.collections, async () => {
+    await this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
       const affected = await this.db.collections.where('tagIds').equals(tagId).toArray();
       for (const c of affected) await this.db.collections.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
+      const cards = await this.db.cards.where('tagIds').equals(tagId).toArray();
+      for (const c of cards) await this.db.cards.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
       await this.db.tags.delete(tagId);
+    });
+  }
+
+  /** Finds the hashtag with this name or creates it. Throws when the name has no usable characters. */
+  async ensureHashtag(input: string): Promise<Hashtag> {
+    const name = normalizeHashtag(input);
+    if (name === '') throw new Error(`"${input}" is not a valid hashtag`);
+    return this.db.transaction('rw', this.db.hashtags, async () => {
+      const existing = await this.db.hashtags.where('name').equals(name).first();
+      if (existing) return existing;
+      const hashtag: Hashtag = { id: crypto.randomUUID(), name, createdAt: Date.now() };
+      await this.db.hashtags.add(hashtag);
+      return hashtag;
+    });
+  }
+
+  async renameHashtag(hashtagId: string, input: string): Promise<void> {
+    const name = normalizeHashtag(input);
+    if (name === '') throw new Error(`"${input}" is not a valid hashtag`);
+    const clash = await this.db.hashtags.where('name').equals(name).first();
+    if (clash && clash.id !== hashtagId) throw new Error(`#${name} already exists`);
+    if ((await this.db.hashtags.update(hashtagId, { name })) === 0) throw new Error(`Hashtag ${hashtagId} does not exist`);
+  }
+
+  async deleteHashtag(hashtagId: string): Promise<void> {
+    await this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+      const cards = await this.db.cards.where('hashtagIds').equals(hashtagId).toArray();
+      for (const c of cards) await this.db.cards.update(c.id, { hashtagIds: c.hashtagIds.filter((h) => h !== hashtagId) });
+      await this.db.hashtags.delete(hashtagId);
+    });
+  }
+
+  /** Replaces the tags and hashtags of a card. Every id must exist. */
+  async setCardLabels(cardId: string, labels: { tagIds: readonly string[]; hashtagIds: readonly string[] }): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.tags, this.db.hashtags, async () => {
+      const tags = new Set(await this.db.tags.toCollection().primaryKeys());
+      const hashtags = new Set(await this.db.hashtags.toCollection().primaryKeys());
+      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(`Tag ${t} does not exist`);
+      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(`Hashtag ${h} does not exist`);
+      const updated = await this.db.cards.update(cardId, {
+        tagIds: [...new Set(labels.tagIds)],
+        hashtagIds: [...new Set(labels.hashtagIds)],
+        updatedAt: Date.now(),
+      });
+      if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
     });
   }
 

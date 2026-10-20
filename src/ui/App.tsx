@@ -5,6 +5,7 @@ import { type BoardFilter, filterCollections, NO_FILTER, sortCollections } from 
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
 import { groupTabs } from '../core/ai/tasks';
+import { applyGroups, loadLibraryContext } from '../core/organise';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
@@ -22,6 +23,9 @@ import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
+import { SWATCHES } from './colors';
+import { HashtagsPage, TagsPage } from './LabelPages';
+import { LabelsProvider, type LabelsApi } from './labels';
 import { DuplicatesView, NextView, SearchResults } from './LibraryViews';
 import { OpenTabsPanel } from './OpenTabsPanel';
 import { filterOpenTabs } from './openTabsModel';
@@ -45,7 +49,7 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', settings: 'Settings' } as const;
+const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
 
 export function App() {
   const platform = usePlatform();
@@ -85,7 +89,8 @@ export function App() {
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
 
-  const panelEnabled = settings?.openTabsPanel !== false && view?.kind !== 'settings';
+  const plainPage = view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
+  const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
   const tabsCtl = useOpenTabsController({
     enabled: panelEnabled,
     settings,
@@ -97,7 +102,7 @@ export function App() {
     void run(what, async () => void (await updateSettings(db, patch)));
 
   if (!data) return null;
-  const { spaces, collections, cards, tags, nexts, cardsByCollection, cardById, collectionById } = data;
+  const { spaces, collections, cards, tags, hashtags, nexts, cardsByCollection, cardById, collectionById } = data;
 
   const activeSpace = view?.kind === 'space' ? spaces.find((s) => s.id === view.spaceId) : undefined;
   const spaceId = activeSpace?.id;
@@ -131,7 +136,23 @@ export function App() {
       setDialog({ kind: 'session', tabs: await platform.tabs.listWindowTabs() });
     });
 
-  const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''}`.toLowerCase().includes(q);
+  const labelText = (c: Card) =>
+    [
+      ...c.tagIds.flatMap((id) => tags.find((t) => t.id === id)?.title ?? []),
+      ...c.hashtagIds.flatMap((id) => hashtags.find((h) => h.id === id)?.name ?? []).map((n) => `#${n}`),
+    ].join(' ');
+  const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''} ${labelText(c)}`.toLowerCase().includes(q);
+
+  const labelsApi: LabelsApi = {
+    tags,
+    hashtags,
+    createTag: async (name) => (await repo.createTag(name, (SWATCHES[tags.length % SWATCHES.length] ?? SWATCHES[0]).value)).id,
+    createHashtag: async (name) => (await repo.ensureHashtag(name)).id,
+  };
+  const tagUsage = new Map(
+    tags.map((t) => [t.id, { collections: collections.filter((c) => c.tagIds.includes(t.id)).length, links: cards.filter((c) => c.tagIds.includes(t.id)).length }]),
+  );
+  const hashtagUsage = new Map(hashtags.map((h) => [h.id, cards.filter((c) => c.hashtagIds.includes(h.id)).length]));
   const searchGroups = collections
     .map((col) => ({
       collection: col,
@@ -154,10 +175,11 @@ export function App() {
   });
 
   const title = view && view.kind !== 'space' ? TITLES[view.kind] : (activeSpace?.name ?? 'Library');
-  const searching = q !== '' && view?.kind !== 'settings';
+  const searching = q !== '' && !plainPage;
   const tagsDialogCollection = dialog?.kind === 'tags' && dialog.collectionId ? collectionById.get(dialog.collectionId) : undefined;
 
   return (
+    <LabelsProvider tags={tags} hashtags={hashtags}>
     <div className="flex h-full">
       <Sidebar
         spaces={spaces}
@@ -181,7 +203,6 @@ export function App() {
             });
           }
         }}
-        onManageTags={() => setDialog({ kind: 'tags' })}
         onDropCollection={(id, targetSpaceId) => void run('Moving collection', () => repo.moveCollection(id, targetSpaceId))}
         onDropTabs={(tabIds, targetSpaceId) =>
           void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId: targetSpaceId, title: newCollectionTitle() })
@@ -194,7 +215,7 @@ export function App() {
           ) : (
             <h1 className="text-xl font-bold tracking-tight">{title}</h1>
           )}
-          {view?.kind !== 'settings' && (
+          {!plainPage && (
             <label className="relative ml-4 max-w-md flex-1">
               <span className="sr-only">Search all tabs</span>
               <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -278,6 +299,26 @@ export function App() {
           )}
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
+
+          {view?.kind === 'tags' && (
+            <TagsPage
+              tags={tags}
+              usage={tagUsage}
+              onCreate={(t, color) => void run('Creating tag', async () => void (await repo.createTag(t, color)))}
+              onUpdate={(id, patch) => void run('Updating tag', () => repo.updateTag(id, patch))}
+              onDelete={(id) => void run('Deleting tag', () => repo.deleteTag(id))}
+            />
+          )}
+
+          {view?.kind === 'hashtags' && (
+            <HashtagsPage
+              hashtags={hashtags}
+              usage={hashtagUsage}
+              onCreate={(name) => void run('Creating hashtag', async () => void (await repo.ensureHashtag(name)))}
+              onRename={(id, name) => void run('Renaming hashtag', () => repo.renameHashtag(id, name))}
+              onDelete={(id) => void run('Deleting hashtag', () => repo.deleteHashtag(id))}
+            />
+          )}
 
           {!searching && view?.kind === 'space' && spaceId && (
             <>
@@ -404,12 +445,23 @@ export function App() {
       {dialog?.kind === 'link' && (
         <AddLinkDialog
           collectionTitle={dialog.title}
+          labels={labelsApi}
           onClose={() => setDialog(null)}
           onSubmit={(link) => run('Adding link', async () => void (await repo.addCards(dialog.collectionId, [link])))}
         />
       )}
       {dialog?.kind === 'card' && (
-        <CardDialog card={dialog.card} onClose={() => setDialog(null)} onSubmit={(patch) => run('Saving tab', () => repo.updateCard(dialog.card.id, patch))} />
+        <CardDialog
+          card={dialog.card}
+          labels={labelsApi}
+          onClose={() => setDialog(null)}
+          onSubmit={({ tagIds, hashtagIds, ...patch }) =>
+            run('Saving tab', async () => {
+              await repo.updateCard(dialog.card.id, patch);
+              await repo.setCardLabels(dialog.card.id, { tagIds, hashtagIds });
+            })
+          }
+        />
       )}
       {dialog?.kind === 'move' && (
         <MoveCardDialog
@@ -466,8 +518,15 @@ export function App() {
                     const groups = await groupTabs(
                       settings.ai,
                       tabs.map((t) => ({ title: t.title, url: t.url })),
+                      undefined,
+                      await loadLibraryContext(db, spaceId),
                     );
-                    return groups.map((g) => ({ title: g.title, tabs: g.indexes.map((i) => tabs[i] as OpenTab) }));
+                    return groups.map((g) => ({
+                      title: g.title,
+                      tabs: g.indexes.map((i) => tabs[i] as OpenTab),
+                      tags: g.tags,
+                      hashtags: g.hashtags,
+                    }));
                   })
               : undefined
           }
@@ -475,10 +534,12 @@ export function App() {
             run('Saving session', async () => {
               const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
               if (groups) {
-                for (const g of groups) {
-                  const col = await repo.createCollection(spaceId, g.title);
-                  await repo.addCards(col.id, g.tabs.map(toCard));
-                }
+                await applyGroups(
+                  db,
+                  repo,
+                  spaceId,
+                  groups.map((g) => ({ title: g.title, cards: g.tabs.map(toCard), tags: g.tags, hashtags: g.hashtags })),
+                );
               } else {
                 const targetId = collectionId ?? (await repo.createCollection(spaceId, newTitle)).id;
                 await repo.addCards(targetId, tabs.map(toCard));
@@ -489,5 +550,6 @@ export function App() {
         />
       )}
     </div>
+    </LabelsProvider>
   );
 }

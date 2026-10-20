@@ -2,6 +2,7 @@ import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { groupTabs } from '../../core/ai/tasks';
 import { db, repo } from '../../core/instance';
+import { applyGroups, loadLibraryContext } from '../../core/organise';
 import { setQuickTarget } from '../../core/quicksave';
 import type { Settings } from '../../core/settings';
 import type { Card, Collection, Space } from '../../core/types';
@@ -65,16 +66,21 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
   const organise = async (dest: Destination) => {
     setBusy(true);
     try {
-      const groups = await withProviderAccess(platform, settings.ai, () =>
+      if (dest.kind !== 'new') throw new Error('Pick a space for the new collections.');
+      const groups = await withProviderAccess(platform, settings.ai, async () =>
         groupTabs(
           settings.ai,
           chosen.map((t) => ({ title: t.title, url: t.url })),
+          undefined,
+          await loadLibraryContext(db, dest.spaceId),
         ),
       );
-      for (const g of groups) {
-        const col = await repo.createCollection(dest.kind === 'new' ? dest.spaceId : '', g.title);
-        await repo.addCards(col.id, g.indexes.map((i) => toCard(chosen[i] as OpenTab)));
-      }
+      await applyGroups(
+        db,
+        repo,
+        dest.spaceId,
+        groups.map((g) => ({ title: g.title, cards: g.indexes.map((i) => toCard(chosen[i] as OpenTab)), tags: g.tags, hashtags: g.hashtags })),
+      );
       await finish(`Organised ${chosen.length} tabs into ${groups.length} collections in ${dest.label}.`);
     } catch (e) {
       fail('Organising with AI', e);
