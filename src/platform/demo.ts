@@ -29,16 +29,23 @@ export function createDemoPlatform(): Platform {
       },
       openUrls: async () => undefined,
       listWindows: async () => [
-        { id: 1, current: true, tabs: [...tabs] },
+        {
+          id: 1,
+          current: true,
+          tabs: tabs.map((t) => (t.id === 3 || t.id === 4 ? { ...t, groupId: 7 } : t)),
+          groups: [{ id: 7, title: 'Frontend docs', color: 'blue' }],
+        },
         {
           id: 2,
           current: false,
+          groups: [],
           tabs: [
             { id: 11, title: 'Rust by Example', url: 'https://doc.rust-lang.org/rust-by-example/', favIconUrl: null },
             { id: 12, title: 'crates.io', url: 'https://crates.io/', favIconUrl: null },
           ],
         },
       ],
+      groupTabs: async () => undefined,
       focusTab: async () => undefined,
       closeWindow: async () => undefined,
       mergeWindows: async () => undefined,

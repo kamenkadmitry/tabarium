@@ -137,6 +137,35 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   await p.close();
 });
 
+test('open tabs panel: shows browser tab groups, groups a selection, finds open tabs in search', async () => {
+  const x = await app.context.newPage();
+  await x.goto(web('grp-x'));
+  const y = await app.context.newPage();
+  await y.goto(web('grp-y'));
+
+  const p = await openLibraryWithSpace('Groups');
+  const panel = p.getByRole('complementary', { name: 'Open tabs' });
+
+  // "Group" turns the selected tabs into a real browser tab group, and the panel shows it with its title.
+  await panel.getByLabel('Select Page grp-x').check();
+  await panel.getByLabel('Select Page grp-y').check();
+  await panel.getByRole('button', { name: 'Group', exact: true }).click();
+  await expect(panel.getByRole('group', { name: /^Tab group Group \d+$/ })).toBeVisible();
+  const groups = await app.worker.evaluate(async () => (await chrome.tabGroups.query({})).map((g) => g.title));
+  expect(groups.some((t) => /^Group \d+$/.test(t))).toBe(true);
+
+  // A group can be saved as a collection under its own name.
+  const groupBox = panel.getByRole('group', { name: /^Tab group Group \d+$/ });
+  await groupBox.getByRole('button', { name: /^Save group/ }).click();
+  await expect(p.locator('main section h2', { hasText: /^Group \d+$/ })).toBeVisible();
+
+  // Search also finds tabs that are only open (not saved) in the browser.
+  await p.getByPlaceholder('Search all tabs').fill('grp-y');
+  const open = p.getByRole('region', { name: 'Open tabs' }).or(p.locator('section[aria-label="Open tabs"]'));
+  await expect(open.getByText('Page grp-y')).toBeVisible();
+  await p.close();
+});
+
 test('scheduled backup writes a file and records the time', async () => {
   const p = await app.context.newPage();
   await p.goto(library(app.extensionId));

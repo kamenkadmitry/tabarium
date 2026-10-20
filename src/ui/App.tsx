@@ -21,6 +21,7 @@ import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
 import { DuplicatesView, NextView, SearchResults } from './LibraryViews';
 import { OpenTabsPanel } from './OpenTabsPanel';
+import { filterOpenTabs } from './openTabsModel';
 import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
 import { SpaceBoard } from './SpaceBoard';
@@ -272,7 +273,16 @@ export function App() {
         )}
 
         <div className="flex-1 overflow-y-auto p-6">
-          {searching && <SearchResults groups={searchGroups} query={query.trim()} cardActions={cardActions} />}
+          {searching && (
+            <SearchResults
+              groups={searchGroups}
+              query={query.trim()}
+              cardActions={cardActions}
+              openTabs={filterOpenTabs(tabsCtl.windows, query)}
+              onFocusTab={tabsCtl.focus}
+              onAddOpenTab={(tabId) => setDialog({ kind: 'add-tabs', tabIds: [tabId] })}
+            />
+          )}
 
           {!searching && view?.kind === 'starred' && (
             <ul className="max-w-xl rounded-2xl border border-line bg-surface p-2">
@@ -350,6 +360,8 @@ export function App() {
           onCloseWindow={tabsCtl.closeWindow}
           onToggle={tabsCtl.toggle}
           onSaveWindow={tabsCtl.saveWindow}
+          onSaveGroup={tabsCtl.saveGroup}
+          onGroupSelected={tabsCtl.groupSelected}
           onOrganiseWindow={tabsCtl.organiseWindow}
           onAddSelected={() => setDialog({ kind: 'add-tabs', tabIds: [...tabsCtl.selected] })}
           onClearSelection={tabsCtl.clear}

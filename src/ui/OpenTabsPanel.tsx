@@ -1,8 +1,9 @@
-import { FolderInput, PanelRightClose, Shrink, Sparkles, X } from 'lucide-react';
+import { FolderInput, Group, PanelRightClose, Shrink, Sparkles, X } from 'lucide-react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import type { TabsAccess } from './useOpenTabs';
 import { hostOf } from './CardRow';
 import { dragSourceProps } from './dnd';
+import { GROUP_COLORS, segmentTabs } from './openTabsModel';
 
 const AVATAR_COLORS = ['#0d9488', '#ea580c', '#6366f1', '#a855f7', '#0284c7', '#db2777', '#65a30d'];
 
@@ -40,6 +41,8 @@ interface Props {
   onCloseWindow: (windowId: number) => void;
   onToggle: (tabId: number) => void;
   onSaveWindow: (window: OpenWindow, name: string) => void;
+  onSaveGroup: (tabs: OpenTab[], title: string) => void;
+  onGroupSelected: () => void;
   onOrganiseWindow: (window: OpenWindow) => void;
   onAddSelected: () => void;
   onClearSelection: () => void;
@@ -127,48 +130,69 @@ export function OpenTabsPanel(props: Props) {
                     </button>
                   )}
                 </div>
-                <ul className="flex flex-col gap-1">
-                  {w.tabs.map((t) => {
-                    const isSelected = selected.has(t.id);
-                    // Dragging a selected tab takes the whole selection with it.
-                    const tabIds = isSelected ? [...selected] : [t.id];
-                    return (
-                      <li
-                        key={t.id}
-                        {...dragSourceProps({ type: 'tabs', tabIds })}
-                        data-open-tab-id={t.id}
-                        className={`group flex min-h-9 items-center gap-2 rounded-lg border px-2 transition-colors duration-150 ${
-                          isSelected ? 'border-primary bg-surface-2' : 'border-transparent bg-bg hover:bg-surface-2'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${t.title}`}
-                          checked={isSelected}
-                          onChange={() => props.onToggle(t.id)}
-                          className="size-3.5 shrink-0 accent-[var(--primary)]"
-                        />
-                        <TabFavicon tab={t} />
-                        <button
-                          type="button"
-                          title={`${t.title}\n${t.url}`}
-                          onClick={() => props.onFocus(t.id)}
-                          className="min-w-0 flex-1 truncate py-1.5 text-left text-xs font-medium"
-                        >
-                          {t.title}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Close tab ${t.title}`}
-                          onClick={() => props.onCloseTab(t.id)}
-                          className="grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-0 transition-opacity duration-150 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
-                        >
-                          <X size={13} aria-hidden />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="flex flex-col gap-1">
+                  {segmentTabs(w).map((run, runIndex) => (
+                    <div key={`${run.group?.id ?? 'none'}-${runIndex}`} role={run.group ? 'group' : undefined} aria-label={run.group ? `Tab group ${run.group.title || 'untitled'}` : undefined}>
+                      {run.group && (
+                        <div className="mb-1 flex items-center gap-2 px-2 pt-1">
+                          <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: GROUP_COLORS[run.group.color] ?? GROUP_COLORS.grey }} />
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold">{run.group.title || 'Group'}</span>
+                          <span className="text-xs text-muted">{run.tabs.length}</span>
+                          <button
+                            type="button"
+                            aria-label={`Save group ${run.group.title || 'untitled'} as a collection`}
+                            onClick={() => props.onSaveGroup(run.tabs, run.group?.title || 'Group')}
+                            className={`${iconButton} size-6`}
+                          >
+                            <FolderInput size={13} aria-hidden />
+                          </button>
+                        </div>
+                      )}
+                      <ul className={`flex flex-col gap-1 ${run.group ? 'ml-2 border-l-2 pl-1.5' : ''}`} style={run.group ? { borderColor: GROUP_COLORS[run.group.color] ?? GROUP_COLORS.grey } : undefined}>
+                        {run.tabs.map((t) => {
+                          const isSelected = selected.has(t.id);
+                          // Dragging a selected tab takes the whole selection with it.
+                          const tabIds = isSelected ? [...selected] : [t.id];
+                          return (
+                            <li
+                              key={t.id}
+                              {...dragSourceProps({ type: 'tabs', tabIds })}
+                              data-open-tab-id={t.id}
+                              className={`group flex min-h-9 items-center gap-2 rounded-lg border px-2 transition-colors duration-150 ${
+                                isSelected ? 'border-primary bg-surface-2' : 'border-transparent bg-bg hover:bg-surface-2'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${t.title}`}
+                                checked={isSelected}
+                                onChange={() => props.onToggle(t.id)}
+                                className="size-3.5 shrink-0 accent-[var(--primary)]"
+                              />
+                              <TabFavicon tab={t} />
+                              <button
+                                type="button"
+                                title={`${t.title}\n${t.url}`}
+                                onClick={() => props.onFocus(t.id)}
+                                className="min-w-0 flex-1 truncate py-1.5 text-left text-xs font-medium"
+                              >
+                                {t.title}
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Close tab ${t.title}`}
+                                onClick={() => props.onCloseTab(t.id)}
+                                className="grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-0 transition-opacity duration-150 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+                              >
+                                <X size={13} aria-hidden />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </section>
             );
           })}
@@ -186,6 +210,13 @@ export function OpenTabsPanel(props: Props) {
               className="h-9 flex-1 rounded-lg bg-primary text-xs font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
             >
               Add to collection
+            </button>
+            <button
+              type="button"
+              onClick={props.onGroupSelected}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold transition-colors duration-150 hover:bg-surface"
+            >
+              <Group size={13} aria-hidden /> Group
             </button>
             <button
               type="button"

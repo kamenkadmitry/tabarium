@@ -27,9 +27,11 @@ async function openInBackground(urls: readonly string[], options?: OpenOptions):
 
 const isWebUrl = (url: string | undefined): url is string => url !== undefined && /^https?:\/\//.test(url);
 
-function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string }): OpenTab | null {
+function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string; groupId?: number }): OpenTab | null {
   if (t.id === undefined || !isWebUrl(t.url)) return null;
-  return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null };
+  // Chrome reports -1 for tabs that are not in a group.
+  const groupId = t.groupId !== undefined && t.groupId >= 0 ? t.groupId : undefined;
+  return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null, ...(groupId !== undefined && { groupId }) };
 }
 
 export function createChromePlatform(): Platform {
@@ -73,10 +75,28 @@ export function createChromePlatform(): Platform {
             const tab = toOpenTab(t);
             return tab ? [tab] : [];
           });
-          result.push({ id: w.id, current: w.id === here.id, tabs });
+          // `tabGroups` exists only once the user granted the optional permission.
+          const groups = api.tabGroups
+            ? (await api.tabGroups.query({ windowId: w.id })).map((g) => ({ id: g.id, title: g.title ?? '', color: g.color }))
+            : [];
+          result.push({ id: w.id, current: w.id === here.id, tabs, groups });
         }
         // Windows that hold nothing saveable (only the library, settings pages, ...) are not worth showing.
         return result.filter((w) => w.tabs.length > 0 || w.current);
+      },
+      async groupTabs(tabIds, title) {
+        const api = requireExtension();
+        const tabs = await Promise.all(tabIds.map((id) => api.tabs.get(id)));
+        const byWindow = new Map<number, number[]>();
+        for (const t of tabs) {
+          if (t.id === undefined) continue;
+          byWindow.set(t.windowId, [...(byWindow.get(t.windowId) ?? []), t.id]);
+        }
+        // A browser group lives inside one window, so a selection spanning windows yields one group per window.
+        for (const ids of byWindow.values()) {
+          const groupId = await api.tabs.group({ tabIds: ids as [number, ...number[]] });
+          await api.tabGroups.update(groupId, { title });
+        }
       },
       async focusTab(tabId) {
         const api = requireExtension();

@@ -68,6 +68,22 @@ export function useOpenTabsController({ enabled, settings, spaceId, run }: Args)
     closeTab: (id: number) => void run('Closing tab', () => platform.tabs.closeTabs([id])),
     closeWindow: (id: number) => void run('Closing window', () => platform.tabs.closeWindow(id)),
     merge: () => void run('Merging windows', () => platform.tabs.mergeWindows()),
+    saveGroup: (groupTabsList: readonly OpenTab[], title: string) =>
+      void addTabs(
+        groupTabsList.map((t) => t.id),
+        { kind: 'new', spaceId: needSpaceOrThrow(spaceId), title },
+      ),
+    /** Turns the selected tabs into a browser tab group (one per window). Needs the `tabGroups` permission. */
+    groupSelected: () =>
+      void run('Grouping tabs', async () => {
+        if (selected.size === 0) throw new Error('Select some tabs first.');
+        if (!(await platform.permissions.request('tabGroups'))) {
+          throw new Error('Tabarium needs the "tabGroups" permission to create browser tab groups.');
+        }
+        await platform.tabs.groupTabs([...selected], `Group ${tabs.windows.flatMap((w) => w.groups).length + 1}`);
+        setPicked(new Set());
+        await tabs.refresh();
+      }),
     saveWindow: (w: OpenWindow, name: string) =>
       void addTabs(
         w.tabs.map((t) => t.id),

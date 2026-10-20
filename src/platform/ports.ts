@@ -13,6 +13,15 @@ export interface OpenTab {
   title: string;
   url: string;
   favIconUrl: string | null;
+  /** Browser tab group this tab belongs to, when it is in one. */
+  groupId?: number;
+}
+
+export interface TabGroupInfo {
+  id: number;
+  title: string;
+  /** One of the browser's fixed group colours ("blue", "red", ...). */
+  color: string;
 }
 
 export interface OpenOptions {
@@ -25,6 +34,8 @@ export interface OpenWindow {
   current: boolean;
   /** Saveable (http/https) tabs only, in tab-strip order. */
   tabs: OpenTab[];
+  /** Browser tab groups in this window. Empty until the optional `tabGroups` permission is granted. */
+  groups: TabGroupInfo[];
 }
 
 export interface PermissionsPort {
@@ -47,6 +58,8 @@ export interface TabsPort {
   getActiveTab(): Promise<OpenTab | null>;
   /** All normal browser windows with their saveable tabs. Requires the `tabs` permission. */
   listWindows(): Promise<OpenWindow[]>;
+  /** Puts the tabs into a new browser tab group per window (needs `tabGroups`). */
+  groupTabs(tabIds: readonly number[], title: string): Promise<void>;
   /** Brings a tab (and its window) to the front. */
   focusTab(tabId: number): Promise<void>;
   closeWindow(windowId: number): Promise<void>;
