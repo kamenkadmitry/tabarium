@@ -180,6 +180,7 @@ test('board toolbar: view, sort, colour filter and collapse all', async () => {
   await p.getByRole('button', { name: 'Change view' }).click();
   await p.getByRole('menuitemradio', { name: 'List' }).click();
   await p.reload();
+  await p.getByRole('button', { name: /^B\s*Board(?![a-z])/ }).first().click(); // a reload shows the first space again
   await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
 
   await p.getByRole('button', { name: 'Sort collections' }).click();
@@ -202,11 +203,15 @@ test('board toolbar: view, sort, colour filter and collapse all', async () => {
 
 test('toolbar button: side panel by default, switchable to the classic popup and back', async () => {
   // Real browser state: the toolbar button opens the side panel and the popup is empty.
-  const initial = await app.worker.evaluate(async () => ({
-    popup: await chrome.action.getPopup({}),
-    behaviour: await chrome.sidePanel.getPanelBehavior(),
-  }));
-  expect(initial).toEqual({ popup: '', behaviour: { openPanelOnActionClick: true } });
+  // The worker applies this shortly after it starts, so poll instead of reading once.
+  await expect
+    .poll(() =>
+      app.worker.evaluate(async () => ({
+        popup: await chrome.action.getPopup({}),
+        behaviour: await chrome.sidePanel.getPanelBehavior(),
+      })),
+    )
+    .toEqual({ popup: '', behaviour: { openPanelOnActionClick: true } });
 
   const panel = await app.context.newPage();
   await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
