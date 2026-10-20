@@ -46,6 +46,40 @@ describe('repository', () => {
   });
 });
 
+describe('manual management', () => {
+  it('renames, recolors, stars, moves and deletes', async () => {
+    const space = await repo.createSpace('S');
+    const a = await repo.createCollection(space.id, 'A');
+    const b = await repo.createCollection(space.id, 'B');
+    const [card] = await repo.addCards(a.id, [{ title: 'T', url: 'https://x.dev/1' }]);
+
+    await repo.updateCollection(a.id, { title: 'A2', color: '#ea580c' });
+    await repo.updateCard(card!.id, { starred: true, customTitle: 'Mine' });
+    await repo.moveCard(card!.id, b.id);
+
+    expect((await db.collections.get(a.id))?.title).toBe('A2');
+    const moved = await db.cards.get(card!.id);
+    expect(moved).toMatchObject({ collectionId: b.id, starred: true, customTitle: 'Mine' });
+
+    await repo.deleteCard(card!.id);
+    expect(await db.cards.count()).toBe(0);
+  });
+  it('deleting a space cascades', async () => {
+    const space = await repo.createSpace('S');
+    const col = await repo.createCollection(space.id, 'C');
+    await repo.addCards(col.id, [{ title: 'T', url: 'https://x.dev/1' }]);
+    await repo.deleteSpace(space.id);
+    expect(await db.spaces.count()).toBe(0);
+    expect(await db.collections.count()).toBe(0);
+    expect(await db.cards.count()).toBe(0);
+  });
+  it('rejects invalid urls and unknown ids', async () => {
+    await expect(repo.updateCard('nope', { starred: true })).rejects.toThrow(/does not exist/);
+    await expect(repo.updateCard('nope', { url: 'not a url' })).rejects.toThrow();
+    await expect(repo.renameSpace('nope', 'x')).rejects.toThrow(/does not exist/);
+  });
+});
+
 describe('backup', () => {
   async function seed() {
     const space = await repo.createSpace('S');

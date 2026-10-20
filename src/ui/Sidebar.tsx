@@ -76,7 +76,11 @@ export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
               key={s.id}
               active={view?.kind === 'space' && view.spaceId === s.id}
               onClick={() => onSelect({ kind: 'space', spaceId: s.id })}
-              icon={<span className="grid size-5 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">{s.name[0]?.toUpperCase()}</span>}
+              icon={
+                <span className="grid size-5 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">
+                  {s.name[0]?.toUpperCase()}
+                </span>
+              }
             >
               {s.name}
             </NavButton>

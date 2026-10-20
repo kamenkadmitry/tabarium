@@ -84,6 +84,56 @@ export class Repository {
     });
   }
 
+  async renameSpace(spaceId: string, name: string): Promise<void> {
+    if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(`Space ${spaceId} does not exist`);
+  }
+
+  async deleteSpace(spaceId: string): Promise<void> {
+    const ids = await this.db.collections.where('spaceId').equals(spaceId).primaryKeys();
+    for (const id of ids) await this.deleteCollection(id);
+    await this.db.spaces.delete(spaceId);
+  }
+
+  async updateCollection(
+    collectionId: string,
+    patch: Partial<Pick<Collection, 'title' | 'color' | 'expanded' | 'tagIds'>>,
+  ): Promise<void> {
+    const updated = await this.db.collections.update(collectionId, { ...patch, updatedAt: Date.now() });
+    if (updated === 0) throw new Error(`Collection ${collectionId} does not exist`);
+  }
+
+  async updateCard(
+    cardId: string,
+    patch: Partial<Pick<Card, 'title' | 'customTitle' | 'note' | 'starred' | 'url'>>,
+  ): Promise<void> {
+    if (patch.url !== undefined) new URL(patch.url);
+    const updated = await this.db.cards.update(cardId, { ...patch, updatedAt: Date.now() });
+    if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+  }
+
+  async deleteCard(cardId: string): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
+      await this.db.nexts.where('cardId').equals(cardId).delete();
+      await this.db.cards.delete(cardId);
+    });
+  }
+
+  /** Moves a card to another collection, appending it at the end. */
+  async moveCard(cardId: string, targetCollectionId: string): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
+      if (!(await this.db.collections.get(targetCollectionId))) {
+        throw new Error(`Collection ${targetCollectionId} does not exist`);
+      }
+      const siblings = await this.db.cards.where('collectionId').equals(targetCollectionId).toArray();
+      const updated = await this.db.cards.update(cardId, {
+        collectionId: targetCollectionId,
+        position: positionAfterLast(siblings.map((c) => c.position)),
+        updatedAt: Date.now(),
+      });
+      if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+    });
+  }
+
   async deleteCollection(collectionId: string): Promise<void> {
     await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, async () => {
       const cardIds = await this.db.cards.where('collectionId').equals(collectionId).primaryKeys();

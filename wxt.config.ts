@@ -8,7 +8,16 @@ export default defineConfig({
   manifest: {
     name: 'Tabarium',
     description: 'Local-first tab and session manager. No account, no server.',
-    permissions: ['storage', 'unlimitedStorage', 'tabs', 'contextMenus', 'sidePanel', 'alarms', 'downloads'],
-    optional_permissions: ['tabGroups', 'history'],
+    // Nothing is granted at install time: every capability is requested from the user when a feature needs it.
+    permissions: [],
+    optional_permissions: [
+      'tabs',
+      'contextMenus',
+      'sidePanel',
+      'downloads',
+      'alarms',
+      'tabGroups',
+      'history',
+    ],
   },
 });

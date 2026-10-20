@@ -1,5 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import { db } from '../../core/instance';
+import { createChromePlatform } from '../../platform/chrome';
+import { PlatformProvider } from '../../platform/context';
+import { createDemoPlatform } from '../../platform/demo';
 import { App } from '../../ui/App';
 import { seedDemo } from '../../ui/seed';
 import '../../ui/styles.css';
@@ -8,9 +11,14 @@ const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');
 
 async function start(container: HTMLElement): Promise<void> {
-  // Demo content is available only in dev builds or with ?demo=1 so reviewers can see a populated UI.
-  if (import.meta.env.DEV || new URLSearchParams(location.search).has('demo')) await seedDemo(db);
-  createRoot(container).render(<App />);
+  // `?demo=1` loads sample data and an in-memory browser stub so the UI can be reviewed outside an extension.
+  const demo = new URLSearchParams(location.search).has('demo');
+  if (demo) await seedDemo(db);
+  createRoot(container).render(
+    <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
+      <App />
+    </PlatformProvider>,
+  );
 }
 
 void start(root);
