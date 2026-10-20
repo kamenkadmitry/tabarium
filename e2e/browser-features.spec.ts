@@ -161,7 +161,7 @@ test('open tabs panel: shows browser tab groups, groups a selection, finds open 
 
   // Search also finds tabs that are only open (not saved) in the browser.
   await p.getByPlaceholder('Search all tabs').fill('grp-y');
-  const open = p.getByRole('region', { name: 'Open tabs' }).or(p.locator('section[aria-label="Open tabs"]'));
+  const open = p.locator('main section[aria-label="Open tabs"]'); // the search results, not the panel
   await expect(open.getByText('Page grp-y')).toBeVisible();
   await p.close();
 });
