@@ -132,7 +132,8 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   await expect(panel.locator('section')).toHaveCount(2);
   await panel.getByRole('button', { name: 'Merge windows' }).click();
   await expect(panel.locator('section')).toHaveCount(1);
-  await expect(panel.getByRole('button', { name: 'Page other-window', exact: true })).toBeVisible();
+  // Matched by address: the moved tab's title may still be loading.
+  await expect(panel.locator('[data-open-tab-id] button[title*="/other-window"]')).toBeVisible();
   await p.close();
 });
 
