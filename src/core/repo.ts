@@ -9,6 +9,8 @@ export interface NewCard {
   title: string;
   url: string;
   favIconUrl?: string | null;
+  customTitle?: string | null;
+  note?: string | null;
 }
 
 export { normalizeUrl };
@@ -68,8 +70,8 @@ export class Repository {
           title: item.title,
           url: item.url,
           favIconUrl: item.favIconUrl ?? null,
-          customTitle: null,
-          note: null,
+          customTitle: item.customTitle ?? null,
+          note: item.note ?? null,
           starred: false,
           position,
           createdAt: now,
@@ -224,6 +226,7 @@ export class Repository {
   async importStructure(spaces: readonly ImportedSpace[]): Promise<{ collections: number; cards: number }> {
     let collections = 0;
     let cards = 0;
+    const tagByTitle = new Map((await this.db.tags.toArray()).map((t) => [t.title.toLowerCase(), t.id]));
     for (const s of spaces) {
       const existing = (await this.db.spaces.toArray()).find((x) => x.name === s.name);
       const space = existing ?? (await this.createSpace(s.name));
@@ -231,6 +234,17 @@ export class Repository {
         const col = await this.createCollection(space.id, c.title || 'Untitled');
         collections += 1;
         cards += (await this.addCards(col.id, dedupeLinks(c.links))).length;
+        const tagIds: string[] = [];
+        for (const tag of c.tags ?? []) {
+          const key = tag.title.toLowerCase();
+          let id = tagByTitle.get(key);
+          if (id === undefined) {
+            id = (await this.createTag(tag.title || 'Untitled', tag.color || '#0d9488')).id;
+            tagByTitle.set(key, id);
+          }
+          tagIds.push(id);
+        }
+        if (tagIds.length > 0) await this.setCollectionTags(col.id, tagIds);
       }
     }
     return { collections, cards };

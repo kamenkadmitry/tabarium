@@ -53,17 +53,25 @@ export function toPlainText(b: Backup): string {
 export interface ImportedLink {
   title: string;
   url: string;
+  favIconUrl?: string | null;
+  customTitle?: string | null;
+  note?: string | null;
+}
+export interface ImportedTag {
+  title: string;
+  color: string;
 }
 export interface ImportedCollection {
   title: string;
   links: ImportedLink[];
+  tags?: ImportedTag[];
 }
 export interface ImportedSpace {
   name: string;
   collections: ImportedCollection[];
 }
 
-const isWebUrl = (url: string) => /^https?:\/\//i.test(url);
+export const isWebUrl = (url: string) => /^https?:\/\//i.test(url);
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 const decodeEntities = (s: string) =>

@@ -3,6 +3,7 @@ import { Download, Eye, EyeOff, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
 import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
+import { parseTobyFile, toTobyJson } from '../core/toby';
 import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
@@ -80,17 +81,25 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     setStatus(`Exported ${backup.cards.length} tabs in ${backup.collections.length} collections.`);
   });
 
-  const exportAs = (format: 'html' | 'txt') =>
+  const exportAs = (format: 'html' | 'txt' | 'toby') =>
     guard('Export', async () => {
       const backup = await exportBackup(db);
       const base = backupFilename().replace(/\.json$/, '');
       if (format === 'html') downloadTextFile(`${base}.html`, toBookmarksHtml(backup), 'text/html');
-      else downloadTextFile(`${base}.txt`, toPlainText(backup), 'text/plain');
-      setStatus(`Exported ${backup.cards.length} tabs as ${format.toUpperCase()}.`);
+      else if (format === 'txt') downloadTextFile(`${base}.txt`, toPlainText(backup), 'text/plain');
+      else downloadTextFile(`${base}-toby.json`, toTobyJson(backup));
+      setStatus(`Exported ${backup.cards.length} tabs as ${format === 'toby' ? 'Toby-compatible JSON' : format.toUpperCase()}.`);
     })();
 
+  /** Browser bookmarks (.html with folders) or a Toby export (.json, .txt, flat .html). */
   const importBookmarks = async (file: File) => {
-    const imported = parseBookmarksHtml(await file.text());
+    const text = await file.text();
+    const isNetscape = /<!DOCTYPE NETSCAPE-Bookmark-file/i.test(text) || /<dl\b/i.test(text);
+    const imported = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')
+      ? isNetscape
+        ? parseBookmarksHtml(text)
+        : parseTobyFile(file.name, text)
+      : parseTobyFile(file.name, text);
     const result = await repo.importStructure(imported);
     setStatus(`Imported ${result.cards} tabs into ${result.collections} collections from ${file.name}.`);
   };
@@ -179,15 +188,18 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
           <button type="button" className={buttonClass} onClick={() => exportAs('txt')}>
             <Download size={16} aria-hidden /> Text
           </button>
+          <button type="button" className={buttonClass} onClick={() => exportAs('toby')}>
+            <Download size={16} aria-hidden /> Toby-compatible JSON
+          </button>
           <button type="button" className={buttonClass} onClick={() => bookmarksInput.current?.click()}>
-            <Upload size={16} aria-hidden /> Import bookmarks (HTML)
+            <Upload size={16} aria-hidden /> Import bookmarks or Toby file
           </button>
           <input
             ref={bookmarksInput}
             type="file"
-            accept="text/html,.html,.htm"
+            accept=".html,.htm,.json,.txt"
             className="hidden"
-            aria-label="Bookmarks file"
+            aria-label="Bookmarks or Toby file"
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
