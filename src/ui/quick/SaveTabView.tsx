@@ -61,7 +61,10 @@ export function SaveTabView({ spaces, collections, cardCounts, autoClose, onAuto
   };
 
   const save = async (dest: Destination) => {
-    if (!tab) return;
+    if (!tab) {
+      onStatus({ tone: 'error', text: 'Open a web page (http or https) to save it.' });
+      return;
+    }
     setBusy(true);
     onStatus(null);
     try {
@@ -110,7 +113,7 @@ export function SaveTabView({ spaces, collections, cardCounts, autoClose, onAuto
         </div>
       </section>
 
-      <div className={busy || !tab ? 'pointer-events-none opacity-50' : undefined}>
+      <div className={busy ? 'pointer-events-none opacity-50' : undefined}>
         <DestinationPicker spaces={spaces} collections={collections} cardCounts={cardCounts} query={query} onPick={(d) => void save(d)} />
       </div>
 
