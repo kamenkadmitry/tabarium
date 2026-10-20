@@ -48,6 +48,11 @@ export async function saveSettings(db: TabariumDB, settings: Settings): Promise<
   await db.settings.put({ key: KEY, value: SettingsSchema.parse(settings) });
 }
 
+/** Remembers that a backup was just written. */
+export async function recordBackup(db: TabariumDB): Promise<void> {
+  await updateSettings(db, { lastBackupAt: Date.now() });
+}
+
 export async function updateSettings(db: TabariumDB, patch: Partial<Settings>): Promise<Settings> {
   return db.transaction('rw', db.settings, async () => {
     const next = { ...(await loadSettings(db)), ...patch };

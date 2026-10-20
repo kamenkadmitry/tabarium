@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { exportBackup } from '../core/backup';
 import { db } from '../core/instance';
-import { loadSettings, updateSettings } from '../core/settings';
+import { loadSettings, recordBackup } from '../core/settings';
 import { backupFilename } from '../platform/files';
 
 const BACKUP_ALARM = 'tabarium-auto-backup';
@@ -12,7 +12,7 @@ async function runAutoBackup(): Promise<void> {
   // Service workers cannot create object URLs, so the payload goes through a data: URL.
   const url = `data:application/json;charset=utf-8,${encodeURIComponent(json)}`;
   await browser.downloads.download({ url, filename: `Tabarium/${backupFilename()}`, conflictAction: 'uniquify' });
-  await updateSettings(db, { lastBackupAt: Date.now() });
+  await recordBackup(db);
 }
 
 /** Aligns the alarm with settings. A no-op until the user has granted `alarms`. */

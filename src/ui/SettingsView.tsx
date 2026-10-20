@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
 import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
 import { db, repo } from '../core/instance';
-import { AI_PROVIDERS, loadSettings, type Settings, updateSettings } from '../core/settings';
+import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
 import { inputClass } from './Dialog';
@@ -76,7 +76,7 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const exportNow = guard('Export', async () => {
     const backup = await exportBackup(db);
     downloadTextFile(backupFilename(), JSON.stringify(backup, null, 2));
-    await updateSettings(db, { lastBackupAt: Date.now() });
+    await recordBackup(db);
     setStatus(`Exported ${backup.cards.length} tabs in ${backup.collections.length} collections.`);
   });
 

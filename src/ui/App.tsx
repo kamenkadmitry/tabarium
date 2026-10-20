@@ -37,7 +37,7 @@ export function App() {
   const platform = usePlatform();
   const data = useLibraryData();
   const settings = useLiveQuery(() => loadSettings(db), []);
-  const [view, setView] = useState<View | null>(null);
+  const [selectedView, setView] = useState<View | null>(null);
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -50,10 +50,9 @@ export function App() {
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  // Until the user picks something, show the first space.
   const firstSpaceId = data?.spaces[0]?.id;
-  useEffect(() => {
-    if (view === null && firstSpaceId) setView({ kind: 'space', spaceId: firstSpaceId });
-  }, [firstSpaceId, view]);
+  const view: View | null = selectedView ?? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null);
 
   const reportError = (what: string, e: unknown) => {
     console.error(`Tabarium: ${what} failed`, e);
