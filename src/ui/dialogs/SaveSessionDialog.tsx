@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection } from '../../core/types';
 import type { OpenTab } from '../../platform/ports';
@@ -8,15 +9,25 @@ const NEW = '__new__';
 interface Props {
   tabs: readonly OpenTab[];
   collections: readonly Collection[];
-  onSave: (args: { tabs: OpenTab[]; collectionId: string | null; newTitle: string; closeTabs: boolean }) => Promise<void>;
+  /** Present only when an AI provider is configured. */
+  onOrganise?: (tabs: OpenTab[]) => Promise<{ title: string; tabs: OpenTab[] }[]>;
+  onSave: (args: {
+    tabs: OpenTab[];
+    collectionId: string | null;
+    newTitle: string;
+    closeTabs: boolean;
+    groups: { title: string; tabs: OpenTab[] }[] | null;
+  }) => Promise<void>;
   onClose: () => void;
 }
 
-export function SaveSessionDialog({ tabs, collections, onSave, onClose }: Props) {
+export function SaveSessionDialog({ tabs, collections, onOrganise, onSave, onClose }: Props) {
   const [selected, setSelected] = useState(() => new Set(tabs.map((t) => t.id)));
   const [target, setTarget] = useState(NEW);
   const [newTitle, setNewTitle] = useState(`Session ${new Date().toLocaleDateString()}`);
   const [busy, setBusy] = useState(false);
+  const [groups, setGroups] = useState<{ title: string; tabs: OpenTab[] }[] | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const chosen = tabs.filter((t) => selected.has(t.id));
   const canSave = chosen.length > 0 && (target !== NEW || newTitle.trim() !== '') && !busy;
@@ -24,23 +35,60 @@ export function SaveSessionDialog({ tabs, collections, onSave, onClose }: Props)
   const save = async (closeTabs: boolean) => {
     setBusy(true);
     try {
-      await onSave({ tabs: chosen, collectionId: target === NEW ? null : target, newTitle: newTitle.trim(), closeTabs });
+      await onSave({ tabs: chosen, collectionId: target === NEW ? null : target, newTitle: newTitle.trim(), closeTabs, groups });
       onClose();
     } finally {
       setBusy(false);
     }
   };
 
-  const toggle = (id: number) =>
+  const organise = async () => {
+    if (!onOrganise) return;
+    setBusy(true);
+    setAiError(null);
+    try {
+      setGroups(await onOrganise(chosen));
+    } catch (e) {
+      console.error('Tabarium: AI grouping failed', e);
+      setAiError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (id: number) => {
+    setGroups(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   return (
     <Dialog title="Save session" onClose={onClose}>
+      {groups && (
+        <section aria-label="AI groups" className="mb-4 rounded-lg border border-primary p-3">
+          <p className="mb-2 flex items-center justify-between text-sm font-semibold">
+            <span>
+              {groups.length} groups from AI
+            </span>
+            <button type="button" className="text-xs font-semibold text-primary" onClick={() => setGroups(null)}>
+              Discard
+            </button>
+          </p>
+          <ul className="text-sm">
+            {groups.map((g) => (
+              <li key={g.title} className="flex justify-between py-0.5">
+                <span className="truncate font-medium">{g.title}</span>
+                <span className="text-muted">{g.tabs.length}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className={groups ? 'hidden' : undefined}>
       <Field label="Save to">
         <select value={target} onChange={(e) => setTarget(e.target.value)} className={inputClass}>
           <option value={NEW}>New collection…</option>
@@ -56,6 +104,7 @@ export function SaveSessionDialog({ tabs, collections, onSave, onClose }: Props)
           <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className={inputClass} />
         </Field>
       )}
+      </div>
 
       <fieldset className="mb-5">
         <legend className="mb-1.5 flex w-full items-center justify-between text-sm font-semibold">
@@ -89,8 +138,18 @@ export function SaveSessionDialog({ tabs, collections, onSave, onClose }: Props)
         {tabs.length === 0 && <p className="mt-2 text-sm text-muted">No web pages are open in this window.</p>}
       </fieldset>
 
+      {aiError && (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {aiError}
+        </p>
+      )}
       <div className="flex flex-wrap justify-end gap-2">
         <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        {onOrganise && (
+          <SecondaryButton disabled={chosen.length === 0 || busy} onClick={() => void organise()}>
+            <Sparkles size={15} aria-hidden /> Organise with AI
+          </SecondaryButton>
+        )}
         <SecondaryButton disabled={!canSave} onClick={() => void save(false)}>
           Add &amp; keep tabs open
         </SecondaryButton>

@@ -8,6 +8,8 @@ import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
+import { testConnection } from '../core/ai/tasks';
+import { isAiConfigured, withProviderAccess } from './ai';
 import { inputClass } from './Dialog';
 
 const PROVIDER_LABELS: Record<(typeof AI_PROVIDERS)[number], string> = {
@@ -143,6 +145,11 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       await updateSettings(db, { tabGroups: enabled });
       setStatus(enabled ? 'Collections will open as tab groups.' : 'Collections will open as plain tabs.');
     })();
+
+  const testAi = guard('AI connection test', async () => {
+    await withProviderAccess(platform, settings.ai, () => testConnection(settings.ai));
+    setStatus('Connection works.');
+  });
 
   const saveAi = guard('Saving AI settings', async () => {
     if (aiDraft === null) return;
@@ -336,9 +343,12 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             </label>
           </>
         )}
-        <div>
+        <div className="flex flex-wrap gap-2">
           <button type="button" disabled={aiDraft === null} onClick={saveAi} className={buttonClass}>
             Save AI settings
+          </button>
+          <button type="button" disabled={aiDraft !== null || !isAiConfigured(settings.ai)} onClick={testAi} className={buttonClass}>
+            Test connection
           </button>
         </div>
       </Section>

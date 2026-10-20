@@ -23,6 +23,8 @@ export interface PermissionsPort {
   has(capability: Capability): Promise<boolean>;
   /** Must be called from a user gesture (click handler). Resolves to whether the user granted it. */
   request(capability: Capability): Promise<boolean>;
+  /** Asks for access to one web origin (e.g. an AI provider). Must be called from a user gesture. */
+  requestOrigin(origin: string): Promise<boolean>;
 }
 
 export interface TabsPort {

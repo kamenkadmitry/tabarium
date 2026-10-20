@@ -2,14 +2,17 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { FolderPlus, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db, repo } from '../core/instance';
+import { groupTabs, suggestCollectionNames } from '../core/ai/tasks';
 import { loadSettings } from '../core/settings';
 import type { Card, Collection, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
+import { isAiConfigured, withProviderAccess } from './ai';
 import type { OpenTab } from '../platform/ports';
 import type { CardRowActions } from './CardRow';
 import { CardRow } from './CardRow';
 import { CollectionCard, type CollectionActions } from './CollectionCard';
 import { AddLinkDialog } from './dialogs/AddLinkDialog';
+import { AiNamesDialog } from './dialogs/AiNamesDialog';
 import { CardDialog } from './dialogs/CardDialog';
 import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
@@ -29,6 +32,7 @@ type DialogState =
   | { kind: 'card'; card: Card }
   | { kind: 'move'; card: Card }
   | { kind: 'tags'; collectionId?: string }
+  | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
 const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', settings: 'Settings' } as const;
@@ -84,6 +88,7 @@ export function App() {
     onNext: act('Adding to Next', async () => void (await repo.addToNext(c.id))),
   });
 
+  const aiReady = settings !== undefined && isAiConfigured(settings.ai);
   const groupOptions = (col: Collection) => (settings?.tabGroups ? { groupTitle: col.title } : undefined);
 
   const collectionActions = (col: Collection, list: readonly Card[]): CollectionActions => ({
@@ -94,6 +99,19 @@ export function App() {
         groupOptions(col),
       ),
     ),
+    suggestName:
+      aiReady && settings
+        ? () =>
+            void run('Suggesting names', async () => {
+              const suggestions = await withProviderAccess(platform, settings.ai, () =>
+                suggestCollectionNames(
+                  settings.ai,
+                  list.map((c) => ({ title: c.customTitle ?? c.title, url: c.url })),
+                ),
+              );
+              setDialog({ kind: 'ai-names', collectionId: col.id, suggestions });
+            })
+        : undefined,
     replaceWindow: () => {
       if (!confirm(`Close the other tabs in this window and open “${col.title}” instead?`)) return;
       void run('Replacing window tabs', async () => {
@@ -371,6 +389,13 @@ export function App() {
           onSubmit={(target) => run('Moving tab', () => repo.moveCard(dialog.card.id, target))}
         />
       )}
+      {dialog?.kind === 'ai-names' && (
+        <AiNamesDialog
+          suggestions={dialog.suggestions}
+          onClose={() => setDialog(null)}
+          onPick={(title) => run('Renaming collection', () => repo.updateCollection(dialog.collectionId, { title }))}
+        />
+      )}
       {dialog?.kind === 'tags' && (
         <TagsDialog
           tags={tags}
@@ -386,13 +411,30 @@ export function App() {
           tabs={dialog.tabs}
           collections={collections.filter((c) => c.spaceId === spaceId)}
           onClose={() => setDialog(null)}
-          onSave={({ tabs, collectionId, newTitle, closeTabs }) =>
+          onOrganise={
+            aiReady && settings
+              ? (tabs) =>
+                  withProviderAccess(platform, settings.ai, async () => {
+                    const groups = await groupTabs(
+                      settings.ai,
+                      tabs.map((t) => ({ title: t.title, url: t.url })),
+                    );
+                    return groups.map((g) => ({ title: g.title, tabs: g.indexes.map((i) => tabs[i] as OpenTab) }));
+                  })
+              : undefined
+          }
+          onSave={({ tabs, collectionId, newTitle, closeTabs, groups }) =>
             run('Saving session', async () => {
-              const targetId = collectionId ?? (await repo.createCollection(spaceId, newTitle)).id;
-              await repo.addCards(
-                targetId,
-                tabs.map((t) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl })),
-              );
+              const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
+              if (groups) {
+                for (const g of groups) {
+                  const col = await repo.createCollection(spaceId, g.title);
+                  await repo.addCards(col.id, g.tabs.map(toCard));
+                }
+              } else {
+                const targetId = collectionId ?? (await repo.createCollection(spaceId, newTitle)).id;
+                await repo.addCards(targetId, tabs.map(toCard));
+              }
               if (closeTabs) await platform.tabs.closeTabs(tabs.map((t) => t.id));
             })
           }

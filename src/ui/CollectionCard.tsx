@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Tag } from '../core/types';
 import { CardRow, type CardRowActions } from './CardRow';
@@ -8,6 +8,8 @@ import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 export interface CollectionActions {
   addLink: () => void;
   openAll: () => void;
+  /** Present only when an AI provider is configured. */
+  suggestName?: () => void;
   /** Close the other tabs of this window and open this collection instead. */
   replaceWindow: () => void;
   rename: () => void;
@@ -58,6 +60,11 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
       <button role="menuitem" type="button" onClick={run(actions.replaceWindow)} className={menuItem}>
         <RefreshCw size={15} aria-hidden /> Replace window tabs
       </button>
+      {actions.suggestName && (
+        <button role="menuitem" type="button" onClick={run(actions.suggestName)} className={menuItem}>
+          <Sparkles size={15} aria-hidden /> Suggest name (AI)
+        </button>
+      )}
       <button role="menuitem" type="button" onClick={run(actions.editTags)} className={menuItem}>
         <TagIcon size={15} aria-hidden /> Tags…
       </button>
