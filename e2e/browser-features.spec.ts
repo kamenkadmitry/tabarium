@@ -111,8 +111,8 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   const panel = p.getByRole('complementary', { name: 'Open tabs' });
 
   // The list comes from the real browser and follows it.
-  await expect(panel.getByRole('button', { name: 'Page panel-one' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Page panel-two' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Page panel-one', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Page panel-two', exact: true })).toBeVisible();
 
   // Drag a real tab into the collection; the tab stays open by default.
   await panel.locator('[data-open-tab-id]', { hasText: 'Page panel-one' }).dragTo(p.locator('section[aria-label="Target"]'));
@@ -124,14 +124,14 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   await panel.locator('[data-open-tab-id]', { hasText: 'Page panel-two' }).dragTo(p.locator('section[aria-label="Target"]'));
   await expect(p.locator('section[aria-label="Target"] a[href="https://example.test/panel-two"]')).toBeVisible();
   await expect.poll(() => two.isClosed()).toBe(true);
-  await expect(panel.getByRole('button', { name: 'Page panel-two' })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Page panel-two', exact: true })).toHaveCount(0);
 
   // A second window shows up as its own block; "Merge windows" pulls its tabs into this one.
   await app.worker.evaluate(() => chrome.windows.create({ url: 'https://example.test/other-window' }));
   await expect(panel.locator('section')).toHaveCount(2);
   await panel.getByRole('button', { name: 'Merge windows' }).click();
   await expect(panel.locator('section')).toHaveCount(1);
-  await expect(panel.getByRole('button', { name: 'Page other-window' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Page other-window', exact: true })).toBeVisible();
   await p.close();
 });
 
