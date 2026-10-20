@@ -197,7 +197,7 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await p.getByRole('button', { name: /^L\s*Labels/ }).first().click();
   await p.locator('section[aria-label="Reading"]').getByRole('button', { name: 'Add link' }).click();
   await p.getByLabel('Address').fill('https://example.test/labelled');
-  await p.getByLabel('Title', { exact: true }).fill('Labelled link');
+  await p.locator('dialog[open]').getByLabel('Title').fill('Labelled link');
   await p.getByLabel('Tags', { exact: true }).fill('wor');
   await p.getByRole('button', { name: 'Work', exact: true }).click();
   await p.getByLabel('Hashtags', { exact: true }).fill('machine');
