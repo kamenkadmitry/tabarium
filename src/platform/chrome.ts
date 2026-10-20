@@ -18,6 +18,11 @@ export function createChromePlatform(): Platform {
       has: (capability) => requireExtension().permissions.contains(toPermissions(capability)),
       request: (capability) => requireExtension().permissions.request(toPermissions(capability)),
     },
+    backupSchedule: {
+      async resync() {
+        await requireExtension().runtime.sendMessage({ type: 'sync-backup-alarm' });
+      },
+    },
     tabs: {
       async listWindowTabs() {
         const tabs = await requireExtension().tabs.query({ currentWindow: true });

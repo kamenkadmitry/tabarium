@@ -20,6 +20,7 @@ export function createDemoPlatform(): Platform {
         return true;
       },
     },
+    backupSchedule: { resync: async () => undefined },
     tabs: {
       listWindowTabs: async () => [...tabs],
       closeTabs: async (ids) => {

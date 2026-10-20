@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { FolderPlus, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db, repo } from '../core/instance';
+import { loadSettings } from '../core/settings';
 import type { Card } from '../core/types';
 import { usePlatform } from '../platform/context';
 import type { OpenTab } from '../platform/ports';
@@ -9,6 +10,7 @@ import { CardRow, CollectionCard } from './CollectionCard';
 import { AddLinkDialog } from './dialogs/AddLinkDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
+import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
 
 type DialogState =
@@ -28,19 +30,30 @@ export function App() {
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const settings = useLiveQuery(() => loadSettings(db), []);
+  const theme = settings?.theme;
+  useEffect(() => {
+    if (theme === undefined) return;
+    if (theme === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
   useEffect(() => {
     const first = spaces?.[0];
     if (view === null && first) setView({ kind: 'space', spaceId: first.id });
   }, [spaces, view]);
 
   /** Runs a user-triggered action; expected failures are logged with context and shown to the user. */
+  const reportError = (what: string, e: unknown) => {
+    console.error(`Tabarium: ${what} failed`, e);
+    setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
+  };
   const run = async (what: string, action: () => Promise<void>) => {
     try {
       setError(null);
       await action();
     } catch (e) {
-      console.error(`Tabarium: ${what} failed`, e);
-      setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
+      reportError(what, e);
     }
   };
 
@@ -77,7 +90,9 @@ export function App() {
     run('Opening tabs', () => platform.tabs.openUrls(list.map((c) => c.url)));
 
   const spaceId = activeSpace?.id;
-  const titleText = view?.kind === 'starred' ? 'Starred' : view?.kind === 'next' ? 'Next' : (activeSpace?.name ?? 'Library');
+  const titleByKind = { starred: 'Starred', next: 'Next', settings: 'Settings' } as const;
+  const titleText = view && view.kind !== 'space' ? titleByKind[view.kind] : (activeSpace?.name ?? 'Library');
+  const showLibraryTools = view?.kind === 'space';
 
   return (
     <div className="flex h-full">
@@ -85,6 +100,7 @@ export function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
           <h1 className="text-xl font-bold tracking-tight">{titleText}</h1>
+          {showLibraryTools && (
           <label className="relative ml-4 max-w-md flex-1">
             <span className="sr-only">Search tabs</span>
             <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -95,6 +111,8 @@ export function App() {
               className="h-10 w-full rounded-lg border border-line bg-bg pl-9 pr-3 text-sm placeholder:text-muted"
             />
           </label>
+          )}
+          {showLibraryTools && (
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -112,6 +130,7 @@ export function App() {
               <Plus size={16} aria-hidden /> Save session
             </button>
           </div>
+          )}
         </header>
 
         {error && (
@@ -138,7 +157,9 @@ export function App() {
             </ul>
           )}
 
-          {view?.kind === 'next' && <p className="mt-16 text-center text-muted">The Next queue is coming soon.</p>}
+          {view?.kind === 'settings' && <SettingsView onError={reportError} />}
+
+          {view?.kind === 'next' &&<p className="mt-16 text-center text-muted">The Next queue is coming soon.</p>}
 
           {view?.kind === 'space' && (
             <>

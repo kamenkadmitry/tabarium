@@ -28,7 +28,13 @@ export interface TabsPort {
   openUrls(urls: readonly string[]): Promise<void>;
 }
 
+export interface BackupSchedulePort {
+  /** Tells the background worker to re-read the auto-backup settings and (re)create or clear its alarm. */
+  resync(): Promise<void>;
+}
+
 export interface Platform {
   permissions: PermissionsPort;
   tabs: TabsPort;
+  backupSchedule: BackupSchedulePort;
 }

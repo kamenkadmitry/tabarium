@@ -1,7 +1,7 @@
 import { Clock, Layers, Plus, Settings, Star } from 'lucide-react';
 import type { Space } from '../core/types';
 
-export type View = { kind: 'space'; spaceId: string } | { kind: 'starred' } | { kind: 'next' };
+export type View = { kind: 'space'; spaceId: string } | { kind: 'starred' } | { kind: 'next' } | { kind: 'settings' };
 
 interface Props {
   spaces: readonly Space[];
@@ -88,7 +88,11 @@ export function Sidebar({ spaces, view, onSelect, onCreateSpace }: Props) {
         </div>
       </nav>
 
-      <NavButton active={false} onClick={() => undefined} icon={<Settings size={18} aria-hidden />}>
+      <NavButton
+        active={view?.kind === 'settings'}
+        onClick={() => onSelect({ kind: 'settings' })}
+        icon={<Settings size={18} aria-hidden />}
+      >
         Settings
       </NavButton>
     </aside>
