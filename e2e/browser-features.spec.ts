@@ -185,13 +185,13 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await p.getByRole('button', { name: 'Tags', exact: true }).click();
   await p.getByLabel('Tag name').fill('Work');
   await p.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(p.getByRole('list', { name: 'Tags' }).getByDisplayValue('Work')).toBeVisible();
+  await expect(p.getByLabel('Name of tag Work')).toBeVisible();
 
   // Hashtags page: create one, normalised.
   await p.getByRole('button', { name: 'Hashtags', exact: true }).click();
   await p.getByLabel('Hashtag name').fill('#Machine Learning');
   await p.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(p.getByRole('list', { name: 'Hashtags' }).getByDisplayValue('machine-learning')).toBeVisible();
+  await expect(p.getByLabel('Name of hashtag machine-learning')).toBeVisible();
 
   // Add a link: pick the existing tag and hashtag, and create a new hashtag right there.
   await p.getByRole('button', { name: /^L\s*Labels/ }).first().click();
