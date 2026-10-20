@@ -179,6 +179,8 @@ test('board toolbar: view, sort, colour filter and collapse all', async () => {
   // The layout is remembered per space, also after a reload.
   await p.getByRole('button', { name: 'Change view' }).click();
   await p.getByRole('menuitemradio', { name: 'List' }).click();
+  // The button label comes from the stored setting, so once it reads "List" the choice is saved.
+  await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
   await p.reload();
   await p.getByRole('button', { name: /^B\s*Board(?![a-z])/ }).first().click(); // a reload shows the first space again
   await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
