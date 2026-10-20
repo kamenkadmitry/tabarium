@@ -319,7 +319,7 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await expect(popup.getByText('Page popup-b')).toBeVisible();
   await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
   await popup.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).click(); // space row
-  await popup.getByRole('button', { name: 'Quick target' }).click(); // collection row
+  await popup.getByRole('button', { name: 'Quick target', exact: true }).click(); // collection row (not its expander)
   await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
 
   await lib.reload();
