@@ -87,8 +87,16 @@ test('open all as a tab group, then replace the window tabs', async () => {
   await p.getByRole('menuitem', { name: 'Replace window tabs' }).click();
 
   await expect.poll(() => stray.isClosed()).toBe(true);
-  await expect.poll(() => app.context.pages().filter((x) => x.url().startsWith(web('docs-'))).length).toBe(2);
-  expect(p.isClosed()).toBe(false); // the library itself is kept
+  await expect
+    .poll(() =>
+      app.worker.evaluate(
+        async () => (await chrome.tabs.query({})).map((t) => t.url ?? t.pendingUrl ?? '').filter((u) => u.includes('docs-')).length,
+      ),
+    )
+    .toBe(2);
+  const urls = await app.worker.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.url ?? t.pendingUrl ?? ''));
+  expect(urls.some((u) => u.includes('/newtab.html'))).toBe(true); // the library itself is kept
+  expect(urls.some((u) => u.includes('stray'))).toBe(false);
   await p.close();
 });
 
