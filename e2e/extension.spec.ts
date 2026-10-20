@@ -72,6 +72,8 @@ test('settings: export produces a valid backup that restores after deletion', as
 test('popup renders and the service worker started without errors', async () => {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/popup.html`);
-  await expect(page.getByRole('button', { name: 'Save this tab' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Save tab' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Group tabs' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Next' })).toBeVisible();
   expect(workerErrors).toEqual([]);
 });

@@ -225,6 +225,7 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
 
   await lib.reload();
+  await lib.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).first().click(); // show the space the popup saved into
   const target = lib.locator('section[aria-label="Quick target"]');
   await expect(target.getByText('Page popup-a')).toBeVisible();
   await expect(target.getByText('Page popup-b')).toBeVisible();
