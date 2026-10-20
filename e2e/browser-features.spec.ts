@@ -166,6 +166,68 @@ test('open tabs panel: shows browser tab groups, groups a selection, finds open 
   await p.close();
 });
 
+test('board toolbar: view, sort, colour filter and collapse all', async () => {
+  const p = await openLibraryWithSpace('Board');
+  await addCollectionWithLinks(p, 'Bravo', []);
+  await addCollectionWithLinks(p, 'alpha', []);
+  await p.locator('section[aria-label="Bravo"]').getByRole('button', { name: 'Collection menu' }).click();
+  await p.getByRole('button', { name: 'Orange' }).click();
+
+  const titles = () => p.locator('main section[aria-label] > header h2').allTextContents();
+  await expect(p.getByText('2 Collections')).toBeVisible();
+
+  // The layout is remembered per space, also after a reload.
+  await p.getByRole('button', { name: 'Change view' }).click();
+  await p.getByRole('menuitemradio', { name: 'List' }).click();
+  await p.reload();
+  await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
+
+  await p.getByRole('button', { name: 'Sort collections' }).click();
+  await p.getByRole('menuitemradio', { name: 'Name A–Z' }).click();
+  await expect.poll(titles).toEqual(['alpha', 'Bravo']);
+
+  await p.getByRole('button', { name: 'Filter collections' }).click();
+  await p.getByRole('menuitem', { name: /^Colour/ }).click();
+  await p.getByRole('menuitemradio', { name: 'Orange' }).click();
+  await expect.poll(titles).toEqual(['Bravo']);
+  await p.getByRole('button', { name: 'Clear filter Orange' }).click();
+  await expect.poll(titles).toEqual(['alpha', 'Bravo']);
+
+  await p.getByRole('button', { name: 'Collapse all' }).click();
+  await expect(p.getByRole('button', { name: 'Expand Bravo' })).toHaveAttribute('aria-expanded', 'false');
+  await p.getByRole('button', { name: 'Expand all' }).click();
+  await expect(p.getByRole('button', { name: 'Collapse Bravo' })).toHaveAttribute('aria-expanded', 'true');
+  await p.close();
+});
+
+test('toolbar button: side panel by default, switchable to the classic popup and back', async () => {
+  // Real browser state: the toolbar button opens the side panel and the popup is empty.
+  const initial = await app.worker.evaluate(async () => ({
+    popup: await chrome.action.getPopup({}),
+    behaviour: await chrome.sidePanel.getPanelBehavior(),
+  }));
+  expect(initial).toEqual({ popup: '', behaviour: { openPanelOnActionClick: true } });
+
+  const panel = await app.context.newPage();
+  await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
+  await expect(panel.getByText('Prefer the classic popup?')).toBeVisible();
+  await panel.getByRole('button', { name: 'Switch back' }).click();
+  await expect(panel.getByRole('status')).toContainText('classic popup');
+  await expect
+    .poll(() => app.worker.evaluate(async () => (await chrome.action.getPopup({})).endsWith('popup.html')))
+    .toBe(true);
+  expect(await app.worker.evaluate(() => chrome.sidePanel.getPanelBehavior())).toEqual({ openPanelOnActionClick: false });
+
+  // The popup offers the way back.
+  const popup = await app.context.newPage();
+  await popup.goto(`chrome-extension://${app.extensionId}/popup.html`);
+  await popup.getByRole('button', { name: /side panel instead/ }).click();
+  await expect(popup.getByRole('status')).toContainText('side panel');
+  await expect.poll(() => app.worker.evaluate(async () => await chrome.action.getPopup({}))).toBe('');
+  await panel.close();
+  await popup.close();
+});
+
 test('scheduled backup writes a file and records the time', async () => {
   const p = await app.context.newPage();
   await p.goto(library(app.extensionId));

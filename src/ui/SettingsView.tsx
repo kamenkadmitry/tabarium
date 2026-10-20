@@ -144,6 +144,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       setStatus(enabled ? 'Auto-backup enabled. Files are saved to Downloads/Tabarium.' : 'Auto-backup disabled.');
     })();
 
+  const setToolbar = (quickPanel: 'side' | 'popup') =>
+    guard('Toolbar button', async () => {
+      await updateSettings(db, { quickPanel });
+      await platform.backupSchedule.resync();
+      setStatus(quickPanel === 'side' ? 'The toolbar button opens the side panel.' : 'The toolbar button opens the classic popup.');
+    })();
+
   const setContextMenu = (enabled: boolean) =>
     guard('Right-click menu', async () => {
       if (enabled && !(await platform.permissions.request('contextMenus'))) {
@@ -263,6 +270,28 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
 
       <Section title="Browser integration" description="Save pages without opening the library. Each feature asks for its own permission.">
         <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Toolbar button opens</p>
+            <p className="text-xs text-muted">The side panel stays open while you browse; the popup closes after each use.</p>
+          </div>
+          <div role="radiogroup" aria-label="Toolbar button opens" className="flex gap-1">
+            {(['side', 'popup'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={settings.quickPanel === mode}
+                onClick={() => setToolbar(mode)}
+                className={`h-9 rounded-lg border px-3 text-sm font-semibold transition-colors duration-150 ${
+                  settings.quickPanel === mode ? 'border-primary bg-primary text-primary-fg' : 'border-line hover:bg-surface-2'
+                }`}
+              >
+                {mode === 'side' ? 'Side panel' : 'Popup'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 border-t border-line pt-4">
           <div className="flex-1">
             <p className="text-sm font-semibold">Right-click menu</p>
             <p className="text-xs text-muted">Adds “Save page”, “Save link” and “Save all tabs” to the browser menu.</p>

@@ -1,18 +1,21 @@
 import { browser } from 'wxt/browser';
 import { attachAlarmHandler, syncBackupAlarm } from '../background/backupAlarm';
 import { attachContextMenuHandler, handleClick, syncContextMenu } from '../background/contextMenu';
+import { applyToolbarBehavior } from '../background/toolbar';
 
 /** Re-applies everything that depends on optional permissions or settings. Safe to call repeatedly. */
 async function syncAll(): Promise<void> {
   attachAlarmHandler();
   attachContextMenuHandler();
-  await Promise.all([syncBackupAlarm(), syncContextMenu()]);
+  await Promise.all([syncBackupAlarm(), syncContextMenu(), applyToolbarBehavior()]);
 }
 
 export default defineBackground(() => {
   // Listeners must be registered synchronously on every worker start so the browser can wake the worker.
   attachAlarmHandler();
   attachContextMenuHandler();
+  // The popup override is not persisted by the browser, so it is re-applied every time the worker starts.
+  applyToolbarBehavior().catch((e: unknown) => console.error('Tabarium: applying the toolbar behaviour failed', e));
   browser.runtime.onInstalled.addListener(() => void syncAll());
   browser.runtime.onStartup.addListener(() => void syncAll());
   browser.permissions.onAdded.addListener(() => void syncAll());

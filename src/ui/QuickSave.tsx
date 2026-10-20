@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Layers, LibraryBig } from 'lucide-react';
+import { Layers, LibraryBig, X } from 'lucide-react';
 import { useState } from 'react';
 import { db } from '../core/instance';
 import { loadSettings, updateSettings } from '../core/settings';
@@ -17,8 +17,8 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'next', label: 'Next' },
 ];
 
-/** Compact surface shared by the toolbar popup and the side panel: Save tab, Group tabs and Next. */
-export function QuickSave() {
+/** Compact surface shared by the side panel (default toolbar action) and the classic popup. */
+export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   const platform = usePlatform();
   const settings = useLiveQuery(() => loadSettings(db), []);
   const spaces = useLiveQuery(() => db.spaces.orderBy('position').toArray(), []);
@@ -27,8 +27,26 @@ export function QuickSave() {
   const nexts = useLiveQuery(() => db.nexts.orderBy('position').toArray(), []);
   const [tab, setTab] = useState<TabKey>('save');
   const [status, setStatus] = useState<Status>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   if (!settings || !spaces || !collections || !cards || !nexts) return null;
+
+  const cardCounts = new Map<string, number>();
+  for (const c of cards) cardCounts.set(c.collectionId, (cardCounts.get(c.collectionId) ?? 0) + 1);
+
+  const chooseToolbar = async (quickPanel: 'side' | 'popup') => {
+    try {
+      await updateSettings(db, { quickPanel });
+      await platform.backupSchedule.resync();
+      setStatus({
+        tone: 'ok',
+        text: quickPanel === 'popup' ? 'The toolbar button now opens the classic popup.' : 'The toolbar button now opens the side panel.',
+      });
+    } catch (e) {
+      console.error('Tabarium: switching the toolbar behaviour failed', e);
+      setStatus({ tone: 'error', text: `Switching failed: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
 
   return (
     <div className="flex min-h-full flex-col gap-4 p-4">
@@ -45,6 +63,20 @@ export function QuickSave() {
           <LibraryBig size={15} aria-hidden /> Open library
         </button>
       </header>
+
+      {surface === 'sidepanel' && settings.quickPanel === 'side' && !bannerDismissed && (
+        <p className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
+          <span className="flex-1">
+            Prefer the classic popup?{' '}
+            <button type="button" className="font-bold text-primary underline" onClick={() => void chooseToolbar('popup')}>
+              Switch back
+            </button>
+          </span>
+          <button type="button" aria-label="Dismiss" className="grid size-6 place-items-center rounded-md text-muted hover:text-fg" onClick={() => setBannerDismissed(true)}>
+            <X size={14} aria-hidden />
+          </button>
+        </p>
+      )}
 
       <div role="tablist" aria-label="Quick actions" className="grid grid-cols-3 rounded-xl bg-surface-2 p-1">
         {TABS.map((t) => (
@@ -71,12 +103,15 @@ export function QuickSave() {
           <SaveTabView
             spaces={spaces}
             collections={collections}
+            cardCounts={cardCounts}
             autoClose={settings.autoCloseTabs}
             onAutoClose={(v) => void updateSettings(db, { autoCloseTabs: v })}
             onStatus={setStatus}
           />
         )}
-        {tab === 'group' && <GroupTabsView spaces={spaces} collections={collections} settings={settings} onStatus={setStatus} />}
+        {tab === 'group' && (
+          <GroupTabsView spaces={spaces} collections={collections} cardCounts={cardCounts} settings={settings} onStatus={setStatus} />
+        )}
         {tab === 'next' && <NextQueueView nexts={nexts} cards={cards} onStatus={setStatus} />}
       </div>
 
@@ -84,6 +119,12 @@ export function QuickSave() {
         <p role="status" className={`text-sm font-medium ${status.tone === 'ok' ? 'text-primary' : 'text-danger'}`}>
           {status.text}
         </p>
+      )}
+
+      {surface === 'popup' && (
+        <button type="button" className="mt-auto self-start text-xs font-semibold text-primary underline" onClick={() => void chooseToolbar('side')}>
+          Open the toolbar button in the side panel instead
+        </button>
       )}
     </div>
   );

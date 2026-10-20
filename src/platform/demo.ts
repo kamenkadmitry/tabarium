@@ -46,6 +46,7 @@ export function createDemoPlatform(): Platform {
         },
       ],
       groupTabs: async () => undefined,
+      watchActiveTab: () => () => undefined,
       focusTab: async () => undefined,
       closeWindow: async () => undefined,
       mergeWindows: async () => undefined,

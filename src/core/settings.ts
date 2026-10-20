@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { TabariumDB } from './db';
 
+export const BOARD_VIEWS = ['card', 'compact', 'list', 'grid'] as const;
+export const BOARD_SORTS = ['custom', 'name-asc', 'name-desc', 'newest', 'oldest', 'most-tabs'] as const;
+
 export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter', 'custom'] as const;
 
 export const SettingsSchema = z.object({
@@ -15,6 +18,11 @@ export const SettingsSchema = z.object({
   contextMenu: z.boolean().default(false),
   /** Open collections as browser tab groups (needs the optional `tabGroups` permission). */
   tabGroups: z.boolean().default(false),
+  /** What the toolbar button opens: the side panel (default) or the classic popup. */
+  quickPanel: z.enum(['side', 'popup']).default('side'),
+  /** How collections are laid out, remembered per space. A space without an entry uses "grid". */
+  boardView: z.record(z.string(), z.enum(BOARD_VIEWS)).default({}),
+  boardSort: z.enum(BOARD_SORTS).default('custom'),
   /** Show the "Open tabs" side panel in the library. */
   openTabsPanel: z.boolean().default(true),
   /** Close browser tabs after they are added to a collection from the Open tabs panel. */
@@ -36,6 +44,9 @@ export const DEFAULT_SETTINGS: Settings = {
   quickSaveCollectionId: null,
   contextMenu: false,
   tabGroups: false,
+  quickPanel: 'side',
+  boardView: {},
+  boardSort: 'custom',
   openTabsPanel: true,
   autoCloseTabs: false,
   ai: { provider: null, model: '', baseUrl: '', apiKey: '' },

@@ -1,16 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { FolderPlus, PanelRightOpen, Plus, Search, X } from 'lucide-react';
+import { PanelRightOpen, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { type BoardFilter, filterCollections, NO_FILTER, sortCollections } from '../core/board';
+import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
-import { groupTabs, suggestCollectionNames } from '../core/ai/tasks';
+import { groupTabs } from '../core/ai/tasks';
 import { loadSettings, updateSettings } from '../core/settings';
-import type { Card, Collection, Space } from '../core/types';
+import type { Card, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
 import { isAiConfigured, withProviderAccess } from './ai';
+import { createCollectionActions } from './collectionActions';
 import type { OpenTab } from '../platform/ports';
 import type { CardRowActions } from './CardRow';
+import { BoardToolbar } from './BoardToolbar';
 import { CardRow } from './CardRow';
-import type { CollectionActions } from './CollectionCard';
 import { AddLinkDialog } from './dialogs/AddLinkDialog';
 import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
@@ -25,6 +28,7 @@ import { filterOpenTabs } from './openTabsModel';
 import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
 import { SpaceBoard } from './SpaceBoard';
+import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
 import { useOpenTabsController } from './useOpenTabsController';
 
@@ -49,7 +53,7 @@ export function App() {
   const settings = useLiveQuery(() => loadSettings(db), []);
   const [selectedView, setView] = useState<View | null>(null);
   const [query, setQuery] = useState('');
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [filter, setFilter] = useState<BoardFilter>(NO_FILTER);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,56 +110,15 @@ export function App() {
   });
 
   const aiReady = settings !== undefined && isAiConfigured(settings.ai);
-  const groupOptions = (col: Collection) => (settings?.tabGroups ? { groupTitle: col.title } : undefined);
 
-  const collectionActions = (col: Collection, list: readonly Card[]): CollectionActions => ({
-    addLink: () => setDialog({ kind: 'link', collectionId: col.id, title: col.title }),
-    openAll: act('Opening tabs', () =>
-      platform.tabs.openUrls(
-        list.map((c) => c.url),
-        groupOptions(col),
-      ),
-    ),
-    suggestName:
-      aiReady && settings
-        ? () =>
-            void run('Suggesting names', async () => {
-              const suggestions = await withProviderAccess(platform, settings.ai, () =>
-                suggestCollectionNames(
-                  settings.ai,
-                  list.map((c) => ({ title: c.customTitle ?? c.title, url: c.url })),
-                ),
-              );
-              setDialog({ kind: 'ai-names', collectionId: col.id, suggestions });
-            })
-        : undefined,
-    replaceWindow: () => {
-      if (!confirm(`Close the other tabs in this window and open “${col.title}” instead?`)) return;
-      void run('Replacing window tabs', async () => {
-        if (!(await platform.permissions.request('tabs'))) {
-          throw new Error('Tabarium needs the "tabs" permission to replace the tabs of this window.');
-        }
-        await platform.tabs.replaceWindowTabs(
-          list.map((c) => c.url),
-          groupOptions(col),
-        );
-      });
-    },
-    rename: () => setDialog({ kind: 'rename-collection', id: col.id, title: col.title }),
-    remove: () => {
-      if (confirm(`Delete “${col.title}” and its ${list.length} tabs?`)) {
-        void run('Deleting collection', () => repo.deleteCollection(col.id));
-      }
-    },
-    editTags: () => setDialog({ kind: 'tags', collectionId: col.id }),
-    setColor: (color) => void run('Setting colour', () => repo.updateCollection(col.id, { color })),
-    addAllToNext: act('Adding to Next', async () => {
-      for (const c of list) await repo.addToNext(c.id);
-    }),
-    card: cardActions,
-    dropCard: (cardId, before) => void run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
-    dropTabs: (tabIds, before) => void tabsCtl.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),
-    dropCollection: (id) => void run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
+  const collectionActions = createCollectionActions({
+    platform,
+    settings,
+    run,
+    aiReady,
+    cardActions,
+    setDialog: (d) => setDialog(d),
+    addTabs: tabsCtl.addTabs,
   });
 
   const openSaveSession = () =>
@@ -175,10 +138,13 @@ export function App() {
     }))
     .filter((g) => g.cards.length > 0);
 
-  const visibleCollections = collections
-    .filter((c) => spaceId !== undefined && c.spaceId === spaceId)
-    .filter((c) => tagFilter === null || c.tagIds.includes(tagFilter));
-  const spaceTags = tags.filter((t) => collections.some((c) => c.spaceId === spaceId && c.tagIds.includes(t.id)));
+  const tabCounts = new Map([...cardsByCollection].map(([id, list]) => [id, list.length]));
+  const spaceCollections = collections.filter((c) => spaceId !== undefined && c.spaceId === spaceId);
+  const visibleCollections = sortCollections(filterCollections(spaceCollections, filter), settings?.boardSort ?? 'custom', tabCounts);
+  const spaceTags = tags.filter((t) => spaceCollections.some((c) => c.tagIds.includes(t.id)));
+  const spaceColors = [...new Set(spaceCollections.flatMap((c) => (c.color === null ? [] : [c.color])))];
+  const boardView: BoardView = (spaceId !== undefined ? settings?.boardView[spaceId] : undefined) ?? 'grid';
+  const spaceTabCount = spaceCollections.reduce((n, c) => n + (tabCounts.get(c.id) ?? 0), 0);
 
   const nextEntries = nexts.flatMap((item) => {
     const card = cardById.get(item.cardId);
@@ -199,7 +165,7 @@ export function App() {
         onSelect={(v) => {
           setView(v);
           setQuery('');
-          setTagFilter(null);
+          setFilter(NO_FILTER);
         }}
         onCreateSpace={() => setDialog({ kind: 'space' })}
         onRenameSpace={(space) => setDialog({ kind: 'rename-space', space })}
@@ -220,7 +186,11 @@ export function App() {
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
-          <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+          {view?.kind === 'space' && activeSpace ? (
+            <SpaceHeading name={activeSpace.name} collections={spaceCollections.length} tabs={spaceTabCount} />
+          ) : (
+            <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+          )}
           {view?.kind !== 'settings' && (
             <label className="relative ml-4 max-w-md flex-1">
               <span className="sr-only">Search all tabs</span>
@@ -245,13 +215,6 @@ export function App() {
                   <PanelRightOpen size={17} aria-hidden />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: 'collection' })}
-                className="flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
-              >
-                <FolderPlus size={16} aria-hidden /> New collection
-              </button>
               <button
                 type="button"
                 onClick={() => void openSaveSession()}
@@ -313,19 +276,36 @@ export function App() {
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 
-          {!searching && view?.kind === 'space' && (
-            <SpaceBoard
-              collections={visibleCollections}
-              cardsByCollection={cardsByCollection}
-              tags={tags}
-              spaceTags={spaceTags}
-              tagFilter={tagFilter}
-              onTagFilter={setTagFilter}
-              collectionActions={collectionActions}
-              onDropTabsAsCollection={(tabIds) => {
-                if (spaceId) void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
-              }}
-            />
+          {!searching && view?.kind === 'space' && spaceId && (
+            <>
+              <div className="mb-5">
+                <BoardToolbar
+                  sort={settings?.boardSort ?? 'custom'}
+                  onSort={(boardSort: BoardSort) => saveSetting('Saving the sort order', { boardSort })}
+                  view={boardView}
+                  onView={(v) => saveSetting('Saving the view', { boardView: { ...(settings?.boardView ?? {}), [spaceId]: v } })}
+                  filter={filter}
+                  onFilter={setFilter}
+                  tags={spaceTags}
+                  colors={spaceColors}
+                  onExpandAll={() => void run('Expanding collections', () => repo.setExpandedAll(spaceId, true))}
+                  onCollapseAll={() => void run('Collapsing collections', () => repo.setExpandedAll(spaceId, false))}
+                  onNewCollection={() => setDialog({ kind: 'collection' })}
+                />
+              </div>
+              <SpaceBoard
+                collections={visibleCollections}
+                cardsByCollection={cardsByCollection}
+                tags={tags}
+                view={boardView}
+                reorderable={(settings?.boardSort ?? 'custom') === 'custom'}
+                filtered={filter.color !== null || filter.tagId !== null}
+                collectionActions={collectionActions}
+                onDropTabsAsCollection={(tabIds) => {
+                  void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
+                }}
+              />
+            </>
           )}
 
           {view === null && (

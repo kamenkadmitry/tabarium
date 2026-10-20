@@ -1,11 +1,14 @@
-import { Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Tag } from '../core/types';
-import { CardRow, type CardRowActions } from './CardRow';
+import type { BoardView } from '../core/boardTypes';
+import { CardRow, type CardDensity, type CardRowActions } from './CardRow';
 import { SWATCHES } from './colors';
 import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 
 export interface CollectionActions {
+  /** Fold or unfold the collection's tabs. */
+  toggleExpanded: () => void;
   addLink: () => void;
   openAll: () => void;
   /** Present only when an AI provider is configured. */
@@ -30,6 +33,9 @@ interface Props {
   cards: readonly Card[];
   tags: readonly Tag[];
   actions: CollectionActions;
+  view: BoardView;
+  /** Manual drag-reordering is offered only while the board uses "Custom order". */
+  reorderable: boolean;
 }
 
 const menuItem = 'flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2';
@@ -101,7 +107,25 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
   );
 }
 
-export function CollectionCard({ collection, cards, tags, actions }: Props) {
+const DENSITY: Record<BoardView, CardDensity> = { grid: 'default', compact: 'compact', list: 'wide', card: 'tile' };
+
+function TagChips({ tags, className = '' }: { tags: readonly Tag[]; className?: string }) {
+  if (tags.length === 0) return null;
+  return (
+    <ul className={`flex flex-wrap gap-1.5 ${className}`} aria-label="Tags">
+      {tags.map((t) => (
+        <li key={t.id} className="flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold">
+          <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
+          {t.title}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function CollectionCard({ collection, cards, tags, actions, view, reorderable }: Props) {
+  const expanded = collection.expanded;
+  const density = DENSITY[view];
   const [menuOpen, setMenuOpen] = useState(false);
   /** undefined = no drag over; null = indicator at the end; string = before that card id. */
   const [indicator, setIndicator] = useState<string | null | undefined>(undefined);
@@ -154,15 +178,27 @@ export function CollectionCard({ collection, cards, tags, actions }: Props) {
       className={`flex break-inside-avoid flex-col rounded-2xl border bg-surface ${collectionOver ? 'border-primary' : 'border-line'}`}
     >
       <header className="relative flex items-center gap-2 border-b border-line px-3 py-3">
-        <span
-          {...dragSourceProps({ type: 'collection', id: collection.id })}
-          aria-label="Drag collection"
-          className="grid size-7 shrink-0 cursor-grab place-items-center rounded-md text-muted hover:bg-surface-2"
+        <button
+          type="button"
+          aria-label={expanded ? `Collapse ${collection.title}` : `Expand ${collection.title}`}
+          aria-expanded={expanded}
+          onClick={actions.toggleExpanded}
+          className="grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2"
         >
-          <GripVertical size={16} aria-hidden />
-        </span>
+          {expanded ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
+        </button>
+        {reorderable && (
+          <span
+            {...dragSourceProps({ type: 'collection', id: collection.id })}
+            aria-label="Drag collection"
+            className="grid size-7 shrink-0 cursor-grab place-items-center rounded-md text-muted hover:bg-surface-2"
+          >
+            <GripVertical size={16} aria-hidden />
+          </span>
+        )}
         <span aria-hidden className="h-5 w-1.5 shrink-0 rounded-full" style={{ background: collection.color ?? 'var(--border)' }} />
-        <h2 className="min-w-0 flex-1 truncate text-base font-bold">{collection.title}</h2>
+        <h2 className={`min-w-0 truncate text-base font-bold ${view === 'list' ? '' : 'flex-1'}`}>{collection.title}</h2>
+        {view === 'list' && <TagChips tags={tags} className="min-w-0 flex-1" />}
         <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">{cards.length}</span>
         <button
           type="button"
@@ -185,21 +221,12 @@ export function CollectionCard({ collection, cards, tags, actions }: Props) {
         {menuOpen && <CollectionMenu collection={collection} actions={actions} onClose={() => setMenuOpen(false)} />}
       </header>
 
-      {tags.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5 px-4 pt-3" aria-label="Tags">
-          {tags.map((t) => (
-            <li key={t.id} className="flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold">
-              <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
-              {t.title}
-            </li>
-          ))}
-        </ul>
-      )}
+      {view !== 'list' && <TagChips tags={tags} className="px-4 pt-3" />}
 
-      {cards.length > 0 ? (
-        <ul className="flex flex-col gap-0.5 p-2">
+      {!expanded ? null : cards.length > 0 ? (
+        <ul className={view === 'card' ? 'grid grid-cols-2 gap-2 p-3' : 'flex flex-col gap-0.5 p-2'}>
           {cards.map((c) => (
-            <CardRow key={c.id} card={c} dropAbove={indicator === c.id} {...actions.card(c)} />
+            <CardRow key={c.id} card={c} density={density} dropAbove={indicator === c.id} {...actions.card(c)} />
           ))}
           {indicator === null && <li aria-hidden className="mx-1 h-0.5 rounded bg-primary" />}
         </ul>
@@ -208,11 +235,13 @@ export function CollectionCard({ collection, cards, tags, actions }: Props) {
           Empty. Add a link, drop a tab here, or save your open tabs.
         </p>
       )}
+      {expanded && (
       <footer className="border-t border-line p-2">
         <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
           <Plus size={15} aria-hidden /> Add link
         </button>
       </footer>
+      )}
     </section>
   );
 }

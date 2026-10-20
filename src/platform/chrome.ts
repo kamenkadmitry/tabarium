@@ -98,6 +98,20 @@ export function createChromePlatform(): Platform {
           await api.tabGroups.update(groupId, { title });
         }
       },
+      watchActiveTab(listener) {
+        const api = requireExtension();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const fire = () => {
+          clearTimeout(timer);
+          timer = setTimeout(listener, 100);
+        };
+        const events = [api.tabs.onActivated, api.tabs.onUpdated, api.windows.onFocusChanged];
+        for (const e of events) e.addListener(fire);
+        return () => {
+          clearTimeout(timer);
+          for (const e of events) e.removeListener(fire);
+        };
+      },
       async focusTab(tabId) {
         const api = requireExtension();
         const tab = await api.tabs.update(tabId, { active: true });

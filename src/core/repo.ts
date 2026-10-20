@@ -280,6 +280,11 @@ export class Repository {
     return added;
   }
 
+  /** Expands or collapses every collection of a space (the "+" and "-" buttons above the board). */
+  async setExpandedAll(spaceId: string, expanded: boolean): Promise<void> {
+    await this.db.collections.where('spaceId').equals(spaceId).modify({ expanded, updatedAt: Date.now() });
+  }
+
   async deleteCollection(collectionId: string): Promise<void> {
     await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, async () => {
       const cardIds = await this.db.cards.where('collectionId').equals(collectionId).primaryKeys();

@@ -60,6 +60,8 @@ export interface TabsPort {
   listWindows(): Promise<OpenWindow[]>;
   /** Puts the tabs into a new browser tab group per window (needs `tabGroups`). */
   groupTabs(tabIds: readonly number[], title: string): Promise<void>;
+  /** Calls `listener` when the focused tab or its title/address changes; returns an unsubscribe function. */
+  watchActiveTab(listener: () => void): () => void;
   /** Brings a tab (and its window) to the front. */
   focusTab(tabId: number): Promise<void>;
   closeWindow(windowId: number): Promise<void>;

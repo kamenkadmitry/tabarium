@@ -1,3 +1,3 @@
 import { mountQuickSave } from '../../ui/mountQuickSave';
 
-void mountQuickSave();
+void mountQuickSave('popup');

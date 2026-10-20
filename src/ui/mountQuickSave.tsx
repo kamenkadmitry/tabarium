@@ -9,7 +9,7 @@ import { seedDemo } from './seed';
 import './styles.css';
 
 /** Entry shared by popup and side panel: applies the saved theme and renders the quick-save surface. */
-export async function mountQuickSave(): Promise<void> {
+export async function mountQuickSave(surface: 'popup' | 'sidepanel'): Promise<void> {
   const root = document.getElementById('root');
   if (!root) throw new Error('#root not found');
   const demo = new URLSearchParams(location.search).has('demo');
@@ -18,7 +18,7 @@ export async function mountQuickSave(): Promise<void> {
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
   createRoot(root).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
-      <QuickSave />
+      <QuickSave surface={surface} />
     </PlatformProvider>,
   );
 }

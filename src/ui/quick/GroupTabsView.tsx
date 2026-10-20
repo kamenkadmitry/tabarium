@@ -14,6 +14,7 @@ import { type Destination, DestinationPicker } from './DestinationPicker';
 interface Props {
   spaces: readonly Space[];
   collections: readonly Collection[];
+  cardCounts: ReadonlyMap<string, number>;
   settings: Settings;
   onStatus: (status: { tone: 'ok' | 'error'; text: string } | null) => void;
 }
@@ -21,7 +22,7 @@ interface Props {
 type Mode = 'idle' | 'save' | 'ai';
 
 /** Saves the tabs of this window together: into one collection, or split into topic collections by AI. */
-export function GroupTabsView({ spaces, collections, settings, onStatus }: Props) {
+export function GroupTabsView({ spaces, collections, cardCounts, settings, onStatus }: Props) {
   const platform = usePlatform();
   const [tabs, setTabs] = useState<OpenTab[] | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
@@ -168,6 +169,7 @@ export function GroupTabsView({ spaces, collections, settings, onStatus }: Props
           <DestinationPicker
             spaces={spaces}
             collections={collections}
+            cardCounts={cardCounts}
             query=""
             pickSpace={mode === 'ai'}
             onPick={(d) => void (mode === 'save' ? saveTogether(d) : organise(d))}

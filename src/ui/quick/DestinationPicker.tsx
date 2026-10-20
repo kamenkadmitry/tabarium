@@ -10,6 +10,8 @@ export type Destination =
 interface Props {
   spaces: readonly Space[];
   collections: readonly Collection[];
+  /** Number of saved tabs per collection id, shown next to the name. */
+  cardCounts?: ReadonlyMap<string, number>;
   /** Filters collections across all spaces when not empty. */
   query: string;
   /** Offer "New collection…" inside a space. */
@@ -23,12 +25,16 @@ const row =
   'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors duration-150 hover:bg-surface-2';
 
 /** Spaces list that drills into a space's collections, or a flat search over all collections. */
-export function DestinationPicker({ spaces, collections, query, allowNew = true, pickSpace = false, onPick }: Props) {
+export function DestinationPicker({ spaces, collections, query, cardCounts, allowNew = true, pickSpace = false, onPick }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   const [title, setTitle] = useState('');
   const spaceName = (id: string) => spaces.find((s) => s.id === id)?.name ?? '';
   const q = query.trim().toLowerCase();
+  const countOf = (id: string) => {
+    const n = cardCounts?.get(id);
+    return n === undefined ? '' : ` · ${n} tab${n === 1 ? '' : 's'}`;
+  };
 
   if (q !== '') {
     const hits = collections.filter((c) => `${c.title} ${spaceName(c.spaceId)}`.toLowerCase().includes(q));
@@ -42,7 +48,10 @@ export function DestinationPicker({ spaces, collections, query, allowNew = true,
               onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${spaceName(c.spaceId)} / ${c.title}` })}
             >
               <Layers size={16} aria-hidden className="shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 truncate">{c.title}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {c.title}
+                <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
+              </span>
               <span className="truncate text-xs text-muted">{spaceName(c.spaceId)}</span>
             </button>
           </li>
@@ -79,16 +88,44 @@ export function DestinationPicker({ spaces, collections, query, allowNew = true,
   const inSpace = collections.filter((c) => c.spaceId === open.id);
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => {
-          setOpenId(null);
-          setNaming(false);
-        }}
-        className="mb-1 flex min-h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-surface-2"
-      >
-        <ChevronLeft size={16} aria-hidden /> {open.name}
-      </button>
+      <div className="mb-1 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => {
+            setOpenId(null);
+            setNaming(false);
+          }}
+          className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-sm font-semibold hover:bg-surface-2"
+        >
+          <ChevronLeft size={16} aria-hidden className="shrink-0 text-muted" />
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">{open.name[0]?.toUpperCase()}</span>
+          <span className="truncate">{open.name}</span>
+        </button>
+        {allowNew && !pickSpace && (
+          <button
+            type="button"
+            aria-label={`New collection in ${open.name}`}
+            onClick={() => setNaming((v) => !v)}
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-primary"
+          >
+            <FolderPlus size={16} aria-hidden />
+          </button>
+        )}
+      </div>
+      {naming && !pickSpace && (
+        <form
+          className="mb-1 flex gap-2 px-1 py-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (title.trim() !== '') onPick({ kind: 'new', spaceId: open.id, title: title.trim(), label: `${open.name} / ${title.trim()}` });
+          }}
+        >
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Collection name" className={`${inputClass} h-10`} />
+          <button type="submit" disabled={title.trim() === ''} className="h-10 rounded-lg bg-primary px-3 text-sm font-bold text-primary-fg disabled:opacity-50">
+            Create
+          </button>
+        </form>
+      )}
       <ul aria-label={`Collections in ${open.name}`} className="flex flex-col gap-0.5">
         {pickSpace && (
           <li>
@@ -109,34 +146,15 @@ export function DestinationPicker({ spaces, collections, query, allowNew = true,
                 className={row}
                 onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${open.name} / ${c.title}` })}
               >
-                <Layers size={16} aria-hidden className="shrink-0 text-muted" />
-                <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: c.color ?? 'var(--border)' }} />
+                <span className="min-w-0 flex-1 truncate">
+                  {c.title}
+                  <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
+                </span>
               </button>
             </li>
           ))}
         {!pickSpace && inSpace.length === 0 && <li className="px-3 py-3 text-center text-sm text-muted">No collections in this space yet.</li>}
-        {allowNew && !pickSpace && (
-          <li>
-            {naming ? (
-              <form
-                className="flex gap-2 px-1 py-1"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (title.trim() !== '') onPick({ kind: 'new', spaceId: open.id, title: title.trim(), label: `${open.name} / ${title.trim()}` });
-                }}
-              >
-                <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Collection name" className={`${inputClass} h-10`} />
-                <button type="submit" disabled={title.trim() === ''} className="h-10 rounded-lg bg-primary px-3 text-sm font-bold text-primary-fg disabled:opacity-50">
-                  Create
-                </button>
-              </form>
-            ) : (
-              <button type="button" className={`${row} text-primary`} onClick={() => setNaming(true)}>
-                <FolderPlus size={16} aria-hidden /> New collection…
-              </button>
-            )}
-          </li>
-        )}
       </ul>
     </div>
   );
