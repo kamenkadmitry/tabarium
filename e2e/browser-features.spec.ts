@@ -120,7 +120,8 @@ test('open tabs panel: live list, drag into a collection, auto-close and merge w
   expect(one.isClosed()).toBe(false);
 
   // With "close tabs after adding" the dragged tab is closed and leaves the panel.
-  await panel.getByLabel('Close tabs after adding them').check();
+  await panel.getByLabel('Close tabs after adding them').click(); // saved to settings, so it updates asynchronously
+  await expect(panel.getByLabel('Close tabs after adding them')).toBeChecked();
   await panel.locator('[data-open-tab-id]', { hasText: 'Page panel-two' }).dragTo(p.locator('section[aria-label="Target"]'));
   await expect(p.locator('section[aria-label="Target"] a[href="https://example.test/panel-two"]')).toBeVisible();
   await expect.poll(() => two.isClosed()).toBe(true);
