@@ -66,7 +66,17 @@ test('open all as a tab group, then replace the window tabs', async () => {
   await p.getByRole('button', { name: 'B Browse', exact: true }).click();
 
   await p.locator('section[aria-label="Docs"]').getByRole('button', { name: 'Open all tabs' }).click();
-  await expect.poll(() => app.context.pages().filter((x) => x.url().startsWith(web('docs-'))).length).toBe(2);
+  const diagnostics = async () =>
+    JSON.stringify({
+      alerts: await p.getByRole('alert').allTextContents(),
+      tabs: await app.worker.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.url ?? t.pendingUrl)),
+      pages: app.context.pages().map((x) => x.url()),
+    });
+  await expect
+    .poll(async () => app.worker.evaluate(async () => (await chrome.tabs.query({})).filter((t) => (t.url ?? t.pendingUrl ?? '').includes('docs-')).length), {
+      message: `after Open all: ${await diagnostics()}`,
+    })
+    .toBe(2);
   const groups = await app.worker.evaluate(() => chrome.tabGroups.query({ title: 'Docs' }));
   expect(groups).toHaveLength(1);
 
