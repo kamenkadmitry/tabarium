@@ -124,7 +124,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   };
 
   const importFile = async (file: File) => {
-    const backup = parseBackup(await file.text());
+    const text = await file.text();
+    // A Toby export or bookmarks file is not a backup: add it to the library instead of replacing everything.
+    if (!/"app"\s*:\s*"tabarium"/.test(text)) {
+      await importBookmarks(file);
+      return;
+    }
+    const backup = parseBackup(text);
     const current = await db.cards.count();
     const message = `Replace ALL current data (${current} tabs) with this backup (${backup.cards.length} tabs, ${backup.collections.length} collections)? This cannot be undone.`;
     if (!confirm(message)) return;
