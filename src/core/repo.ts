@@ -1,6 +1,9 @@
 import type { TabariumDB } from './db';
+import { dedupeLinks, type ImportedSpace } from './formats';
+import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
-import type { Card, Collection, Space } from './types';
+import type { Card, Collection, NextItem, Space, Tag } from './types';
+import { normalizeUrl } from './url';
 
 export interface NewCard {
   title: string;
@@ -8,12 +11,7 @@ export interface NewCard {
   favIconUrl?: string | null;
 }
 
-/** Normalises a URL for duplicate detection: drops the hash and a trailing slash. */
-export function normalizeUrl(raw: string): string {
-  const u = new URL(raw);
-  u.hash = '';
-  return u.toString().replace(/\/$/, '');
-}
+export { normalizeUrl };
 
 export class Repository {
   constructor(private readonly db: TabariumDB) {}
@@ -118,20 +116,136 @@ export class Repository {
     });
   }
 
-  /** Moves a card to another collection, appending it at the end. */
-  async moveCard(cardId: string, targetCollectionId: string): Promise<void> {
+  /** Moves a card into a collection, directly before `beforeCardId` or at the end when it is null. */
+  async moveCard(cardId: string, targetCollectionId: string, beforeCardId: string | null = null): Promise<void> {
     await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
       if (!(await this.db.collections.get(targetCollectionId))) {
         throw new Error(`Collection ${targetCollectionId} does not exist`);
       }
-      const siblings = await this.db.cards.where('collectionId').equals(targetCollectionId).toArray();
+      const siblings = (await this.db.cards.where('collectionId').equals(targetCollectionId).toArray()).filter(
+        (c) => c.id !== cardId,
+      );
+      const plan = planInsert(siblings, beforeCardId);
+      if (plan.respace) {
+        for (const s of plan.respace) await this.db.cards.update(s.id, { position: s.position });
+      }
       const updated = await this.db.cards.update(cardId, {
         collectionId: targetCollectionId,
-        position: positionAfterLast(siblings.map((c) => c.position)),
+        position: plan.position,
         updatedAt: Date.now(),
       });
       if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
     });
+  }
+
+  /** Moves a collection into a space, directly before `beforeCollectionId` or at the end when it is null. */
+  async moveCollection(collectionId: string, targetSpaceId: string, beforeCollectionId: string | null = null): Promise<void> {
+    await this.db.transaction('rw', this.db.collections, this.db.spaces, async () => {
+      if (!(await this.db.spaces.get(targetSpaceId))) throw new Error(`Space ${targetSpaceId} does not exist`);
+      const siblings = (await this.db.collections.where('spaceId').equals(targetSpaceId).toArray()).filter(
+        (c) => c.id !== collectionId,
+      );
+      const plan = planInsert(siblings, beforeCollectionId);
+      if (plan.respace) {
+        for (const s of plan.respace) await this.db.collections.update(s.id, { position: s.position });
+      }
+      const updated = await this.db.collections.update(collectionId, {
+        spaceId: targetSpaceId,
+        position: plan.position,
+        updatedAt: Date.now(),
+      });
+      if (updated === 0) throw new Error(`Collection ${collectionId} does not exist`);
+    });
+  }
+
+  async createTag(title: string, color: string): Promise<Tag> {
+    const existing = await this.db.tags.toArray();
+    const tag: Tag = { id: crypto.randomUUID(), title, color, position: positionAfterLast(existing.map((t) => t.position)) };
+    await this.db.tags.add(tag);
+    return tag;
+  }
+
+  async updateTag(tagId: string, patch: Partial<Pick<Tag, 'title' | 'color'>>): Promise<void> {
+    if ((await this.db.tags.update(tagId, patch)) === 0) throw new Error(`Tag ${tagId} does not exist`);
+  }
+
+  async deleteTag(tagId: string): Promise<void> {
+    await this.db.transaction('rw', this.db.tags, this.db.collections, async () => {
+      const affected = await this.db.collections.where('tagIds').equals(tagId).toArray();
+      for (const c of affected) await this.db.collections.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
+      await this.db.tags.delete(tagId);
+    });
+  }
+
+  async setCollectionTags(collectionId: string, tagIds: readonly string[]): Promise<void> {
+    const known = new Set(await this.db.tags.toCollection().primaryKeys());
+    for (const t of tagIds) if (!known.has(t)) throw new Error(`Tag ${t} does not exist`);
+    await this.updateCollection(collectionId, { tagIds: [...new Set(tagIds)] });
+  }
+
+  /** Adds a card to the Next queue (no-op if it is already queued). */
+  async addToNext(cardId: string): Promise<NextItem> {
+    return this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
+      if (!(await this.db.cards.get(cardId))) throw new Error(`Card ${cardId} does not exist`);
+      const existing = await this.db.nexts.toArray();
+      const queued = existing.find((n) => n.cardId === cardId);
+      if (queued) return queued;
+      const item: NextItem = {
+        id: crypto.randomUUID(),
+        cardId,
+        state: 'todo',
+        position: positionAfterLast(existing.map((n) => n.position)),
+      };
+      await this.db.nexts.add(item);
+      return item;
+    });
+  }
+
+  async setNextState(nextId: string, state: NextItem['state']): Promise<void> {
+    if ((await this.db.nexts.update(nextId, { state })) === 0) throw new Error(`Next item ${nextId} does not exist`);
+  }
+
+  async removeFromNext(nextId: string): Promise<void> {
+    await this.db.nexts.delete(nextId);
+  }
+
+  async moveNext(nextId: string, beforeNextId: string | null): Promise<void> {
+    await this.db.transaction('rw', this.db.nexts, async () => {
+      const siblings = (await this.db.nexts.toArray()).filter((n) => n.id !== nextId);
+      const plan = planInsert(siblings, beforeNextId);
+      if (plan.respace) for (const s of plan.respace) await this.db.nexts.update(s.id, { position: s.position });
+      if ((await this.db.nexts.update(nextId, { position: plan.position })) === 0) {
+        throw new Error(`Next item ${nextId} does not exist`);
+      }
+    });
+  }
+
+  /** Adds imported spaces/collections/links. Existing data is untouched; spaces with the same name are reused. */
+  async importStructure(spaces: readonly ImportedSpace[]): Promise<{ collections: number; cards: number }> {
+    let collections = 0;
+    let cards = 0;
+    for (const s of spaces) {
+      const existing = (await this.db.spaces.toArray()).find((x) => x.name === s.name);
+      const space = existing ?? (await this.createSpace(s.name));
+      for (const c of s.collections) {
+        const col = await this.createCollection(space.id, c.title || 'Untitled');
+        collections += 1;
+        cards += (await this.addCards(col.id, dedupeLinks(c.links))).length;
+      }
+    }
+    return { collections, cards };
+  }
+
+  /** Groups of cards (across the whole library) that share a normalised URL. */
+  async findDuplicates(): Promise<Card[][]> {
+    const groups = new Map<string, Card[]>();
+    for (const card of await this.db.cards.toArray()) {
+      const key = normalizeUrl(card.url);
+      const list = groups.get(key) ?? [];
+      list.push(card);
+      groups.set(key, list);
+    }
+    return [...groups.values()].filter((g) => g.length > 1);
   }
 
   async deleteCollection(collectionId: string): Promise<void> {

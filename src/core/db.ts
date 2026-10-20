@@ -24,5 +24,7 @@ export class TabariumDB extends Dexie {
       nexts: 'id, cardId, position',
       settings: 'key',
     });
+    // v2: multi-entry index so collections can be looked up by tag.
+    this.version(2).stores({ collections: 'id, spaceId, position, *tagIds' });
   }
 }
