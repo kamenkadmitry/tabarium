@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TabariumDB } from '../src/core/db';
-import { INBOX_COLLECTION, INBOX_SPACE, quickSave, resolveQuickTarget, setQuickTarget } from '../src/core/quicksave';
+import { findInbox, INBOX_COLLECTION, INBOX_SPACE, quickSave, resolveInbox, resolveQuickTarget, saveToInbox, setQuickTarget } from '../src/core/quicksave';
 import { Repository } from '../src/core/repo';
 import { loadSettings } from '../src/core/settings';
 
@@ -58,5 +58,27 @@ describe('settings schema evolution', () => {
     expect(s.theme).toBe('dark');
     expect(s.contextMenu).toBe(false);
     expect(s.quickSaveCollectionId).toBeNull();
+  });
+});
+
+describe('Inbox', () => {
+  it('stays the same collection when the quick target moves elsewhere', async () => {
+    const repo = new Repository(db);
+    const inbox = await resolveInbox(db);
+    const space = await repo.createSpace('Work');
+    const col = await repo.createCollection(space.id, 'Reading');
+    await setQuickTarget(db, col.id);
+
+    expect(await resolveInbox(db)).toBe(inbox);
+    expect(await saveToInbox(db, [{ title: 'A', url: 'https://a.dev/' }])).toBe(1);
+    expect(await saveToInbox(db, [{ title: 'A', url: 'https://a.dev' }])).toBe(0);
+    expect((await db.cards.where('collectionId').equals(inbox).toArray()).map((c) => c.title)).toEqual(['A']);
+    expect(await db.cards.where('collectionId').equals(col.id).count()).toBe(0);
+  });
+
+  it('is found by name without creating anything', async () => {
+    expect(findInbox(await db.spaces.toArray(), await db.collections.toArray())).toBeUndefined();
+    const id = await resolveInbox(db);
+    expect(findInbox(await db.spaces.toArray(), await db.collections.toArray())?.id).toBe(id);
   });
 });

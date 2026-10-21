@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AiError, assertConfigured, complete, detectProviderFromKey, type FetchLike, providerOrigin } from '../src/core/ai/client';
-import { extractJson, groupTabs, MAX_DETAILS_PER_REQUEST, suggestCardDetails, suggestCollectionNames, testConnection } from '../src/core/ai/tasks';
+import { extractJson, groupTabs, MAX_DETAILS_PER_REQUEST, proposeTabGroups, suggestCardDetails, suggestCollectionNames, testConnection } from '../src/core/ai/tasks';
 import type { Settings } from '../src/core/settings';
 
 type Ai = Settings['ai'];
@@ -188,6 +188,18 @@ describe('tasks', () => {
     await expect(suggestCardDetails(cfg({}), many, ctx)).rejects.toThrow('At most');
     const { fetch } = fakeFetch(openaiReply('{"nope":true}'));
     await expect(suggestCardDetails(cfg({}), [{ title: 'a', url: 'https://a.dev' }], ctx, fetch)).rejects.toThrow('valid suggestions');
+  });
+
+  it('proposes browser tab groups: every tab once, leftovers in "Other", needs two tabs', async () => {
+    const pages = ['a', 'b', 'c', 'd'].map((t) => ({ title: t, url: `https://${t}.dev` }));
+    const { fetch, calls } = fakeFetch(openaiReply('```json\n[{"title":"Docs","tabs":[1,2,99]},{"title":"More","tabs":[2,3]}]\n```'));
+    expect(await proposeTabGroups(cfg({}), pages, fetch)).toEqual([
+      { title: 'Docs', indexes: [0, 1] },
+      { title: 'More', indexes: [2] },
+      { title: 'Other', indexes: [3] },
+    ]);
+    expect(JSON.stringify(calls[0]?.body)).toContain('sort open browser tabs');
+    await expect(proposeTabGroups(cfg({}), pages.slice(0, 1))).rejects.toThrow('at least two');
   });
 
   it('connection test succeeds on a reply with no text', async () => {

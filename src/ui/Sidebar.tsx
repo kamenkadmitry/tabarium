@@ -2,7 +2,7 @@ import { Clock, Copy, Hash, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, U
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
-import { endDrag, getDragPayload } from './dnd';
+import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 
 export type View =
   | { kind: 'space'; spaceId: string }
@@ -25,6 +25,8 @@ interface Props {
   onDeleteSpace: (space: Space) => void;
   onDropCollection: (collectionId: string, spaceId: string) => void;
   onDropTabs: (tabIds: number[], spaceId: string) => void;
+  /** Links dragged from the side panel (raw `dataTransfer` text) were dropped on a space. */
+  onDropLinks: (raw: string, spaceId: string) => void;
 }
 
 function NavButton(props: {
@@ -54,14 +56,14 @@ function NavButton(props: {
   );
 }
 
-function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection' | 'onDropTabs'>) {
+function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection' | 'onDropTabs' | 'onDropLinks'>) {
   const [over, setOver] = useState(false);
   return (
     <div
       className={`group relative rounded-lg ${over ? 'ring-2 ring-primary' : ''}`}
       onDragOver={(e) => {
         const type = getDragPayload()?.type;
-        if (type === 'collection' || type === 'tabs') {
+        if (type === 'collection' || type === 'tabs' || hasExternalLinks(e)) {
           e.preventDefault();
           setOver(true);
         }
@@ -73,6 +75,7 @@ function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & 
         const payload = endDrag();
         if (payload?.type === 'collection') p.onDropCollection(payload.id, space.id);
         else if (payload?.type === 'tabs') p.onDropTabs(payload.tabIds, space.id);
+        else if (!payload && hasExternalLinks(e)) p.onDropLinks(e.dataTransfer.getData(LINKS_MIME), space.id);
       }}
     >
       <NavButton
@@ -150,6 +153,7 @@ export function Sidebar(props: Props) {
               onDeleteSpace={props.onDeleteSpace}
               onDropCollection={props.onDropCollection}
               onDropTabs={props.onDropTabs}
+              onDropLinks={props.onDropLinks}
             />
           ))}
         </div>

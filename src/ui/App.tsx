@@ -31,6 +31,7 @@ import { OpenTabsPanel } from './OpenTabsPanel';
 import { filterOpenTabs } from './openTabsModel';
 import { SettingsView } from './SettingsView';
 import { Sidebar, type View } from './Sidebar';
+import { parseDraggedLinks } from './dnd';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
@@ -100,6 +101,13 @@ export function App() {
     run,
   });
   const newCollectionTitle = () => `Saved ${new Date().toLocaleDateString()}`;
+  /** Links dragged out of the side panel become a new collection in the given space. */
+  const dropLinksAsCollection = (raw: string, targetSpaceId: string) =>
+    void run('Adding the dropped links', async () => {
+      const links = parseDraggedLinks(raw);
+      const col = await repo.createCollection(targetSpaceId, newCollectionTitle());
+      await repo.addCards(col.id, links);
+    });
   const saveSetting = (what: string, patch: Parameters<typeof updateSettings>[1]) =>
     void run(what, async () => void (await updateSettings(db, patch)));
 
@@ -232,6 +240,7 @@ export function App() {
           }
         }}
         onDropCollection={(id, targetSpaceId) => void run('Moving collection', () => repo.moveCollection(id, targetSpaceId))}
+        onDropLinks={dropLinksAsCollection}
         onDropTabs={(tabIds, targetSpaceId) =>
           void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId: targetSpaceId, title: newCollectionTitle() })
         }
@@ -384,6 +393,7 @@ export function App() {
                 filtered={isFiltering(filter)}
                 collectionActions={collectionActions}
                 editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack', suggestForLink)}
+                onDropLinksAsCollection={(raw) => dropLinksAsCollection(raw, spaceId)}
                 onDropTabsAsCollection={(tabIds) => {
                   void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
                 }}

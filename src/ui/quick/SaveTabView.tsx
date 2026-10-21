@@ -5,6 +5,7 @@ import { setQuickTarget } from '../../core/quicksave';
 import type { Card, Collection, Space } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { hostOf } from '../CardRow';
+import { linkDragProps } from '../dnd';
 import { inputClass } from '../Dialog';
 import { type Destination, DestinationPicker } from './DestinationPicker';
 import { useActiveTab } from './useActiveTab';
@@ -66,7 +67,10 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
 
       <section aria-label="Saving this tab" className="shrink-0">
         <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">Saving this tab</p>
-        <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
+        <div
+          className="rounded-xl border border-line bg-surface px-3 py-2.5"
+          {...(tab ? { ...linkDragProps([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]), title: 'Drag into the library to save it there' } : {})}
+        >
           {tab === undefined && <p className="text-sm text-muted">Reading the current tab…</p>}
           {tab === null && (
             <div className="text-sm text-muted">

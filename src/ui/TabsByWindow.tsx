@@ -1,6 +1,6 @@
 import { FolderInput, Sparkles, X } from 'lucide-react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
-import { dragSourceProps } from './dnd';
+import { dragSourceProps, linkDragProps } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
 import { TabPill } from './TabPill';
 
@@ -24,6 +24,8 @@ interface Props {
   onSaveGroup?: (tabs: OpenTab[], title: string) => void;
   /** Tabs can be dragged out (into the board); a selected tab drags the whole selection. */
   draggable?: boolean;
+  /** Drag the pages themselves as links, for dropping into the library from another page (the side panel). */
+  dragAsLinks?: boolean;
   size?: 'compact' | 'roomy';
 }
 
@@ -110,7 +112,19 @@ export function TabsByWindow(props: Props) {
                             onToggleSelect={() => props.onToggle(t.id)}
                             onActivate={props.onFocus ? () => props.onFocus?.(t.id) : undefined}
                             onClose={props.onCloseTab ? () => props.onCloseTab?.(t.id) : undefined}
-                            itemProps={props.draggable ? dragSourceProps({ type: 'tabs', tabIds }) : undefined}
+                            itemProps={
+                              props.dragAsLinks
+                                ? linkDragProps(
+                                    (isSelected ? windows.flatMap((x) => x.tabs).filter((x) => selected.has(x.id)) : [t]).map((x) => ({
+                                      title: x.title,
+                                      url: x.url,
+                                      favIconUrl: x.favIconUrl,
+                                    })),
+                                  )
+                                : props.draggable
+                                  ? dragSourceProps({ type: 'tabs', tabIds })
+                                  : undefined
+                            }
                           />
                         );
                       })}

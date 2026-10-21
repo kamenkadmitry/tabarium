@@ -2,20 +2,21 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Layers, LibraryBig, X } from 'lucide-react';
 import { useState } from 'react';
 import { db } from '../core/instance';
+import { findInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card } from '../core/types';
 import { usePlatform } from '../platform/context';
 import { GroupTabsView } from './quick/GroupTabsView';
-import { NextQueueView } from './quick/NextQueueView';
+import { InboxView } from './quick/InboxView';
 import { SaveTabView } from './quick/SaveTabView';
 
 type Status = { tone: 'ok' | 'error'; text: string } | null;
-type TabKey = 'save' | 'group' | 'next';
+type TabKey = 'save' | 'group' | 'inbox';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'save', label: 'Save tab' },
   { key: 'group', label: 'Group tabs' },
-  { key: 'next', label: 'Next' },
+  { key: 'inbox', label: 'Inbox' },
 ];
 
 /** Compact surface shared by the side panel (default toolbar action) and the classic popup. */
@@ -25,15 +26,18 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   const spaces = useLiveQuery(() => db.spaces.orderBy('position').toArray(), []);
   const collections = useLiveQuery(() => db.collections.orderBy('position').toArray(), []);
   const cards = useLiveQuery(() => db.cards.toArray(), []);
-  const nexts = useLiveQuery(() => db.nexts.orderBy('position').toArray(), []);
   const [tab, setTab] = useState<TabKey>('save');
   const [status, setStatus] = useState<Status>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  if (!settings || !spaces || !collections || !cards || !nexts) return null;
+  if (!settings || !spaces || !collections || !cards) return null;
 
   const cardsByCollection = new Map<string, Card[]>();
   for (const c of cards) cardsByCollection.set(c.collectionId, [...(cardsByCollection.get(c.collectionId) ?? []), c]);
+
+  // What waits in the Inbox, newest first. Moving a link out or removing it takes it off this list.
+  const inbox = findInbox(spaces, collections);
+  const inboxItems = inbox ? [...(cardsByCollection.get(inbox.id) ?? [])].sort((a, b) => b.createdAt - a.createdAt) : [];
 
   const chooseToolbar = async (quickPanel: 'side' | 'popup') => {
     try {
@@ -95,6 +99,7 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
             }`}
           >
             {t.label}
+            {t.key === 'inbox' && inboxItems.length > 0 && <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-xs font-bold text-muted">{inboxItems.length}</span>}
           </button>
         ))}
       </div>
@@ -113,7 +118,15 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
         {tab === 'group' && (
           <GroupTabsView spaces={spaces} collections={collections} cardsByCollection={cardsByCollection} settings={settings} onStatus={setStatus} />
         )}
-        {tab === 'next' && <NextQueueView nexts={nexts} cards={cards} onStatus={setStatus} />}
+        {tab === 'inbox' && (
+          <InboxView
+            spaces={spaces}
+            collections={collections.filter((c) => c.id !== inbox?.id)}
+            cardsByCollection={cardsByCollection}
+            items={inboxItems}
+            onStatus={setStatus}
+          />
+        )}
       </div>
 
       {status && (

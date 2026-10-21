@@ -1,6 +1,7 @@
 import { MAX_DETAILS_PER_REQUEST, suggestCardDetails, suggestCollectionNames } from '../core/ai/tasks';
 import { db, repo } from '../core/instance';
 import { loadLabelContext } from '../core/organise';
+import { parseDraggedLinks } from './dnd';
 import type { Settings } from '../core/settings';
 import type { Card, Collection } from '../core/types';
 import type { Platform } from '../platform/ports';
@@ -103,6 +104,11 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
     card: deps.cardActions,
     dropCard: (cardId, before) => void deps.run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
     dropTabs: (tabIds, before) => void deps.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),
+    dropLinks: (raw, before) =>
+      void deps.run('Adding the dropped links', async () => {
+        const links = parseDraggedLinks(raw);
+        await repo.addCardsBefore(col.id, links, before);
+      }),
     dropCollection: (id) => void deps.run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
   });
 }

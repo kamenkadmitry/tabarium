@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { BoardView } from '../core/boardTypes';
 import type { Card, Collection, Tag } from '../core/types';
 import { CollectionCard, type CollectionActions } from './CollectionCard';
-import { endDrag, getDragPayload } from './dnd';
+import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 
 interface Props {
   collections: readonly Collection[];
@@ -19,6 +19,8 @@ interface Props {
   editor: { collectionId: string | null; cardId: string | null; render: (collection: Collection, card: Card | null) => React.ReactNode };
   /** Browser tabs were dropped on empty board space: create a new collection from them. */
   onDropTabsAsCollection: (tabIds: number[]) => void;
+  /** Links dragged from the side panel (raw `dataTransfer` text) were dropped on empty board space. */
+  onDropLinksAsCollection: (raw: string) => void;
 }
 
 // Columns have a minimum width instead of a fixed count: a collection header needs about 19rem for its
@@ -37,7 +39,7 @@ export function SpaceBoard(props: Props) {
 
   const zone = {
     onDragOver: (e: React.DragEvent) => {
-      if (getDragPayload()?.type === 'tabs') {
+      if (getDragPayload()?.type === 'tabs' || hasExternalLinks(e)) {
         e.preventDefault();
         setOver(true);
       }
@@ -50,6 +52,7 @@ export function SpaceBoard(props: Props) {
       setOver(false);
       const payload = endDrag();
       if (payload?.type === 'tabs') props.onDropTabsAsCollection(payload.tabIds);
+      else if (!payload && hasExternalLinks(e)) props.onDropLinksAsCollection(e.dataTransfer.getData(LINKS_MIME));
     },
   };
 

@@ -4,7 +4,7 @@ import type { Card, Collection, Tag } from '../core/types';
 import type { BoardView } from '../core/boardTypes';
 import { CardRow, type CardDensity, type CardRowActions } from './CardRow';
 import { SWATCHES } from './colors';
-import { dragSourceProps, endDrag, getDragPayload } from './dnd';
+import { dragSourceProps, endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 
 export interface CollectionActions {
   /** Fold or unfold the collection's tabs. */
@@ -26,6 +26,8 @@ export interface CollectionActions {
   dropCard: (cardId: string, beforeCardId: string | null) => void;
   /** Browser tabs were dropped on this collection: add them before `beforeCardId` (end when null). */
   dropTabs: (tabIds: number[], beforeCardId: string | null) => void;
+  /** Links dragged from the side panel (raw `dataTransfer` text): add them before `beforeCardId` (end when null). */
+  dropLinks: (raw: string, beforeCardId: string | null) => void;
   /** A collection was dropped onto this one: place it before this one. */
   dropCollection: (collectionId: string) => void;
 }
@@ -155,10 +157,11 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
 
   const onDragOver = (e: React.DragEvent<HTMLElement>) => {
     const payload = getDragPayload();
-    if (!payload || payload.type === 'next') return;
+    const external = hasExternalLinks(e);
+    if ((!payload && !external) || payload?.type === 'next') return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (payload.type === 'collection') {
+    e.dataTransfer.dropEffect = external ? 'copy' : 'move';
+    if (payload?.type === 'collection') {
       if (payload.id !== collection.id) setCollectionOver(true);
       return;
     }
@@ -177,8 +180,12 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
     e.preventDefault();
     const payload = endDrag();
     const before = indicator ?? null;
+    const external = hasExternalLinks(e) ? e.dataTransfer.getData(LINKS_MIME) : null;
     clear();
-    if (!payload) return;
+    if (!payload) {
+      if (external !== null) actions.dropLinks(external, before);
+      return;
+    }
     if (payload.type === 'card') actions.dropCard(payload.id, before);
     else if (payload.type === 'tabs') actions.dropTabs(payload.tabIds, before);
     else if (payload.type === 'collection' && payload.id !== collection.id) actions.dropCollection(payload.id);

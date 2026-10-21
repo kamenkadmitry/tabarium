@@ -122,6 +122,41 @@ export async function groupTabs(
   return groups;
 }
 
+/**
+ * Proposes how to group open browser tabs by meaning, to be applied as browser tab groups. Every tab ends up in exactly one
+ * group; tabs the model leaves out go to "Other". Unlike `groupTabs` it knows nothing about the library.
+ */
+export async function proposeTabGroups(config: AiConfig, pages: readonly PageRef[], fetchImpl?: FetchLike): Promise<{ title: string; indexes: number[] }[]> {
+  if (pages.length < 2) throw new AiError('Pick at least two tabs to group.');
+  const answer = await complete(
+    config,
+    {
+      system:
+        'You sort open browser tabs into groups by meaning (topic, project or task) so the user can group them in the browser. ' +
+        'Reply with only JSON: [{"title":"Group name","tabs":[1,2]}]. ' +
+        'Use the tab numbers given and put each tab in exactly one group. Make 2 to 6 groups, with names of at most 3 words, ' +
+        'in the language most of the tab titles use. A tab that fits nowhere goes into a group called "Other". No commentary.',
+      prompt: `Group these tabs:\n${list(pages.slice(0, 80))}`,
+      maxTokens: 2400,
+    },
+    fetchImpl,
+  );
+  const parsed = GroupsSchema.safeParse(extractJson(answer));
+  if (!parsed.success) throw new AiError('The model did not return valid groups.');
+
+  const limit = Math.min(pages.length, 80);
+  const assigned = new Set<number>();
+  const groups: { title: string; indexes: number[] }[] = [];
+  for (const g of parsed.data) {
+    const indexes = g.tabs.map((n) => n - 1).filter((i) => i < limit && !assigned.has(i));
+    indexes.forEach((i) => assigned.add(i));
+    if (indexes.length > 0) groups.push({ title: g.title, indexes });
+  }
+  const rest = pages.map((_, i) => i).filter((i) => !assigned.has(i));
+  if (rest.length > 0) groups.push({ title: 'Other', indexes: rest });
+  return groups;
+}
+
 export interface CardDetails {
   /** One short sentence about the page; empty when the model is not sure what the page is. */
   note: string;

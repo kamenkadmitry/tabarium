@@ -84,7 +84,7 @@ export function createChromePlatform(): Platform {
         // Windows that hold nothing saveable (only the library, settings pages, ...) are not worth showing.
         return result.filter((w) => w.tabs.length > 0 || w.current);
       },
-      async groupTabs(tabIds, title) {
+      async groupTabs(tabIds, title, color) {
         const api = requireExtension();
         const tabs = await Promise.all(tabIds.map((id) => api.tabs.get(id)));
         const byWindow = new Map<number, number[]>();
@@ -95,7 +95,7 @@ export function createChromePlatform(): Platform {
         // A browser group lives inside one window, so a selection spanning windows yields one group per window.
         for (const ids of byWindow.values()) {
           const groupId = await api.tabs.group({ tabIds: ids as [number, ...number[]] });
-          await api.tabGroups.update(groupId, { title });
+          await api.tabGroups.update(groupId, color === undefined ? { title } : { title, color });
         }
       },
       watchActiveTab(listener) {

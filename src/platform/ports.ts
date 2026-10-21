@@ -19,6 +19,10 @@ export interface OpenTab {
   active?: boolean;
 }
 
+/** The fixed colours of browser tab groups. */
+export const TAB_GROUP_COLORS = ['blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange', 'grey'] as const;
+export type TabGroupColor = (typeof TAB_GROUP_COLORS)[number];
+
 export interface TabGroupInfo {
   id: number;
   title: string;
@@ -61,7 +65,7 @@ export interface TabsPort {
   /** All normal browser windows with their saveable tabs. Requires the `tabs` permission. */
   listWindows(): Promise<OpenWindow[]>;
   /** Puts the tabs into a new browser tab group per window (needs `tabGroups`). */
-  groupTabs(tabIds: readonly number[], title: string): Promise<void>;
+  groupTabs(tabIds: readonly number[], title: string, color?: TabGroupColor): Promise<void>;
   /** Calls `listener` when the focused tab or its title/address changes; returns an unsubscribe function. */
   watchActiveTab(listener: () => void): () => void;
   /** Brings a tab (and its window) to the front. */

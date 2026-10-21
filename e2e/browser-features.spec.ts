@@ -524,6 +524,93 @@ test('AI: suggest details in the editor and fill a whole collection', async () =
   await p.close();
 });
 
+test('side panel Inbox: a link leaves the list when it is moved or removed', async () => {
+  const lib = await openLibraryWithSpace('Sorting');
+  await addCollectionWithLinks(lib, 'Sorted', []);
+  await app.worker.evaluate(async (urls) => {
+    for (const [i, url] of urls.entries()) {
+      await chrome.runtime.sendMessage({ type: 'e2e-context-click', info: { menuItemId: 'tabarium-save-page' }, tab: { url, title: `Inbox item ${i + 1}` } });
+    }
+  }, [web('inbox-1'), web('inbox-2')]);
+
+  const panel = await app.context.newPage();
+  panel.setDefaultTimeout(10_000);
+  await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
+  await panel.getByRole('tab', { name: /^Inbox/ }).click();
+  const list = panel.getByRole('list', { name: 'Inbox' });
+  await expect(list.getByRole('listitem')).toHaveCount(2);
+
+  // Move one into a collection: it leaves the Inbox list.
+  await panel.getByRole('button', { name: 'Move Inbox item 1 out of Inbox' }).click();
+  await panel.getByRole('button', { name: /^S\s*Sorting(?![a-z])/ }).click();
+  await panel.getByRole('button', { name: 'Sorted', exact: true }).click();
+  await expect(panel.getByRole('status')).toContainText('Moved to Sorting / Sorted');
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+
+  // Remove the other one: the list is empty.
+  panel.once('dialog', (d) => void d.accept());
+  await panel.getByRole('button', { name: 'Remove Inbox item 2 from Inbox' }).click();
+  await expect(panel.getByText('Inbox is empty')).toBeVisible();
+
+  await lib.reload();
+  await lib.getByRole('button', { name: /^S\s*Sorting(?![a-z])/ }).first().click();
+  await expect(lib.locator('section[aria-label="Sorted"]').getByText('Inbox item 1')).toBeVisible();
+  await panel.close();
+  await lib.close();
+});
+
+test('links dragged from the side panel can be dropped into a collection', async () => {
+  const lib = await openLibraryWithSpace('Dropping');
+  await addCollectionWithLinks(lib, 'Target', []);
+  const target = lib.locator('section[aria-label="Target"]');
+  // The side panel is another page, so the data travels in dataTransfer; here a drag from it is simulated.
+  const dt = await lib.evaluateHandle(() => {
+    const d = new DataTransfer();
+    d.setData('application/x-tabarium-links', JSON.stringify([{ title: 'Dropped page', url: 'https://example.test/dropped', favIconUrl: null }]));
+    return d;
+  });
+  await target.dispatchEvent('dragover', { dataTransfer: dt });
+  await target.dispatchEvent('drop', { dataTransfer: dt });
+  await expect(target.locator('a[href="https://example.test/dropped"]')).toBeVisible();
+  await lib.close();
+});
+
+test('Group tabs: the AI proposes browser tab groups and they are created', async () => {
+  await app.context.route('https://api.openai.com/**', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as { messages: { content: string }[] };
+    const grouping = body.messages[0]?.content.includes('sort open browser tabs');
+    const text = grouping ? '[{"title":"Everything","tabs":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]}]' : '["Fresh name"]';
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: text } }] }) });
+  });
+  const a = await app.context.newPage();
+  await a.goto(web('group-a'));
+  const b = await app.context.newPage();
+  await b.goto(web('group-b'));
+
+  const lib = await openLibraryWithSpace('Grouping');
+  lib.setDefaultTimeout(10_000);
+  await lib.getByRole('button', { name: 'Settings', exact: true }).click();
+  await lib.locator('select:has(option:text("OpenAI"))').selectOption('openai');
+  await lib.getByLabel('Model').fill('test-model');
+  await lib.getByLabel('API key').fill('sk-e2e');
+  await lib.getByRole('button', { name: 'Save AI settings' }).click();
+
+  const panel = await app.context.newPage();
+  panel.setDefaultTimeout(10_000);
+  await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
+  await panel.getByRole('tab', { name: 'Group tabs' }).click();
+  await panel.getByText('Page group-a').waitFor();
+  await panel.getByRole('button', { name: /Organise with AI/ }).click();
+  await expect(panel.getByRole('list', { name: 'Proposed groups' })).toContainText('Everything');
+  // Nothing was added to the library: the proposal is only about how the open tabs belong together.
+  await panel.getByRole('button', { name: /^Group in the browser/ }).click();
+  await expect(panel.getByRole('status')).toContainText('browser tab groups');
+  const groups = await app.worker.evaluate(() => chrome.tabGroups.query({}));
+  expect(groups.map((g) => g.title)).toContain('Everything');
+  await panel.close();
+  await lib.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });
