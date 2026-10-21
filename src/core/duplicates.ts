@@ -21,6 +21,16 @@ export async function findExistingLinks(db: TabariumDB, urls: readonly string[])
   const [cards, collections, spaces] = await Promise.all([db.cards.toArray(), db.collections.toArray(), db.spaces.toArray()]);
   const collectionById = new Map(collections.map((c) => [c.id, c]));
   const spaceById = new Map(spaces.map((s) => [s.id, s]));
+  // The copy reported is the first one in reading order: space, then collection, then position inside it.
+  const spaceOrder = new Map(spaces.map((s) => [s.id, s.position]));
+  const order = (c: (typeof cards)[number]) => {
+    const col = collectionById.get(c.collectionId);
+    return [spaceOrder.get(col?.spaceId ?? '') ?? 0, col?.position ?? 0, c.position];
+  };
+  cards.sort((a, b) => {
+    const [x, y] = [order(a), order(b)];
+    return (x[0] ?? 0) - (y[0] ?? 0) || (x[1] ?? 0) - (y[1] ?? 0) || (x[2] ?? 0) - (y[2] ?? 0);
+  });
   for (const card of cards) {
     const key = normalizeUrl(card.url);
     if (!wanted.has(key)) continue;

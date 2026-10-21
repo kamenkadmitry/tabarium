@@ -471,6 +471,8 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
   await popup.getByRole('button', { name: /^Quick(?![a-z])/ }).click(); // space row (its name ends with the collection count)
   await popup.getByRole('button', { name: 'Quick target', exact: true }).click(); // collection row (not its expander)
+  // Pages saved by earlier tests may be among the open tabs; confirm adding them again if asked.
+  await popup.getByRole('button', { name: /^Add all, duplicates too/ }).click({ timeout: 2000 }).catch(() => undefined);
   await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
 
   await lib.reload();
@@ -709,9 +711,9 @@ test('duplicate guard: a link that is already saved is confirmed before it is ad
   const p = await openLibraryWithSpace('Dupes');
   p.setDefaultTimeout(10_000);
   await addCollectionWithLinks(p, 'First', ['https://example.test/dupe']);
-  await addCollectionWithLinks(p, 'Second', []);
-  await addCollectionWithLinks(p, 'Third', []);
-  const second = p.locator('section[aria-label="Second"]');
+  await addCollectionWithLinks(p, 'Dupe two', []);
+  await addCollectionWithLinks(p, 'Dupe three', []);
+  const second = p.locator('section[aria-label="Dupe two"]');
   const dialog = p.locator('dialog[open]');
 
   // By hand: cancelling adds nothing, confirming creates the duplicate on purpose.
@@ -728,7 +730,7 @@ test('duplicate guard: a link that is already saved is confirmed before it is ad
   await expect(second.locator('[data-card-id]')).toHaveCount(1);
 
   // Dropped links: two arrive, one of them is already saved, so only the new one is added.
-  const third = p.locator('section[aria-label="Third"]');
+  const third = p.locator('section[aria-label="Dupe three"]');
   const dt = await p.evaluateHandle(() => {
     const d = new DataTransfer();
     d.setData(
