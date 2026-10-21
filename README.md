@@ -18,6 +18,7 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Organising | Drag and drop tabs and collections (also between spaces), move via dialog, coloured tags (on collections and links), #hashtags on links, filter by colour, tag or hashtag |
 | Notes and stars | Edit a tab's title, address, note, tags and hashtags in an editor that opens under the link (Ctrl+Enter saves, Esc cancels, E opens it); star tabs; Starred view |
 | Inbox | A system space (envelope icon, cannot be renamed or deleted) where saved tabs wait to be sorted. The side panel's Inbox tab shows the same links, so editing in one place changes both |
+| Inbox page | The Inbox is a table: page, description read from the page itself (meta description, with the first heading below), labels and when it was added. Sort (newest, oldest, title A–Z/Z–A, site), group (date, site, collection), select links for bulk actions, and let the AI propose one tag, several hashtags and a collection for what is unsorted (new tags, hashtags and collections only when nothing existing fits) |
 | Finding things | Search across all spaces including notes; Duplicates view |
 | Restoring | Open all, open as a browser tab group, or replace the current window's tabs |
 | Data | JSON backup/restore, Netscape bookmarks HTML export and import, plain-text export |
@@ -49,6 +50,7 @@ Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked** 
 | `alarms`, `downloads` | Enabling automatic backup in Settings | Run on a schedule and write backup files |
 | `tabGroups` | Enabling "Open collections as tab groups" | Group the tabs of an opened collection |
 | One web origin (your AI provider) | First AI action or "Test connection" | Send the prompt to the provider you configured |
+| Access to websites | "Load page descriptions" on the Inbox page | Read the description and heading of the pages you saved. Only the address of each saved page is requested, with no cookies |
 
 ## Privacy
 

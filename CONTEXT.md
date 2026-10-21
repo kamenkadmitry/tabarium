@@ -25,7 +25,7 @@ Deferred by agreement (not part of the local version): sharing and public pages,
 | Hashtag | Free-form `#label` for cards only, stored lowercase without `#` (`normalizeHashtag`) |
 | Open tabs panel | Right-hand panel of the library listing live browser windows, groups and tabs; supports selection and drag into collections |
 | Quick save | Popup, side panel and context menu saving into the remembered collection, default `Inbox / Saved tabs` |
-| Inbox | The one system space (`Space.kind === 'inbox'`): fixed name, envelope icon, cannot be renamed, edited or deleted. Its default collection is "Saved tabs". The side panel's Inbox tab lists every link in it, so library and side panel are the same data. `ensureInbox` creates it, adopts an older plain "Saved tabs" space (even renamed) and merges the accidental empty copy. The old Next queue is retired: its rows stay in the database and backups but nothing shows them |
+| Inbox | The one system space (`Space.kind === 'inbox'`): fixed name, envelope icon, cannot be renamed, edited or deleted. Its default collection is "Saved tabs". The side panel's Inbox tab lists every link in it, so library and side panel are the same data. The Inbox page (`InboxPage.tsx`) is a table with sorting, grouping, page descriptions (needs the optional access to websites, asked on "Load page descriptions"; afterwards new links are read while the page is open) and an AI button. `ensureInbox` creates it, adopts an older plain "Saved tabs" space (even renamed) and merges the accidental empty copy. The old Next queue is retired: its rows stay in the database and backups but nothing shows them |
 | Side panel | `sidepanel` entrypoint: Save tab, Group tabs, Inbox. The toolbar button opens it (setting: popup instead) |
 | Platform | Port interface (`src/platform/ports.ts`) hiding browser APIs so the UI also runs in `?demo=1` without the extension |
 | Profile | Name and avatar shown at the bottom of the sidebar, with a "Local" badge |
@@ -41,7 +41,9 @@ src/core        pure logic, no browser APIs
   backup.ts       backup export, validation, restore (all or nothing)
   settings.ts     settings schema and defaults (stored as one row)
   formats.ts / toby.ts   Netscape bookmarks, plain text, Toby import and export
-  organise.ts     context sent to the AI, applying proposed groups (reuse collection by title)
+  organise.ts     context sent to the AI, applying proposed groups and suggested details (creates missing tags and hashtags, can move links)
+  inbox.ts        sorting and grouping of Inbox links (by date added, title, site, collection)
+  pageInfo.ts / describe.ts   reads the meta description and first <h1> of saved pages (text parsing, no DOM), a few pages at a time
   ai/client.ts    provider adapters (anthropic, openai, google, openrouter, custom)
   ai/tasks.ts     collection names, grouping tabs, connection test
 src/platform     browser access: chrome.ts (real), demo.ts (in-page), ports.ts (interface), files.ts
@@ -67,7 +69,7 @@ Data rules worth knowing:
 
 ## AI behaviour
 
-`groupTabs` receives the tabs plus the existing collections of the target space, tags and hashtags (up to 100 each). The prompt tells the model to reuse an existing collection title, to use only existing tags, and to give up to three hashtags per group (existing first). Results are checked in code: unknown tags are dropped, hashtags normalised, titles matched case-insensitively to existing collections, every tab ends in exactly one group ("Other" for leftovers). `applyGroups` saves them. Naming suggestions still see only the pages.
+`suggestCardDetails` (Inbox page, editor, collection menu) is given the existing tags, hashtags, spaces and collections and proposes one tag (existing, else new), 3 to 6 hashtags (existing first, new when needed) and a collection (existing, or new inside an existing space); `applyCardDetails` creates what is missing and can move the link. `groupTabs` receives the tabs plus the existing collections of the target space, tags and hashtags (up to 100 each). The prompt tells the model to reuse an existing collection title, to use only existing tags, and to give up to three hashtags per group (existing first). Results are checked in code: unknown tags are dropped, hashtags normalised, titles matched case-insensitively to existing collections, every tab ends in exactly one group ("Other" for leftovers). `applyGroups` saves them. Naming suggestions still see only the pages.
 
 ## Build, test, run
 
@@ -117,4 +119,4 @@ GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, 
 
 ## Status of verification
 
-Everything above the roadmap is implemented and green in CI (104 unit tests, 27 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
+Everything above the roadmap is implemented and green in CI (117 unit tests, 29 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
