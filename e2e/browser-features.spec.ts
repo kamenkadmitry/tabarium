@@ -503,8 +503,8 @@ test('AI: connection test, naming and grouping through a provider', async () => 
 test('AI: suggest details in the editor and fill a whole collection', async () => {
   await app.context.route('https://api.openai.com/**', async (route) => {
     const body = JSON.parse(route.request().postData() ?? '{}') as { messages: { content: string }[] };
-    const details = body.messages[0]?.content.includes('organise a personal bookmark library');
-    const text = details ? '[{"n":1,"note":"About one.","tags":[],"hashtags":["suggested"]},{"n":2,"note":"About two.","tags":[],"hashtags":["suggested"]}]' : '["Fresh name"]';
+    const details = body.messages[0]?.content.includes('sort a personal bookmark library');
+    const text = details ? '[{"n":1,"note":"About one.","hashtags":["suggested"]},{"n":2,"note":"About two.","hashtags":["suggested"]}]' : '["Fresh name"]';
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: text } }] }) });
   });
 
@@ -692,7 +692,7 @@ test('Inbox page: the AI proposes a tag, hashtags and a collection; new ones are
   await dialog.getByRole('button', { name: /^Apply to 1/ }).click();
 
   // The link left the Inbox, now sits in the suggested collection and carries the new labels.
-  await expect(lib.getByRole('table', { name: 'Inbox' })).toHaveCount(0);
+  await expect(lib.getByRole('table', { name: 'Inbox' }).locator('[data-card-id]', { hasText: 'Needs sorting' })).toHaveCount(0);
   await lib.getByRole('button', { name: 'Triage', exact: true }).click();
   const row = lib.locator('section[aria-label="Sorted out"] [data-card-id]', { hasText: 'Needs sorting' });
   await expect(row).toBeVisible();
