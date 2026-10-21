@@ -440,7 +440,7 @@ test('right-click menu: items are registered and saving goes to the Inbox', asyn
   }, web('menu-page'));
 
   await p.reload();
-  await p.getByRole('button', { name: 'Inbox', exact: true }).click();
+  await p.getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
   const saved = p.locator('section[aria-label="Saved tabs"]');
   await expect(saved.getByText('Saved from menu')).toBeVisible();
   await expect(saved.getByText('A link')).toBeVisible();
@@ -578,6 +578,45 @@ test('side panel Inbox: a link leaves the list when it is moved or removed', asy
   await lib.reload();
   await lib.getByRole('button', { name: 'Sorting', exact: true }).first().click();
   await expect(lib.locator('section[aria-label="Sorted"]').getByText('Inbox item 1')).toBeVisible();
+  await panel.close();
+  await lib.close();
+});
+
+test('Inbox is a system space shared by the library and the side panel', async () => {
+  const lib = await openLibraryWithSpace('Systemic');
+  lib.setDefaultTimeout(10_000);
+  const inboxButton = lib.getByRole('navigation', { name: 'Spaces' }).getByRole('button', { name: /^Inbox(?![a-z])/ });
+
+  // A system space: an envelope icon, and no way to edit or delete it. There is no Next page any more.
+  await expect(inboxButton.locator('svg')).toHaveCount(1);
+  await expect(lib.getByRole('button', { name: 'Edit space Inbox' })).toHaveCount(0);
+  await expect(lib.getByRole('button', { name: 'Delete space Inbox' })).toHaveCount(0);
+  await expect(lib.getByRole('button', { name: /^Next/ })).toHaveCount(0);
+
+  await lib.evaluate(
+    (items) => chrome.runtime.sendMessage({ type: 'e2e-save-to-inbox', items }),
+    [{ title: 'Shared item', url: web('shared-item'), favIconUrl: null }],
+  );
+  await inboxButton.click();
+  const board = lib.locator('main section[aria-label]').filter({ hasText: 'Shared item' });
+  await expect(board).toBeVisible();
+
+  // The side panel lists the same links; editing there changes the library at once.
+  const panel = await app.context.newPage();
+  panel.setDefaultTimeout(10_000);
+  await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
+  await panel.getByRole('tab', { name: /^Inbox/ }).click();
+  await panel.getByRole('button', { name: 'Edit Shared item' }).click();
+  await panel.getByLabel('Title').fill('Renamed in the panel');
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(lib.locator('main').getByText('Renamed in the panel')).toBeVisible();
+
+  // Moving it to the Inbox space from elsewhere and removing it in the library empties the panel list too.
+  lib.once('dialog', (d) => void d.accept());
+  const row = lib.locator('[data-card-id]', { hasText: 'Renamed in the panel' });
+  await row.getByRole('button', { name: 'Delete tab' }).focus();
+  await lib.keyboard.press('Enter');
+  await expect(panel.getByRole('list', { name: 'Inbox' })).not.toContainText('Renamed in the panel');
   await panel.close();
   await lib.close();
 });

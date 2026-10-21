@@ -3,7 +3,6 @@ import type { DragEvent } from 'react';
 export type DragPayload =
   | { type: 'card'; id: string }
   | { type: 'collection'; id: string }
-  | { type: 'next'; id: string }
   /** Browser tabs dragged out of the Open tabs panel (ids are browser tab ids). */
   | { type: 'tabs'; tabIds: number[] };
 

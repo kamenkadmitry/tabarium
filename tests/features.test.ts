@@ -122,22 +122,6 @@ describe('tags', () => {
   });
 });
 
-describe('next queue', () => {
-  it('queues once, reorders, completes and cascades with the card', async () => {
-    const { cards } = await seed();
-    const a = await repo.addToNext(cards[0]!.id);
-    expect((await repo.addToNext(cards[0]!.id)).id).toBe(a.id);
-    const b = await repo.addToNext(cards[1]!.id);
-    await repo.moveNext(b.id, a.id);
-    const order = (await db.nexts.orderBy('position').toArray()).map((n) => n.id);
-    expect(order).toEqual([b.id, a.id]);
-    await repo.setNextState(a.id, 'done');
-    expect((await db.nexts.get(a.id))?.state).toBe('done');
-    await repo.deleteCard(cards[0]!.id);
-    expect(await db.nexts.get(a.id)).toBeUndefined();
-  });
-});
-
 describe('duplicates', () => {
   it('finds the same url across collections', async () => {
     const { space } = await seed();
@@ -186,14 +170,12 @@ describe('export and import formats', () => {
 describe('moving an item onto its own spot', () => {
   it('does nothing instead of failing', async () => {
     const { space, col, cards } = await seed();
-    const [first, second] = cards;
-    if (!first || !second) throw new Error('seed must create cards');
+    const [, second] = cards;
+    if (!second) throw new Error('seed must create cards');
     const before = (await db.cards.orderBy('position').toArray()).map((c) => c.id);
 
     await repo.moveCard(second.id, col.id, second.id);
     await repo.moveCollection(col.id, space.id, col.id);
-    const next = await repo.addToNext(first.id);
-    await repo.moveNext(next.id, next.id);
 
     expect((await db.cards.orderBy('position').toArray()).map((c) => c.id)).toEqual(before);
   });
@@ -223,7 +205,8 @@ describe('bulk actions on links', () => {
 
     await repo.setStarred([a.id, b.id], true);
     expect((await db.cards.toArray()).filter((x) => x.starred).map((x) => x.id).sort()).toEqual([a.id, b.id].sort());
-    await repo.addToNext(a.id);
+    // Rows of the retired Next queue are still cleaned up with their link.
+    await db.nexts.add({ id: 'legacy-next', cardId: a.id, state: 'todo', position: 100 });
     await repo.deleteCards([a.id, b.id]);
     expect((await db.cards.toArray()).map((x) => x.id)).toEqual([c.id]);
     expect(await db.nexts.count()).toBe(0);

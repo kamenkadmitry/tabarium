@@ -3,7 +3,7 @@ import { dedupeLinks, type ImportedSpace } from './formats';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
 import { normalizeHashtag } from './hashtag';
-import type { Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
+import type { Card, Collection, Hashtag, Space, Tag } from './types';
 import { normalizeUrl } from './url';
 
 export interface NewCard {
@@ -21,12 +21,13 @@ export { normalizeUrl };
 export class Repository {
   constructor(private readonly db: TabariumDB) {}
 
-  async createSpace(name: string, icon: string | null = null): Promise<Space> {
+  async createSpace(name: string, icon: string | null = null, kind: Space['kind'] = 'user'): Promise<Space> {
     const existing = await this.db.spaces.toArray();
     const space: Space = {
       id: crypto.randomUUID(),
       name,
       icon,
+      kind,
       position: positionAfterLast(existing.map((s) => s.position)),
       createdAt: Date.now(),
     };
@@ -90,17 +91,25 @@ export class Repository {
     });
   }
 
+  /** The Inbox is a system space: it is never renamed, edited or deleted. */
+  private async assertUserSpace(spaceId: string, action: string): Promise<void> {
+    if ((await this.db.spaces.get(spaceId))?.kind === 'inbox') throw new Error(`The Inbox is a system space and cannot be ${action}`);
+  }
+
   /** Changes the name and the icon of a space together. */
   async updateSpace(spaceId: string, patch: { name: string; icon: string | null }): Promise<void> {
+    await this.assertUserSpace(spaceId, 'changed');
     if (patch.name.trim() === '') throw new Error('A space needs a name');
     if ((await this.db.spaces.update(spaceId, { name: patch.name.trim(), icon: patch.icon })) === 0) throw new Error(`Space ${spaceId} does not exist`);
   }
 
   async renameSpace(spaceId: string, name: string): Promise<void> {
+    await this.assertUserSpace(spaceId, 'renamed');
     if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(`Space ${spaceId} does not exist`);
   }
 
   async deleteSpace(spaceId: string): Promise<void> {
+    await this.assertUserSpace(spaceId, 'deleted');
     const ids = await this.db.collections.where('spaceId').equals(spaceId).primaryKeys();
     for (const id of ids) await this.deleteCollection(id);
     await this.db.spaces.delete(spaceId);
@@ -344,44 +353,6 @@ export class Repository {
     const known = new Set(await this.db.tags.toCollection().primaryKeys());
     for (const t of tagIds) if (!known.has(t)) throw new Error(`Tag ${t} does not exist`);
     await this.updateCollection(collectionId, { tagIds: [...new Set(tagIds)] });
-  }
-
-  /** Adds a card to the Next queue (no-op if it is already queued). */
-  async addToNext(cardId: string): Promise<NextItem> {
-    return this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
-      if (!(await this.db.cards.get(cardId))) throw new Error(`Card ${cardId} does not exist`);
-      const existing = await this.db.nexts.toArray();
-      const queued = existing.find((n) => n.cardId === cardId);
-      if (queued) return queued;
-      const item: NextItem = {
-        id: crypto.randomUUID(),
-        cardId,
-        state: 'todo',
-        position: positionAfterLast(existing.map((n) => n.position)),
-      };
-      await this.db.nexts.add(item);
-      return item;
-    });
-  }
-
-  async setNextState(nextId: string, state: NextItem['state']): Promise<void> {
-    if ((await this.db.nexts.update(nextId, { state })) === 0) throw new Error(`Next item ${nextId} does not exist`);
-  }
-
-  async removeFromNext(nextId: string): Promise<void> {
-    await this.db.nexts.delete(nextId);
-  }
-
-  async moveNext(nextId: string, beforeNextId: string | null): Promise<void> {
-    if (beforeNextId === nextId) return;
-    await this.db.transaction('rw', this.db.nexts, async () => {
-      const siblings = (await this.db.nexts.toArray()).filter((n) => n.id !== nextId);
-      const plan = planInsert(siblings, beforeNextId);
-      if (plan.respace) for (const s of plan.respace) await this.db.nexts.update(s.id, { position: s.position });
-      if ((await this.db.nexts.update(nextId, { position: plan.position })) === 0) {
-        throw new Error(`Next item ${nextId} does not exist`);
-      }
-    });
   }
 
   /** Adds imported spaces/collections/links. Existing data is untouched; spaces with the same name are reused. */

@@ -98,9 +98,6 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
     },
     editTags: () => deps.setDialog({ kind: 'tags', collectionId: col.id }),
     setColor: (color) => void deps.run('Setting colour', () => repo.updateCollection(col.id, { color })),
-    addAllToNext: act('Adding to Next', async () => {
-      for (const c of list) await repo.addToNext(c.id);
-    }),
     card: deps.cardActions,
     dropCard: (cardId, before) => void deps.run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
     dropTabs: (tabIds, before) => void deps.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Clock, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Tag } from '../core/types';
 import type { BoardView } from '../core/boardTypes';
@@ -22,7 +22,6 @@ export interface CollectionActions {
   remove: () => void;
   editTags: () => void;
   setColor: (color: string | null) => void;
-  addAllToNext: () => void;
   card: (card: Card) => CardRowActions;
   dropCard: (cardId: string, beforeCardId: string | null) => void;
   /** Browser tabs were dropped on this collection: add them before `beforeCardId` (end when null). */
@@ -97,9 +96,6 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
       <button role="menuitem" type="button" onClick={run(actions.editTags)} className={menuItem}>
         <TagIcon size={15} aria-hidden /> Tags…
       </button>
-      <button role="menuitem" type="button" onClick={run(actions.addAllToNext)} className={menuItem}>
-        <Clock size={15} aria-hidden /> Add all to Next
-      </button>
       <div className="px-3 py-2">
         <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-muted">
           <Palette size={13} aria-hidden /> Colour
@@ -163,7 +159,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
   const onDragOver = (e: React.DragEvent<HTMLElement>) => {
     const payload = getDragPayload();
     const external = hasExternalLinks(e);
-    if ((!payload && !external) || payload?.type === 'next') return;
+    if (!payload && !external) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = external ? 'copy' : 'move';
     if (payload?.type === 'collection') {

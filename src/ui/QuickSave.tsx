@@ -1,11 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Layers, LibraryBig, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../core/instance';
-import { findInbox } from '../core/quicksave';
+import { ensureInbox, inboxCards, inboxSpace } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card } from '../core/types';
 import { usePlatform } from '../platform/context';
+import { buildLabelsApi } from './labelsApi';
 import { GroupTabsView } from './quick/GroupTabsView';
 import { InboxView } from './quick/InboxView';
 import { SaveTabView } from './quick/SaveTabView';
@@ -26,18 +27,29 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   const spaces = useLiveQuery(() => db.spaces.orderBy('position').toArray(), []);
   const collections = useLiveQuery(() => db.collections.orderBy('position').toArray(), []);
   const cards = useLiveQuery(() => db.cards.toArray(), []);
+  const tags = useLiveQuery(() => db.tags.orderBy('position').toArray(), []);
+  const hashtags = useLiveQuery(() => db.hashtags.orderBy('name').toArray(), []);
   const [tab, setTab] = useState<TabKey>('save');
   const [status, setStatus] = useState<Status>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  if (!settings || !spaces || !collections || !cards) return null;
+  // Makes sure the Inbox exists (and adopts an older one) so its tab has something to show.
+  useEffect(() => {
+    ensureInbox(db).catch((e: unknown) => {
+      console.error('Tabarium: preparing the Inbox failed', e);
+      setStatus({ tone: 'error', text: `Preparing the Inbox failed: ${e instanceof Error ? e.message : String(e)}` });
+    });
+  }, []);
+
+  if (!settings || !spaces || !collections || !cards || !tags || !hashtags) return null;
 
   const cardsByCollection = new Map<string, Card[]>();
   for (const c of cards) cardsByCollection.set(c.collectionId, [...(cardsByCollection.get(c.collectionId) ?? []), c]);
 
-  // What waits in the Inbox, newest first. Moving a link out or removing it takes it off this list.
-  const inbox = findInbox(spaces, collections);
-  const inboxItems = inbox ? [...(cardsByCollection.get(inbox.id) ?? [])].sort((a, b) => b.createdAt - a.createdAt) : [];
+  // What waits in the Inbox (all its collections), newest first. Moving a link out or removing it takes it off this list.
+  const inbox = inboxSpace(spaces);
+  const inboxItems = inboxCards(spaces, collections, cards).sort((a, b) => b.createdAt - a.createdAt);
+  const inboxCollectionIds = new Set(collections.filter((c) => c.spaceId === inbox?.id).map((c) => c.id));
 
   const chooseToolbar = async (quickPanel: 'side' | 'popup') => {
     try {
@@ -120,10 +132,11 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
         )}
         {tab === 'inbox' && (
           <InboxView
-            spaces={spaces}
-            collections={collections.filter((c) => c.id !== inbox?.id)}
+            spaces={spaces.filter((sp) => sp.kind !== 'inbox')}
+            collections={collections.filter((c) => !inboxCollectionIds.has(c.id))}
             cardsByCollection={cardsByCollection}
             items={inboxItems}
+            labels={buildLabelsApi(tags, hashtags, cards)}
             onStatus={setStatus}
           />
         )}

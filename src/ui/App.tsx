@@ -6,6 +6,7 @@ import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
 import { groupTabs, suggestCardDetails } from '../core/ai/tasks';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../core/organise';
+import { ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
@@ -26,10 +27,9 @@ import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
 import { SpaceDialog } from './dialogs/SpaceDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
-import { SWATCHES } from './colors';
 import { HashtagsPage, TagsPage } from './LabelPages';
-import { LabelsProvider, type LabelsApi } from './labels';
-import { DuplicatesView, NextView, SearchResults } from './LibraryViews';
+import { LabelsProvider } from './labels';
+import { DuplicatesView, SearchResults } from './LibraryViews';
 import { OpenTabsPanel } from './OpenTabsPanel';
 import { filterOpenTabs } from './openTabsModel';
 import { SettingsView } from './SettingsView';
@@ -38,6 +38,7 @@ import { parseDraggedLinks } from './dnd';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
+import { buildLabelsApi } from './labelsApi';
 import { useCardSelection } from './useCardSelection';
 import { useInlineEditor } from './useInlineEditor';
 import { useOpenTabsController } from './useOpenTabsController';
@@ -57,7 +58,7 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { starred: 'Starred', next: 'Next', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
+const TITLES = { starred: 'Starred', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
 
 export function App() {
   const platform = usePlatform();
@@ -79,7 +80,8 @@ export function App() {
   }, [theme]);
 
   // Until the user picks something, show the first space.
-  const firstSpaceId = data?.spaces[0]?.id;
+  // The Inbox is always there; the welcome screen is for the first space of your own.
+  const firstSpaceId = data?.spaces.find((s) => s.kind !== 'inbox')?.id;
   const view: View | null = selectedView ?? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null);
 
   const reportError = (what: string, e: unknown) => {
@@ -97,6 +99,10 @@ export function App() {
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
   const editor = useInlineEditor({ reportError, clearError: () => setError(null) });
+  // Creates the Inbox on first use and adopts an older one, so it exists before anything is saved to it.
+  useEffect(() => {
+    ensureInbox(db).catch((e: unknown) => reportError('Preparing the Inbox', e));
+  }, []);
   const picked = useCardSelection();
   const clearPicked = picked.clear;
   // Esc drops the selection, unless it is used by something that is open (a field, the editor, a dialog).
@@ -133,11 +139,14 @@ export function App() {
     void run(what, async () => void (await updateSettings(db, patch)));
 
   if (!data) return null;
-  const { spaces, collections, cards, tags, hashtags, nexts, cardsByCollection, cardById, collectionById } = data;
+  const { spaces, collections, cards, tags, hashtags, cardsByCollection, cardById, collectionById } = data;
 
   const activeSpace = view?.kind === 'space' ? spaces.find((s) => s.id === view.spaceId) : undefined;
   const spaceId = activeSpace?.id;
   const q = query.trim().toLowerCase();
+
+  const inboxSpaceId = inboxSpace(spaces)?.id;
+  const inboxCollectionIds = new Set(collections.filter((c) => c.spaceId === inboxSpaceId).map((c) => c.id));
 
   const cardActions = (c: Card): CardRowActions => ({
     onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
@@ -145,7 +154,7 @@ export function App() {
     // On the board the editor opens under the row; lists without a board (Starred, Duplicates, search) use a dialog.
     onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
-    onNext: act('Adding to Next', async () => void (await repo.addToNext(c.id))),
+    onInbox: inboxCollectionIds.has(c.collectionId) ? undefined : act('Moving to Inbox', () => moveToInbox(db, [c.id])),
   });
 
   const aiReady = settings !== undefined && isAiConfigured(settings.ai);
@@ -198,15 +207,7 @@ export function App() {
     ].join(' ');
   const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''} ${labelText(c)}`.toLowerCase().includes(q);
 
-  const labelsApi: LabelsApi = {
-    tags,
-    hashtags,
-    tagUsage: new Map(tags.map((t) => [t.id, cards.filter((c) => c.tagIds.includes(t.id)).length])),
-    hashtagUsage: new Map(hashtags.map((h) => [h.id, cards.filter((c) => c.hashtagIds.includes(h.id)).length])),
-    swatches: SWATCHES.map((sw) => sw.value),
-    createTag: async (name, color) => (await repo.createTag(name, color ?? (SWATCHES[tags.length % SWATCHES.length] ?? SWATCHES[0]).value)).id,
-    createHashtag: async (name) => (await repo.ensureHashtag(name)).id,
-  };
+  const labelsApi = buildLabelsApi(tags, hashtags, cards);
   const tagUsage = new Map(
     tags.map((t) => [t.id, { collections: collections.filter((c) => c.tagIds.includes(t.id)).length, links: cards.filter((c) => c.tagIds.includes(t.id)).length }]),
   );
@@ -232,10 +233,6 @@ export function App() {
   const boardView: BoardView = (spaceId !== undefined ? settings?.boardView[spaceId] : undefined) ?? 'grid';
   const spaceTabCount = spaceCollections.reduce((n, c) => n + (tabCounts.get(c.id) ?? 0), 0);
 
-  const nextEntries = nexts.flatMap((item) => {
-    const card = cardById.get(item.cardId);
-    return card ? [{ item, card }] : [];
-  });
 
   const title = view && view.kind !== 'space' ? TITLES[view.kind] : (activeSpace?.name ?? 'Library');
   const searching = q !== '' && !plainPage;
@@ -248,7 +245,7 @@ export function App() {
         spaces={spaces}
         profile={settings?.profile ?? { name: '', avatar: null }}
         view={view}
-        nextCount={nexts.filter((n) => n.state === 'todo').length}
+        inboxCount={inboxCards(spaces, collections, cards).length}
         duplicateCount={data.duplicates.length}
         onSelect={(v) => {
           setView(v);
@@ -347,15 +344,6 @@ export function App() {
             </ul>
           )}
 
-          {!searching && view?.kind === 'next' && (
-            <NextView
-              entries={nextEntries}
-              onToggle={(item) => void run('Updating Next', () => repo.setNextState(item.id, item.state === 'done' ? 'todo' : 'done'))}
-              onRemove={(item) => void run('Updating Next', () => repo.removeFromNext(item.id))}
-              onMove={(id, before) => void run('Reordering Next', () => repo.moveNext(id, before))}
-            />
-          )}
-
           {!searching && view?.kind === 'duplicates' && (
             <DuplicatesView
               groups={data.duplicates.map((g) => ({ ...g, collections: collectionById }))}
@@ -451,11 +439,7 @@ export function App() {
             onClear={clearPicked}
             onMove={() => setDialog({ kind: 'move-many', ids: pickedIds })}
             onLabels={() => setDialog({ kind: 'bulk-labels', ids: pickedIds })}
-            onNext={() =>
-              bulk('Adding to Next', async () => {
-                for (const id of pickedIds) await repo.addToNext(id);
-              })
-            }
+            onInbox={() => bulk('Moving to Inbox', () => moveToInbox(db, pickedIds))}
             onStar={() => bulk('Updating tabs', () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
             onDelete={() => {
               if (confirm(`Delete ${pickedIds.length} link${pickedIds.length === 1 ? '' : 's'}? This cannot be undone.`)) {

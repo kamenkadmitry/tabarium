@@ -1,4 +1,4 @@
-import { Clock, Copy, Hash, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Copy, Hash, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
@@ -8,7 +8,6 @@ import { SpaceIcon } from './spaceIcons';
 export type View =
   | { kind: 'space'; spaceId: string }
   | { kind: 'starred' }
-  | { kind: 'next' }
   | { kind: 'duplicates' }
   | { kind: 'tags' }
   | { kind: 'hashtags' }
@@ -18,7 +17,8 @@ interface Props {
   spaces: readonly Space[];
   profile: AppSettings['profile'];
   view: View | null;
-  nextCount: number;
+  /** Links waiting in the Inbox. */
+  inboxCount: number;
   duplicateCount: number;
   onSelect: (view: View) => void;
   onCreateSpace: () => void;
@@ -57,7 +57,7 @@ function NavButton(props: {
   );
 }
 
-function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection' | 'onDropTabs' | 'onDropLinks'>) {
+function SpaceItem({ space, active, badge, ...p }: { space: Space; active: boolean; badge?: number } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection' | 'onDropTabs' | 'onDropLinks'>) {
   const [over, setOver] = useState(false);
   return (
     <div
@@ -81,6 +81,7 @@ function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & 
     >
       <NavButton
         active={active}
+        badge={badge}
         onClick={() => p.onSelect({ kind: 'space', spaceId: space.id })}
         icon={
           <span className={`grid size-6 shrink-0 place-items-center rounded-md ${active ? 'text-primary-fg' : 'bg-surface-2 text-primary'}`}>
@@ -90,6 +91,7 @@ function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & 
       >
         {space.name}
       </NavButton>
+      {space.kind !== 'inbox' && (
       <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
         <button type="button" aria-label={`Edit space ${space.name}`} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
           <Pencil size={14} aria-hidden />
@@ -98,6 +100,7 @@ function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & 
           <Trash2 size={14} aria-hidden />
         </button>
       </div>
+      )}
     </div>
   );
 }
@@ -116,9 +119,6 @@ export function Sidebar(props: Props) {
       <nav aria-label="Library" className="flex flex-col gap-1">
         <NavButton active={view?.kind === 'starred'} onClick={() => props.onSelect({ kind: 'starred' })} icon={<Star size={18} aria-hidden />}>
           Starred
-        </NavButton>
-        <NavButton active={view?.kind === 'next'} onClick={() => props.onSelect({ kind: 'next' })} icon={<Clock size={18} aria-hidden />} badge={props.nextCount}>
-          Next
         </NavButton>
         <NavButton active={view?.kind === 'duplicates'} onClick={() => props.onSelect({ kind: 'duplicates' })} icon={<Copy size={18} aria-hidden />} badge={props.duplicateCount}>
           Duplicates
@@ -144,10 +144,11 @@ export function Sidebar(props: Props) {
           </button>
         </div>
         <div className="flex flex-col gap-1 overflow-y-auto">
-          {spaces.map((s) => (
+          {[...spaces].sort((a, b) => Number(b.kind === 'inbox') - Number(a.kind === 'inbox')).map((s) => (
             <SpaceItem
               key={s.id}
               space={s}
+              badge={s.kind === 'inbox' ? props.inboxCount : undefined}
               active={view?.kind === 'space' && view.spaceId === s.id}
               onSelect={props.onSelect}
               onRenameSpace={props.onRenameSpace}

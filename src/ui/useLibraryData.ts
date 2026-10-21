@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../core/instance';
 import { normalizeUrl } from '../core/url';
-import type { Card, Collection, Hashtag, NextItem, Space, Tag } from '../core/types';
+import type { Card, Collection, Hashtag, Space, Tag } from '../core/types';
 
 export interface LibraryData {
   spaces: Space[];
@@ -9,7 +9,6 @@ export interface LibraryData {
   cards: Card[];
   tags: Tag[];
   hashtags: Hashtag[];
-  nexts: NextItem[];
   cardsByCollection: Map<string, Card[]>;
   cardById: Map<string, Card>;
   collectionById: Map<string, Collection>;
@@ -23,8 +22,7 @@ export function useLibraryData(): LibraryData | null {
   const cards = useLiveQuery(() => db.cards.orderBy('position').toArray(), []);
   const tags = useLiveQuery(() => db.tags.orderBy('position').toArray(), []);
   const hashtags = useLiveQuery(() => db.hashtags.orderBy('name').toArray(), []);
-  const nexts = useLiveQuery(() => db.nexts.orderBy('position').toArray(), []);
-  if (!spaces || !collections || !cards || !tags || !hashtags || !nexts) return null;
+  if (!spaces || !collections || !cards || !tags || !hashtags) return null;
 
   const cardsByCollection = new Map<string, Card[]>();
   const byUrl = new Map<string, Card[]>();
@@ -41,7 +39,6 @@ export function useLibraryData(): LibraryData | null {
     cards,
     tags,
     hashtags,
-    nexts,
     cardsByCollection,
     cardById: new Map(cards.map((c) => [c.id, c])),
     collectionById: new Map(collections.map((c) => [c.id, c])),

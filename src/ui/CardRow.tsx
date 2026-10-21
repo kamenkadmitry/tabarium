@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Clock, NotebookText, Pencil, Star, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Inbox, NotebookText, Pencil, Star, Trash2 } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
 import type { Card } from '../core/types';
 import { dragSourceProps } from './dnd';
@@ -41,7 +41,8 @@ export interface CardRowActions {
   onDelete: () => void;
   onEdit: () => void;
   onMove: () => void;
-  onNext: () => void;
+  /** Moves the link to the Inbox. Absent for links that already are there. */
+  onInbox?: () => void;
 }
 
 /** How a tab is drawn: normal row, dense one-liner, wide row with the host on the right, or a tile. */
@@ -136,9 +137,11 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
         <button type="button" aria-label="Edit tab and note" onClick={actions.onEdit} className={`${iconButton} hover:text-primary`}>
           <Pencil size={15} aria-hidden />
         </button>
-        <button type="button" aria-label="Add to Next" onClick={actions.onNext} className={`${iconButton} hover:text-primary`}>
-          <Clock size={15} aria-hidden />
-        </button>
+        {actions.onInbox && (
+          <button type="button" aria-label="Move to Inbox" onClick={actions.onInbox} className={`${iconButton} hover:text-primary`}>
+            <Inbox size={15} aria-hidden />
+          </button>
+        )}
         <button type="button" aria-label="Move to another collection" onClick={actions.onMove} className={`${iconButton} hover:text-primary`}>
           <ArrowRightLeft size={15} aria-hidden />
         </button>

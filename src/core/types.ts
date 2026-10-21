@@ -10,6 +10,8 @@ export const SpaceSchema = z.object({
   name: z.string().min(1),
   /** Key of a picked icon ("lucide:cloud", "brand:github"); null shows the first letter of the name. */
   icon: z.string().max(60).nullable().default(null),
+  /** "inbox" is the one system space: it cannot be renamed, edited or deleted. Everything else is "user". */
+  kind: z.enum(['user', 'inbox']).default('user'),
   position: z.number(),
   createdAt: timestamp,
 });
