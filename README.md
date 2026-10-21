@@ -17,7 +17,7 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Board | Space heading with collection and tab counts; sort (custom, name, age, size), filter by colour or tag, four layouts (Card, Compact, List, Grid, remembered per space), expand or collapse all collections |
 | Organising | Drag and drop tabs and collections (also between spaces), move via dialog, coloured tags (on collections and links), #hashtags on links, filter by colour, tag or hashtag |
 | Notes and stars | Edit a tab's title, address, note, tags and hashtags in an editor that opens under the link (Ctrl+Enter saves, Esc cancels, E opens it); star tabs; Starred view |
-| Next | A queue of tabs to look at: reorder, mark done |
+| Inbox | A system space (envelope icon, cannot be renamed or deleted) where saved tabs wait to be sorted. The side panel's Inbox tab shows the same links, so editing in one place changes both |
 | Finding things | Search across all spaces including notes; Duplicates view |
 | Restoring | Open all, open as a browser tab group, or replace the current window's tabs |
 | Data | JSON backup/restore, Netscape bookmarks HTML export and import, plain-text export |
@@ -26,7 +26,7 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Tags and hashtags | Own pages with search, sort, usage counts, merge and delete-unused; "+" chips with suggestions when editing a link |
 | Profile | Name and avatar in the sidebar with a "Local" badge |
 | Spaces | Pick an icon for a space from themed icons and brand logos |
-| Bulk actions | Tick links (Shift for a range, or a whole collection) to move, tag, send to Next, star or delete them together |
+| Bulk actions | Tick links (Shift for a range, or a whole collection) to move, tag, send to the Inbox, star or delete them together |
 | Side panel | Save tab, Group tabs (AI proposes browser tab groups by topic; or save tabs to a collection) and Inbox (links waiting to be sorted); links can be dragged from it into the library |
 | Appearance | Light, dark or system theme |
 

@@ -23,11 +23,10 @@ Deferred by agreement (not part of the local version): sharing and public pages,
 | Card / link / tab | A saved page (`Card` in code). Has title, optional custom title, address, favicon, note, star, tags and hashtags |
 | Tag | Coloured label. Can be put on collections and on cards |
 | Hashtag | Free-form `#label` for cards only, stored lowercase without `#` (`normalizeHashtag`) |
-| Next | Queue of cards to look at later; items are `todo` or `done` |
 | Open tabs panel | Right-hand panel of the library listing live browser windows, groups and tabs; supports selection and drag into collections |
 | Quick save | Popup, side panel and context menu saving into the remembered collection, default `Inbox / Saved tabs` |
-| Inbox | The collection `Inbox / Saved tabs`. The side panel's Inbox tab lists it; moving a link out or removing it takes it off the list. Explicit "Add this tab to Inbox" always saves there |
-| Side panel | `sidepanel` entrypoint: Save tab, Group tabs, Next. The toolbar button opens it (setting: popup instead) |
+| Inbox | The one system space (`Space.kind === 'inbox'`): fixed name, envelope icon, cannot be renamed, edited or deleted. Its default collection is "Saved tabs". The side panel's Inbox tab lists every link in it, so library and side panel are the same data. `ensureInbox` creates it, adopts an older plain "Saved tabs" space (even renamed) and merges the accidental empty copy. The old Next queue is retired: its rows stay in the database and backups but nothing shows them |
+| Side panel | `sidepanel` entrypoint: Save tab, Group tabs, Inbox. The toolbar button opens it (setting: popup instead) |
 | Platform | Port interface (`src/platform/ports.ts`) hiding browser APIs so the UI also runs in `?demo=1` without the extension |
 | Profile | Name and avatar shown at the bottom of the sidebar, with a "Local" badge |
 
@@ -35,9 +34,9 @@ Deferred by agreement (not part of the local version): sharing and public pages,
 
 ```
 src/core        pure logic, no browser APIs
-  types.ts        Zod schemas and types (Space, Collection, Card, Tag, Hashtag, NextItem)
+  types.ts        Zod schemas and types (Space, Collection, Card, Tag, Hashtag; NextItem only for old backups)
   db.ts           Dexie database, schema versions (v3 added hashtags and card labels)
-  repo.ts         all writes: spaces, collections, cards, tags, hashtags, Next, import, duplicates
+  repo.ts         all writes: spaces, collections, cards, tags, hashtags, import, duplicates
   ordering.ts / position.ts   positions step 100, midpoint insertion (planInsert)
   backup.ts       backup export, validation, restore (all or nothing)
   settings.ts     settings schema and defaults (stored as one row)
@@ -118,4 +117,4 @@ GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, 
 
 ## Status of verification
 
-Everything above the roadmap is implemented and green in CI (102 unit tests, 26 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
+Everything above the roadmap is implemented and green in CI (104 unit tests, 27 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
