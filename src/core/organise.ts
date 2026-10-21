@@ -136,7 +136,7 @@ export async function applyCardDetails(
       if (card.collectionId !== target.id) {
         const key = normalizeUrl(card.url);
         const duplicate = (await db.cards.where('collectionId').equals(target.id).toArray()).some((c) => normalizeUrl(c.url) === key);
-        if (duplicate) await repo.deleteCard(card.id);
+        if (duplicate) await repo.deleteCard(card.id, 'duplicate');
         else await repo.moveCard(card.id, target.id);
         changed += labelsChanged || fillNote ? 0 : 1;
       }

@@ -1,4 +1,4 @@
-import { Copy, Hash, Layers, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Copy, Hash, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
@@ -7,6 +7,7 @@ import { SpaceIcon } from './spaceIcons';
 
 export type View =
   | { kind: 'space'; spaceId: string }
+  | { kind: 'dashboard' }
   | { kind: 'starred' }
   | { kind: 'duplicates' }
   | { kind: 'tags' }
@@ -117,6 +118,9 @@ export function Sidebar(props: Props) {
       </div>
 
       <nav aria-label="Library" className="flex flex-col gap-1">
+        <NavButton active={view?.kind === 'dashboard'} onClick={() => props.onSelect({ kind: 'dashboard' })} icon={<LayoutDashboard size={18} aria-hidden />}>
+          Dashboard
+        </NavButton>
         <NavButton active={view?.kind === 'starred'} onClick={() => props.onSelect({ kind: 'starred' })} icon={<Star size={18} aria-hidden />}>
           Starred
         </NavButton>

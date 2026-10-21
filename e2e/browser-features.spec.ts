@@ -751,6 +751,25 @@ test('duplicate guard: a link that is already saved is confirmed before it is ad
   await p.close();
 });
 
+test('dashboard: counts the library and the history, and the period can be switched', async () => {
+  const p = await openLibraryWithSpace('Counted');
+  p.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(p, 'Counted links', ['https://example.test/counted-1', 'https://example.test/counted-2']);
+  await p.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(p.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+  const today = p.getByRole('region', { name: 'Activity today' });
+  await p.getByRole('radio', { name: 'Today' }).click();
+  await expect(today).toBeVisible();
+  // Earlier tests share the profile, so only check that this test's two links are in the numbers.
+  const added = Number((await today.getByText('New links').locator('xpath=following-sibling::span[1]').innerText()).replace(/\D/g, ''));
+  expect(added).toBeGreaterThanOrEqual(2);
+  await expect(p.getByRole('region', { name: 'Library now' })).toContainText('Collections');
+  await expect(p.getByRole('img', { name: 'Links added and deleted per day' })).toBeVisible();
+  await p.getByRole('radio', { name: 'All time' }).click();
+  await expect(p.getByRole('region', { name: 'Activity in total' })).toBeVisible();
+  await p.close();
+});
+
 test('links dragged from the side panel can be dropped into a collection', async () => {
   const lib = await openLibraryWithSpace('Dropping');
   await addCollectionWithLinks(lib, 'Target', []);

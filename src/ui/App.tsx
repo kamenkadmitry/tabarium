@@ -41,6 +41,7 @@ import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
 import { useDuplicateGuard } from './DuplicateGuard';
 import { buildLabelsApi } from './labelsApi';
+import { DashboardPage } from './DashboardPage';
 import { InboxPage } from './InboxPage';
 import { SWATCHES } from './colors';
 import { proposeDetails } from './suggestDetails';
@@ -64,7 +65,7 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { starred: 'Starred', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
+const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
 
 export function App() {
   const platform = usePlatform();
@@ -129,7 +130,7 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [hasPicked, clearPicked]);
 
-  const plainPage = view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
+  const plainPage = view?.kind === 'dashboard' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
   const tabsCtl = useOpenTabsController({
     enabled: panelEnabled,
@@ -165,7 +166,7 @@ export function App() {
 
   const cardActions = (c: Card): CardRowActions => ({
     onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
-    onDelete: act('Deleting tab', () => repo.deleteCard(c.id)),
+    onDelete: act('Deleting tab', () => repo.deleteCard(c.id, view?.kind === 'duplicates' ? 'duplicate' : undefined)),
     // On the board the editor opens under the row; lists without a board (Starred, Duplicates, search) use a dialog.
     onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
@@ -366,6 +367,10 @@ export function App() {
               groups={data.duplicates.map((g) => ({ ...g, collections: collectionById }))}
               cardActions={cardActions}
             />
+          )}
+
+          {view?.kind === 'dashboard' && (
+            <DashboardPage spaces={spaces} collections={collections} cards={cards} tags={tags} hashtags={hashtags} activity={data.activity} />
           )}
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}

@@ -70,7 +70,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
       const already = (cardsByCollection.get(targetId) ?? []).some((c) => normalizeUrl(c.url) === key);
       if (already) {
         // The link is already there: only take it out of the Inbox instead of creating a second copy.
-        await repo.deleteCard(card.id);
+        await repo.deleteCard(card.id, 'duplicate');
         setMoving(null);
         return `Already in ${dest.label}. Removed from Inbox.`;
       }
