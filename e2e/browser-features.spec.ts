@@ -642,7 +642,9 @@ test('Inbox page: sort, group by date and site, descriptions read from pages', a
   await expect(table.getByRole('heading', { name: /^Today/ })).toBeVisible();
   await lib.getByRole('button', { name: 'Sort the Inbox' }).click();
   await lib.getByRole('menuitemradio', { name: 'Title A–Z' }).click();
-  await expect(table.locator('[data-card-id]').first()).toContainText('Alpha page');
+  // Other tests leave links in the Inbox, so compare the two seeded rows with each other.
+  const position = async (text: string) => (await table.locator('[data-card-id]').allTextContents()).findIndex((t) => t.includes(text));
+  await expect.poll(async () => (await position('Alpha page')) >= 0 && (await position('Alpha page')) < (await position('Zeta page'))).toBe(true);
   await lib.getByRole('button', { name: 'Group the Inbox' }).click();
   await lib.getByRole('menuitemradio', { name: 'Site' }).click();
   await expect(table.getByRole('heading', { name: /^desc\.test/ })).toBeVisible();
