@@ -42,5 +42,16 @@ export class TabariumDB extends Dexie {
             card.hashtagIds ??= [];
           }),
       );
+    // v4: spaces can have an icon; older spaces get none.
+    this.version(4)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table('spaces')
+          .toCollection()
+          .modify((space: { icon?: string | null }) => {
+            space.icon ??= null;
+          }),
+      );
   }
 }

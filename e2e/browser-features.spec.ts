@@ -611,6 +611,26 @@ test('Group tabs: the AI proposes browser tab groups and they are created', asyn
   await lib.close();
 });
 
+test('space icons: pick a brand icon from the list and it shows in the sidebar', async () => {
+  const p = await openLibraryWithSpace('Iconic');
+  p.setDefaultTimeout(10_000);
+  const space = p.getByRole('button', { name: 'Iconic', exact: true });
+  await expect(space.locator('svg')).toHaveCount(0); // without an icon the first letter is shown
+
+  await p.getByRole('button', { name: 'Edit space Iconic' }).focus();
+  await p.keyboard.press('Enter');
+  const dialog = p.locator('dialog[open]');
+  await dialog.getByRole('button', { name: 'Choose icon' }).click();
+  await dialog.getByLabel('Search icons').fill('github');
+  await dialog.getByRole('button', { name: 'GitHub' }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(space.locator('svg')).toHaveCount(1);
+  await p.reload();
+  await expect(p.getByRole('button', { name: 'Iconic', exact: true }).locator('svg')).toHaveCount(1);
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

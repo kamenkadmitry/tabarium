@@ -8,6 +8,8 @@ const timestamp = z.number().int().nonnegative();
 export const SpaceSchema = z.object({
   id,
   name: z.string().min(1),
+  /** Key of a picked icon ("lucide:cloud", "brand:github"); null shows the first letter of the name. */
+  icon: z.string().max(60).nullable().default(null),
   position: z.number(),
   createdAt: timestamp,
 });

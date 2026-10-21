@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
+import { SpaceIcon } from './spaceIcons';
 
 export type View =
   | { kind: 'space'; spaceId: string }
@@ -82,15 +83,15 @@ function SpaceItem({ space, active, ...p }: { space: Space; active: boolean } & 
         active={active}
         onClick={() => p.onSelect({ kind: 'space', spaceId: space.id })}
         icon={
-          <span className="grid size-5 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">
-            {space.name[0]?.toUpperCase()}
+          <span className={`grid size-6 shrink-0 place-items-center rounded-md ${active ? 'text-primary-fg' : 'bg-surface-2 text-primary'}`}>
+            <SpaceIcon icon={space.icon} name={space.name} size={space.icon ? 16 : 14} />
           </span>
         }
       >
         {space.name}
       </NavButton>
       <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-        <button type="button" aria-label={`Rename space ${space.name}`} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
+        <button type="button" aria-label={`Edit space ${space.name}`} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
           <Pencil size={14} aria-hidden />
         </button>
         <button type="button" aria-label={`Delete space ${space.name}`} onClick={() => p.onDeleteSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-danger">

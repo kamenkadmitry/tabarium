@@ -22,6 +22,7 @@ import { CardDialog } from './dialogs/CardDialog';
 import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
+import { SpaceDialog } from './dialogs/SpaceDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
 import { SWATCHES } from './colors';
 import { HashtagsPage, TagsPage } from './LabelPages';
@@ -248,7 +249,7 @@ export function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
           {view?.kind === 'space' && activeSpace ? (
-            <SpaceHeading name={activeSpace.name} collections={spaceCollections.length} tabs={spaceTabCount} />
+            <SpaceHeading name={activeSpace.name} icon={activeSpace.icon} collections={spaceCollections.length} tabs={spaceTabCount} />
           ) : (
             <h1 className="text-xl font-bold tracking-tight">{title}</h1>
           )}
@@ -449,27 +450,24 @@ export function App() {
       )}
 
       {dialog?.kind === 'space' && (
-        <PromptDialog
-          title="Create space"
-          label="Space name"
-          submitLabel="Create"
+        <SpaceDialog
+          mode="create"
           onClose={() => setDialog(null)}
-          onSubmit={(name) =>
+          onSubmit={({ name, icon }) =>
             run('Creating space', async () => {
-              const space = await repo.createSpace(name);
+              const space = await repo.createSpace(name, icon);
               setView({ kind: 'space', spaceId: space.id });
             })
           }
         />
       )}
       {dialog?.kind === 'rename-space' && (
-        <PromptDialog
-          title="Rename space"
-          label="Space name"
-          submitLabel="Save"
-          initialValue={dialog.space.name}
+        <SpaceDialog
+          mode="edit"
+          initialName={dialog.space.name}
+          initialIcon={dialog.space.icon}
           onClose={() => setDialog(null)}
-          onSubmit={(name) => run('Renaming space', () => repo.renameSpace(dialog.space.id, name))}
+          onSubmit={(values) => run('Saving space', () => repo.updateSpace(dialog.space.id, values))}
         />
       )}
       {dialog?.kind === 'collection' && spaceId && (

@@ -21,11 +21,12 @@ export { normalizeUrl };
 export class Repository {
   constructor(private readonly db: TabariumDB) {}
 
-  async createSpace(name: string): Promise<Space> {
+  async createSpace(name: string, icon: string | null = null): Promise<Space> {
     const existing = await this.db.spaces.toArray();
     const space: Space = {
       id: crypto.randomUUID(),
       name,
+      icon,
       position: positionAfterLast(existing.map((s) => s.position)),
       createdAt: Date.now(),
     };
@@ -87,6 +88,12 @@ export class Repository {
       await this.db.cards.bulkAdd(added);
       return added;
     });
+  }
+
+  /** Changes the name and the icon of a space together. */
+  async updateSpace(spaceId: string, patch: { name: string; icon: string | null }): Promise<void> {
+    if (patch.name.trim() === '') throw new Error('A space needs a name');
+    if ((await this.db.spaces.update(spaceId, { name: patch.name.trim(), icon: patch.icon })) === 0) throw new Error(`Space ${spaceId} does not exist`);
   }
 
   async renameSpace(spaceId: string, name: string): Promise<void> {

@@ -4,6 +4,7 @@ import { TabariumDB } from '../src/core/db';
 import { normalizeHashtag } from '../src/core/hashtag';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../src/core/organise';
 import { Repository } from '../src/core/repo';
+import { ALL_ICON_KEYS, ICON_GROUPS } from '../src/ui/spaceIcons';
 
 let db: TabariumDB;
 let repo: Repository;
@@ -170,5 +171,32 @@ describe('applying suggested details', () => {
     const afterB = await db.cards.get(b.id);
     expect(afterB?.note).toBe('mine');
     expect(afterB?.hashtagIds).toEqual([keep.id]);
+  });
+});
+
+describe('space icons', () => {
+  it('stores an icon with a space, changes it with the name, and keeps it in backups', async () => {
+    const space = await repo.createSpace('Code', 'brand:github');
+    expect(space.icon).toBe('brand:github');
+    expect((await repo.createSpace('Plain')).icon).toBeNull();
+    await repo.updateSpace(space.id, { name: ' Cloud stuff ', icon: 'lucide:cloud' });
+    expect(await db.spaces.get(space.id)).toMatchObject({ name: 'Cloud stuff', icon: 'lucide:cloud' });
+    await expect(repo.updateSpace(space.id, { name: '  ', icon: null })).rejects.toThrow('needs a name');
+    await expect(repo.updateSpace('nope', { name: 'x', icon: null })).rejects.toThrow('does not exist');
+
+    const backup = await exportBackup(db);
+    await restoreBackup(db, parseBackup(JSON.stringify(backup)));
+    expect((await db.spaces.get(space.id))?.icon).toBe('lucide:cloud');
+
+    const legacy = JSON.parse(JSON.stringify(backup)) as { spaces: Record<string, unknown>[] };
+    for (const s of legacy.spaces) delete s.icon;
+    expect(parseBackup(JSON.stringify(legacy)).spaces.every((s) => s.icon === null)).toBe(true);
+  });
+
+  it('offers unique icon keys in every group', () => {
+    expect(new Set(ALL_ICON_KEYS).size).toBe(ALL_ICON_KEYS.length);
+    expect(ICON_GROUPS.map((g) => g.title)).toContain('Brands');
+    expect(ALL_ICON_KEYS).toContain('brand:github');
+    expect(ALL_ICON_KEYS).toContain('lucide:cloud');
   });
 });

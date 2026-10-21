@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Card, Collection, Space } from '../../core/types';
 import { normalizeUrl } from '../../core/url';
 import { Favicon } from '../CardRow';
+import { SpaceIcon } from '../spaceIcons';
 import { inputClass } from '../Dialog';
 
 export type Destination =
@@ -87,8 +88,8 @@ export function DestinationPicker({ spaces, collections, query, cardsByCollectio
           {spaces.map((s) => (
             <li key={s.id}>
               <button type="button" className={row} onClick={() => setOpenId(s.id)}>
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">
-                  {s.name[0]?.toUpperCase()}
+                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-primary">
+                  <SpaceIcon icon={s.icon} name={s.name} size={s.icon ? 15 : 13} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{s.name}</span>
                 <span className="text-xs text-muted">{collections.filter((c) => c.spaceId === s.id).length}</span>
@@ -115,7 +116,9 @@ export function DestinationPicker({ spaces, collections, query, cardsByCollectio
           className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-sm font-semibold hover:bg-surface-2"
         >
           <ChevronLeft size={16} aria-hidden className="shrink-0 text-muted" />
-          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-xs font-bold text-primary">{open.name[0]?.toUpperCase()}</span>
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-surface-2 text-primary">
+            <SpaceIcon icon={open.icon} name={open.name} size={open.icon ? 15 : 13} />
+          </span>
           <span className="truncate">{open.name}</span>
         </button>
         {allowNew && !pickSpace && (
