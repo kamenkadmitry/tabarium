@@ -157,38 +157,58 @@ export async function proposeTabGroups(config: AiConfig, pages: readonly PageRef
   return groups;
 }
 
+/** Where the AI thinks a link belongs. `isNew` means the collection does not exist yet (its space does). */
+export interface SuggestedDestination {
+  space: string;
+  collection: string;
+  isNew: boolean;
+}
+
 export interface CardDetails {
   /** One short sentence about the page; empty when the model is not sure what the page is. */
   note: string;
-  /** Titles of existing tags. */
+  /** At most one tag: an existing one when it fits, otherwise a new one. */
   tags: string[];
-  /** Hashtags without "#": existing ones when they fit, new ones otherwise. */
+  /** Which of `tags` do not exist yet. */
+  newTags: string[];
+  /** Hashtags without "#": existing ones first, new ones for what they do not cover. */
   hashtags: string[];
+  /** Which of `hashtags` do not exist yet. */
+  newHashtags: string[];
+  destination: SuggestedDestination | null;
 }
 
-/** The tags and hashtags that already exist, so suggestions reuse them. */
+/** What already exists in the library, so suggestions reuse it before inventing anything. */
 export interface LabelContext {
   tags: readonly string[];
   hashtags: readonly string[];
+  /** Collections outside the Inbox, with the space each lives in. */
+  collections: readonly { space: string; title: string }[];
 }
 
 export const MAX_DETAILS_PER_REQUEST = 30;
+export const MAX_SUGGESTED_HASHTAGS = 6;
 const NOTE_LIMIT = 200;
+const NAME_LIMIT = 40;
 
 const DetailsSchema = z
   .array(
     z.object({
       n: z.number().int().min(1),
       note: z.string().optional(),
-      tags: z.array(z.string()).optional(),
+      tag: z.string().nullish(),
       hashtags: z.array(z.string()).optional(),
+      collection: z.string().nullish(),
+      newCollection: z.object({ space: z.string(), title: z.string() }).nullish(),
     }),
   )
   .min(1);
 
 /**
- * Proposes a short note, tags and hashtags for links. The model sees only each title and address, so it is told to
- * leave the note empty when it cannot tell what the page is. Returns one entry per input page, in order.
+ * Proposes a short note, one tag, several hashtags and a collection for links. The model sees only each title and
+ * address, plus what already exists in the library; it reuses existing tags, hashtags and collections first and may
+ * propose new tags, hashtags and collections (in an existing space) only when nothing fits.
+ * Returns one entry per input page, in order.
  */
 export async function suggestCardDetails(
   config: AiConfig,
@@ -198,19 +218,30 @@ export async function suggestCardDetails(
 ): Promise<CardDetails[]> {
   if (pages.length === 0) throw new AiError('There are no links to describe.');
   if (pages.length > MAX_DETAILS_PER_REQUEST) throw new AiError(`At most ${MAX_DETAILS_PER_REQUEST} links can be described at a time.`);
+  const fullName = (c: { space: string; title: string }) => `${c.space} / ${c.title}`;
+  const spaces = [...new Set(context.collections.map((c) => c.space))];
   const answer = await complete(
     config,
     {
       system:
-        'You help to organise a personal bookmark library. For each numbered link you know only its title and address. ' +
-        'Reply with only JSON: [{"n":1,"note":"...","tags":["Existing tag"],"hashtags":["topic"]}]. ' +
+        'You help to sort a personal bookmark library. For each numbered link you know only its title and address. ' +
+        'Reply with only JSON: [{"n":1,"note":"...","tag":"Tag name","hashtags":["topic","another"],"collection":"Space / Collection"}]. ' +
         'Rules: "note" is one short sentence (at most 140 characters) saying what the page is, in the language of its title; ' +
         'use an empty string when you are not sure what the page is, never guess or invent details. ' +
-        '"tags" may contain only names from the existing tags list and is empty when none fits. ' +
-        '"hashtags" holds 0 to 3 lowercase single-word topics: reuse an existing hashtag when one fits and create a new one only when none does. ' +
+        '"tag" is exactly one tag, the single most fitting category: take it from the existing tags list when one fits, otherwise propose a short new one (one or two words). ' +
+        `"hashtags" holds 3 to ${MAX_SUGGESTED_HASHTAGS} lowercase single-word topics: use existing hashtags first and add new ones for what they do not cover. ` +
+        '"collection" is where the link belongs: copy one entry of the existing collections list exactly as written, or use null when none fits. ' +
+        'When none fits you may give "newCollection":{"space":"Existing space name","title":"Short title"} instead, using only a space from the existing spaces list. ' +
         'Give one entry per link. No commentary.',
-      prompt: `${named('Existing tags', context.tags)}\n${named('Existing hashtags', context.hashtags)}\n\nLinks:\n${list(pages)}`,
-      maxTokens: 500 + pages.length * 150,
+      prompt: [
+        named('Existing tags', context.tags),
+        named('Existing hashtags', context.hashtags),
+        named('Existing spaces', spaces),
+        named('Existing collections', context.collections.map(fullName)),
+        '',
+        `Links:\n${list(pages)}`,
+      ].join('\n'),
+      maxTokens: 700 + pages.length * 250,
     },
     fetchImpl,
   );
@@ -218,12 +249,31 @@ export async function suggestCardDetails(
   if (!parsed.success) throw new AiError('The model did not return valid suggestions.');
 
   const tagByLower = new Map(context.tags.map((t) => [t.toLowerCase(), t]));
+  const knownHashtags = new Set(context.hashtags);
+  const collectionByName = new Map(context.collections.map((c) => [fullName(c).toLowerCase(), c]));
+  const spaceByLower = new Map(spaces.map((sp) => [sp.toLowerCase(), sp]));
   return pages.map((_, i) => {
     const entry = parsed.data.find((e) => e.n === i + 1);
+    const tagText = (entry?.tag ?? '').trim().replace(/^#+/, '').slice(0, NAME_LIMIT);
+    const tag = tagText === '' ? null : (tagByLower.get(tagText.toLowerCase()) ?? tagText);
+    const hashtags = [...new Set((entry?.hashtags ?? []).map(normalizeHashtag).filter((h) => h !== ''))].slice(0, MAX_SUGGESTED_HASHTAGS);
+
+    let destination: SuggestedDestination | null = null;
+    const existing = collectionByName.get((entry?.collection ?? '').trim().toLowerCase());
+    if (existing) {
+      destination = { space: existing.space, collection: existing.title, isNew: false };
+    } else if (entry?.newCollection) {
+      const space = spaceByLower.get(entry.newCollection.space.trim().toLowerCase());
+      const title = entry.newCollection.title.trim().slice(0, 60);
+      if (space && title !== '') destination = { space, collection: title, isNew: true };
+    }
     return {
       note: (entry?.note ?? '').trim().slice(0, NOTE_LIMIT),
-      tags: [...new Set((entry?.tags ?? []).flatMap((t) => tagByLower.get(t.trim().toLowerCase()) ?? []))],
-      hashtags: [...new Set((entry?.hashtags ?? []).map(normalizeHashtag).filter((h) => h !== ''))].slice(0, 3),
+      tags: tag === null ? [] : [tag],
+      newTags: tag !== null && !tagByLower.has(tag.toLowerCase()) ? [tag] : [],
+      hashtags,
+      newHashtags: hashtags.filter((h) => !knownHashtags.has(h)),
+      destination,
     };
   });
 }

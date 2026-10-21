@@ -1,10 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { PanelRightOpen, Plus, Search, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
 import { groupTabs, suggestCardDetails } from '../core/ai/tasks';
+import type { InboxGroup, InboxSort } from '../core/inbox';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../core/organise';
 import { ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
@@ -39,6 +40,10 @@ import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
 import { buildLabelsApi } from './labelsApi';
+import { InboxPage } from './InboxPage';
+import { SWATCHES } from './colors';
+import { proposeDetails } from './suggestDetails';
+import { useInboxReading } from './useInboxReading';
 import { useCardSelection } from './useCardSelection';
 import { useInlineEditor } from './useInlineEditor';
 import { useOpenTabsController } from './useOpenTabsController';
@@ -54,7 +59,7 @@ type DialogState =
   | { kind: 'bulk-labels'; ids: string[] }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
-  | { kind: 'ai-details'; collectionTitle: string; items: ProposedDetails[]; skipped: number }
+  | { kind: 'ai-details'; title: string; items: ProposedDetails[]; skipped: number }
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
@@ -84,10 +89,10 @@ export function App() {
   const firstSpaceId = data?.spaces.find((s) => s.kind !== 'inbox')?.id;
   const view: View | null = selectedView ?? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null);
 
-  const reportError = (what: string, e: unknown) => {
+  const reportError = useCallback((what: string, e: unknown) => {
     console.error(`Tabarium: ${what} failed`, e);
     setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
-  };
+  }, []);
   /** Runs a user-triggered action; failures are logged with context and shown to the user. */
   const run = async (what: string, action: () => Promise<void>) => {
     try {
@@ -102,8 +107,11 @@ export function App() {
   // Creates the Inbox on first use and adopts an older one, so it exists before anything is saved to it.
   useEffect(() => {
     ensureInbox(db).catch((e: unknown) => reportError('Preparing the Inbox', e));
-  }, []);
+  }, [reportError]);
   const picked = useCardSelection();
+  const inboxCardList = inboxCards(data?.spaces ?? [], data?.collections ?? [], data?.cards ?? []);
+  const inboxViewActive = view?.kind === 'space' && data?.spaces.find((sp) => sp.id === view.spaceId)?.kind === 'inbox';
+  const reading = useInboxReading({ enabled: settings?.fetchDescriptions === true, active: inboxViewActive, cards: inboxCardList, reportError });
   const clearPicked = picked.clear;
   // Esc drops the selection, unless it is used by something that is open (a field, the editor, a dialog).
   const hasPicked = picked.selected.size > 0;
@@ -147,6 +155,9 @@ export function App() {
 
   const inboxSpaceId = inboxSpace(spaces)?.id;
   const inboxCollectionIds = new Set(collections.filter((c) => c.spaceId === inboxSpaceId).map((c) => c.id));
+  const inboxCollections = collections.filter((c) => inboxCollectionIds.has(c.id));
+  // Where links added on the Inbox page land: the "Saved tabs" collection, or the first one the Inbox has.
+  const inboxDefault = inboxCollections.find((c) => c.title === 'Saved tabs') ?? inboxCollections[0];
 
   const cardActions = (c: Card): CardRowActions => ({
     onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
@@ -208,6 +219,7 @@ export function App() {
   const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''} ${labelText(c)}`.toLowerCase().includes(q);
 
   const labelsApi = buildLabelsApi(tags, hashtags, cards);
+  const inboxSlot = editor.slot(labelsApi, 'stack', suggestForLink);
   const tagUsage = new Map(
     tags.map((t) => [t.id, { collections: collections.filter((c) => c.tagIds.includes(t.id)).length, links: cards.filter((c) => c.tagIds.includes(t.id)).length }]),
   );
@@ -382,7 +394,41 @@ export function App() {
             />
           )}
 
-          {!searching && view?.kind === 'space' && spaceId && (
+          {!searching && inboxViewActive && inboxDefault && settings && (
+            <InboxPage
+              collections={inboxCollections}
+              cards={inboxCards(spaces, collections, cards)}
+              sort={settings.inboxSort}
+              group={settings.inboxGroup}
+              onSort={(inboxSort: InboxSort) => saveSetting('Saving the Inbox view', { inboxSort })}
+              onGroup={(inboxGroup: InboxGroup) => saveSetting('Saving the Inbox view', { inboxGroup })}
+              selection={selection}
+              cardActions={cardActions}
+              editor={{
+                cardId: inboxSlot.cardId,
+                adding: inboxSlot.collectionId === inboxDefault.id && inboxSlot.cardId === null,
+                render: (card) => inboxSlot.render(card ? (collectionById.get(card.collectionId) ?? inboxDefault) : inboxDefault, card),
+              }}
+              onAdd={() => editor.openAdd(inboxDefault.id)}
+              onSuggest={
+                aiReady && settings
+                  ? (targets) =>
+                      void run('Suggesting labels', async () => {
+                        const { items, skipped } = await proposeDetails(platform, settings.ai, targets);
+                        setDialog({ kind: 'ai-details', title: 'Suggested labels and collections', items, skipped });
+                      })
+                  : undefined
+              }
+              onReadPages={(ids) => void reading.read(ids)}
+              pagesEnabled={settings.fetchDescriptions}
+              pagesBusy={reading.busy}
+              pagesNote={reading.note}
+              onDropTabs={(tabIds) => void tabsCtl.addTabs(tabIds, { kind: 'collection', collectionId: inboxDefault.id, before: null })}
+              onDropLinks={(raw) => void run('Adding the dropped links', async () => void (await repo.addCards(inboxDefault.id, parseDraggedLinks(raw))))}
+            />
+          )}
+
+          {!searching && view?.kind === 'space' && spaceId && !inboxViewActive && (
             <>
               <div className="mb-5">
                 <BoardToolbar
@@ -440,6 +486,7 @@ export function App() {
             onMove={() => setDialog({ kind: 'move-many', ids: pickedIds })}
             onLabels={() => setDialog({ kind: 'bulk-labels', ids: pickedIds })}
             onInbox={() => bulk('Moving to Inbox', () => moveToInbox(db, pickedIds))}
+            hideInbox={inboxViewActive}
             onStar={() => bulk('Updating tabs', () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
             onDelete={() => {
               if (confirm(`Delete ${pickedIds.length} link${pickedIds.length === 1 ? '' : 's'}? This cannot be undone.`)) {
@@ -583,16 +630,17 @@ export function App() {
       )}
       {dialog?.kind === 'ai-details' && (
         <AiDetailsDialog
-          collectionTitle={dialog.collectionTitle}
+          title={dialog.title}
           items={dialog.items}
           skipped={dialog.skipped}
           onClose={() => setDialog(null)}
-          onApply={(selected) =>
+          onApply={(selected, move) =>
             run('Applying suggestions', async () => {
               await applyCardDetails(
                 db,
                 repo,
-                selected.map((i) => ({ cardId: i.card.id, ...i.details })),
+                selected.map((i) => ({ cardId: i.card.id, note: i.details.note, tags: i.details.tags, hashtags: i.details.hashtags, destination: i.details.destination })),
+                { tagColors: SWATCHES.map((sw) => sw.value), move },
               );
             })
           }

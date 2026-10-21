@@ -3,6 +3,7 @@ import { exportBackup, parseBackup, restoreBackup } from '../src/core/backup';
 import { TabariumDB } from '../src/core/db';
 import { normalizeHashtag } from '../src/core/hashtag';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../src/core/organise';
+import { ensureInbox } from '../src/core/quicksave';
 import { Repository } from '../src/core/repo';
 import { ALL_ICON_KEYS, ICON_GROUPS } from '../src/ui/spaceIcons';
 
@@ -157,11 +158,11 @@ describe('applying suggested details', () => {
     const keep = await repo.ensureHashtag('keep');
     await repo.setCardLabels(b.id, { tagIds: [], hashtagIds: [keep.id] });
 
-    expect(await loadLabelContext(db)).toEqual({ tags: ['Work'], hashtags: ['keep'] });
+    expect(await loadLabelContext(db)).toEqual({ tags: ['Work'], hashtags: ['keep'], collections: [{ space: 'S', title: 'C' }] });
     const changed = await applyCardDetails(db, repo, [
       { cardId: a.id, note: 'About A', tags: ['work'], hashtags: ['new'] },
       { cardId: b.id, note: 'Replaced?', tags: [], hashtags: ['keep'] },
-    ]);
+    ], { tagColors: ['#0d9488'], move: false });
 
     expect(changed).toBe(1);
     const afterA = await db.cards.get(a.id);
@@ -171,6 +172,44 @@ describe('applying suggested details', () => {
     const afterB = await db.cards.get(b.id);
     expect(afterB?.note).toBe('mine');
     expect(afterB?.hashtagIds).toEqual([keep.id]);
+  });
+});
+
+describe('applying suggestions that create tags and move links', () => {
+  it('creates a missing tag and hashtags, and moves a link to its collection (or drops the duplicate)', async () => {
+    const work = await repo.createSpace('Work');
+    const reading = await repo.createCollection(work.id, 'Reading');
+    await repo.addCards(reading.id, [{ title: 'Already here', url: 'https://dup.dev/' }]);
+    const { space } = await ensureInbox(db);
+    const inbox = await repo.createCollection(space.id, 'Waiting');
+    const [fresh, dup] = await repo.addCards(inbox.id, [
+      { title: 'Fresh', url: 'https://fresh.dev/' },
+      { title: 'Dup', url: 'https://dup.dev' },
+    ]);
+    if (!fresh || !dup) throw new Error('cards were not added');
+
+    const changed = await applyCardDetails(
+      db,
+      repo,
+      [
+        { cardId: fresh.id, note: 'About it', tags: ['Brand new'], hashtags: ['x', 'y'], destination: { space: 'work', collection: 'Brand new place' } },
+        { cardId: dup.id, note: '', tags: [], hashtags: [], destination: { space: 'Work', collection: 'reading' } },
+      ],
+      { tagColors: ['#0d9488', '#ea580c'], move: true },
+    );
+
+    expect(changed).toBe(2);
+    expect((await db.tags.toArray()).map((t) => t.title)).toEqual(['Brand new']);
+    const moved = await db.cards.get(fresh.id);
+    expect(moved?.hashtagIds).toHaveLength(2);
+    expect(moved?.tagIds).toHaveLength(1);
+    const place = (await db.collections.where('spaceId').equals(work.id).toArray()).find((c) => c.title === 'Brand new place');
+    expect(moved?.collectionId).toBe(place?.id);
+    expect(await db.cards.get(dup.id)).toBeUndefined(); // it was already in Reading
+    // Without `move` nothing is moved.
+    const [again] = await repo.addCards(inbox.id, [{ title: 'Stay', url: 'https://stay.dev/' }]);
+    await applyCardDetails(db, repo, [{ cardId: again?.id ?? '', note: '', tags: [], hashtags: ['z'], destination: { space: 'Work', collection: 'Reading' } }], { tagColors: ['#0d9488'], move: false });
+    expect((await db.cards.get(again?.id ?? ''))?.collectionId).toBe(inbox.id);
   });
 });
 

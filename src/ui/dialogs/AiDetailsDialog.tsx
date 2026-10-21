@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import type { CardDetails } from '../../core/ai/tasks';
 import type { Card } from '../../core/types';
@@ -10,21 +10,24 @@ export interface ProposedDetails {
 }
 
 interface Props {
-  collectionTitle: string;
+  title: string;
   items: readonly ProposedDetails[];
-  /** Links of the collection that were not sent because they already have tags or hashtags, or the limit was reached. */
+  /** Links that were not sent (already labelled, or over the limit of one run). */
   skipped: number;
-  onApply: (selected: readonly ProposedDetails[]) => Promise<void>;
+  /** `move` is true when the links should also go to their suggested collections. */
+  onApply: (selected: readonly ProposedDetails[], move: boolean) => Promise<void>;
   onClose: () => void;
 }
 
-const hasContent = (d: CardDetails) => d.note !== '' || d.tags.length > 0 || d.hashtags.length > 0;
+const hasContent = (d: CardDetails) => d.note !== '' || d.tags.length > 0 || d.hashtags.length > 0 || d.destination !== null;
 
-/** Review the AI's proposals for the links of a collection and apply the ones you want. */
-export function AiDetailsDialog({ collectionTitle, items, skipped, onApply, onClose }: Props) {
+/** Review what the AI proposes for links (note, a tag, hashtags, a collection) and apply the ones you want. */
+export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Props) {
   const [chosen, setChosen] = useState<ReadonlySet<string>>(() => new Set(items.filter((i) => hasContent(i.details)).map((i) => i.card.id)));
+  const [move, setMove] = useState(true);
   const [busy, setBusy] = useState(false);
   const selected = items.filter((i) => chosen.has(i.card.id));
+  const anyDestination = items.some((i) => i.details.destination !== null);
 
   const toggle = (id: string) =>
     setChosen((prev) => {
@@ -35,9 +38,10 @@ export function AiDetailsDialog({ collectionTitle, items, skipped, onApply, onCl
     });
 
   return (
-    <Dialog title={`Suggested details for “${collectionTitle}”`} onClose={onClose}>
+    <Dialog title={title} onClose={onClose}>
       <p className="mb-3 text-sm text-muted">
-        The AI saw only titles and addresses. Existing notes and labels are never replaced; suggestions are added. Untick what you do not want.
+        The AI saw only titles and addresses, and the tags, hashtags and collections you already have. It reuses them and proposes a new one only when nothing fits.
+        Existing notes and labels are never replaced; suggestions are added. Untick what you do not want.
       </p>
       <ul aria-label="Suggestions" className="mb-3 flex max-h-96 flex-col gap-1 overflow-y-auto">
         {items.map(({ card, details }) => {
@@ -62,14 +66,24 @@ export function AiDetailsDialog({ collectionTitle, items, skipped, onApply, onCl
                       {details.note !== '' && <span className="block text-sm">{details.note}</span>}
                       <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
                         {details.tags.map((t) => (
-                          <span key={t}>{t}</span>
+                          <span key={t}>
+                            {t}
+                            {details.newTags.includes(t) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">new</span>}
+                          </span>
                         ))}
                         {details.hashtags.map((h) => (
                           <span key={h} className="text-primary">
                             #{h}
+                            {details.newHashtags.includes(h) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">new</span>}
                           </span>
                         ))}
                       </span>
+                      {details.destination && (
+                        <span className="mt-1 flex items-center gap-1 text-xs text-muted">
+                          <ArrowRight size={12} aria-hidden /> {details.destination.space} / {details.destination.collection}
+                          {details.destination.isNew && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase">new</span>}
+                        </span>
+                      )}
                     </>
                   )}
                 </span>
@@ -78,6 +92,12 @@ export function AiDetailsDialog({ collectionTitle, items, skipped, onApply, onCl
           );
         })}
       </ul>
+      {anyDestination && (
+        <label className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={move} onChange={() => setMove((v) => !v)} className="size-4 accent-[var(--primary)]" />
+          Also move the links to the suggested collections
+        </label>
+      )}
       {skipped > 0 && <p className="mb-3 text-xs text-muted">{skipped} other links were left out: they already have labels, or this run was limited to 30 links.</p>}
       <div className="flex justify-end gap-2">
         <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
@@ -87,7 +107,7 @@ export function AiDetailsDialog({ collectionTitle, items, skipped, onApply, onCl
           onClick={async () => {
             setBusy(true);
             try {
-              await onApply(selected);
+              await onApply(selected, move);
               onClose();
             } finally {
               setBusy(false);

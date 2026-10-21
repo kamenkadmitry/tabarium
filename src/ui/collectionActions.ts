@@ -1,6 +1,5 @@
-import { MAX_DETAILS_PER_REQUEST, suggestCardDetails, suggestCollectionNames } from '../core/ai/tasks';
-import { db, repo } from '../core/instance';
-import { loadLabelContext } from '../core/organise';
+import { suggestCollectionNames } from '../core/ai/tasks';
+import { repo } from '../core/instance';
 import { parseDraggedLinks } from './dnd';
 import type { Settings } from '../core/settings';
 import type { Card, Collection } from '../core/types';
@@ -8,6 +7,7 @@ import type { Platform } from '../platform/ports';
 import { withProviderAccess } from './ai';
 import type { CardRowActions } from './CardRow';
 import type { ProposedDetails } from './dialogs/AiDetailsDialog';
+import { proposeDetails } from './suggestDetails';
 import type { CollectionActions } from './CollectionCard';
 import type { Runner, TabTarget } from './useOpenTabsController';
 
@@ -15,7 +15,7 @@ export type CollectionDialog =
   | { kind: 'rename-collection'; id: string; title: string }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
-  | { kind: 'ai-details'; collectionTitle: string; items: ProposedDetails[]; skipped: number };
+  | { kind: 'ai-details'; title: string; items: ProposedDetails[]; skipped: number };
 
 interface Deps {
   platform: Platform;
@@ -61,21 +61,8 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
           void deps.run('Suggesting details', async () => {
             const unlabeled = list.filter((c) => c.tagIds.length === 0 && c.hashtagIds.length === 0);
             if (unlabeled.length === 0) throw new Error('Every link in this collection already has tags or hashtags.');
-            const targets = unlabeled.slice(0, MAX_DETAILS_PER_REQUEST);
-            const context = await loadLabelContext(db);
-            const details = await withProviderAccess(deps.platform, ai, () =>
-              suggestCardDetails(
-                ai,
-                targets.map((c) => ({ title: c.customTitle ?? c.title, url: c.url })),
-                context,
-              ),
-            );
-            deps.setDialog({
-              kind: 'ai-details',
-              collectionTitle: col.title,
-              items: targets.map((card, i) => ({ card, details: details[i] ?? { note: '', tags: [], hashtags: [] } })),
-              skipped: list.length - targets.length,
-            });
+            const { items, skipped } = await proposeDetails(deps.platform, ai, unlabeled);
+            deps.setDialog({ kind: 'ai-details', title: `Suggested details for “${col.title}”`, items, skipped });
           })
       : undefined,
     replaceWindow: () => {

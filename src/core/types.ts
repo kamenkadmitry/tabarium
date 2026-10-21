@@ -36,6 +36,11 @@ export const CardSchema = z.object({
   favIconUrl: z.string().nullable(),
   customTitle: z.string().nullable(),
   note: z.string().nullable(),
+  /** The page's own description (meta description) and first heading, read when the user allows it. */
+  description: z.string().nullable().default(null),
+  heading: z.string().nullable().default(null),
+  /** When the page was last read for the two fields above; null when it never was. */
+  pageInfoAt: timestamp.nullable().default(null),
   starred: z.boolean(),
   /** Coloured tags (the same tags collections use). */
   tagIds: z.array(id).default([]),

@@ -16,6 +16,8 @@ export function createDemoPlatform(): Platform {
     permissions: {
       has: async (c) => granted.has(c),
       requestOrigin: async () => true,
+      hasAllSites: async () => false,
+      requestAllSites: async () => false,
       request: async (c) => {
         granted.add(c);
         return true;

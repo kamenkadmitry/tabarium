@@ -63,8 +63,11 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
     setSuggestNote(null);
     try {
       const details = await suggest({ title: title.trim() || new URL(url).hostname, url });
-      const tagByTitle = new Map(labels.tags.map((t) => [t.title.toLowerCase(), t.id]));
-      const addTags = details.tags.flatMap((t) => tagByTitle.get(t.toLowerCase()) ?? []);
+      const addTags: string[] = [];
+      for (const name of details.tags) {
+        const known = labels.tags.find((t) => t.title.toLowerCase() === name.toLowerCase());
+        addTags.push(known ? known.id : await labels.createTag(name));
+      }
       const addHashtags: string[] = [];
       for (const name of details.hashtags) {
         const known = labels.hashtags.find((h) => h.name === name);

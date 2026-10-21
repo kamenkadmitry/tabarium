@@ -50,6 +50,10 @@ export interface PermissionsPort {
   request(capability: Capability): Promise<boolean>;
   /** Asks for access to one web origin (e.g. an AI provider). Must be called from a user gesture. */
   requestOrigin(origin: string): Promise<boolean>;
+  /** Whether Tabarium may read any website (needed to read descriptions of saved pages). */
+  hasAllSites(): Promise<boolean>;
+  /** Asks for access to every website. Must run from a click. */
+  requestAllSites(): Promise<boolean>;
 }
 
 export interface TabsPort {

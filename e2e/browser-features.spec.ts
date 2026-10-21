@@ -441,7 +441,7 @@ test('right-click menu: items are registered and saving goes to the Inbox', asyn
 
   await p.reload();
   await p.getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
-  const saved = p.locator('section[aria-label="Saved tabs"]');
+  const saved = p.getByRole('table', { name: 'Inbox' });
   await expect(saved.getByText('Saved from menu')).toBeVisible();
   await expect(saved.getByText('A link')).toBeVisible();
   await p.close();
@@ -618,6 +618,86 @@ test('Inbox is a system space shared by the library and the side panel', async (
   await lib.keyboard.press('Enter');
   await expect(panel.getByRole('list', { name: 'Inbox' })).not.toContainText('Renamed in the panel');
   await panel.close();
+  await lib.close();
+});
+
+test('Inbox page: sort, group by date and site, descriptions read from pages', async () => {
+  await app.context.route('https://desc.test/**', async (route) => {
+    const second = route.request().url().includes('second');
+    const html = `<html><head><meta name="description" content="${second ? 'Read by itself' : 'Read on request'}"></head><body><h1>Heading ${second ? 'two' : 'one'}</h1></body></html>`;
+    await route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+  });
+  const lib = await openLibraryWithSpace('Pages');
+  lib.setDefaultTimeout(10_000);
+  const seed = (items: { title: string; url: string }[]) =>
+    lib.evaluate((list) => chrome.runtime.sendMessage({ type: 'e2e-save-to-inbox', items: list.map((i) => ({ ...i, favIconUrl: null })) }), items);
+  await seed([
+    { title: 'Zeta page', url: 'https://zeta.test/one' },
+    { title: 'Alpha page', url: 'https://desc.test/first' },
+  ]);
+  await lib.getByRole('navigation', { name: 'Spaces' }).getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
+  const table = lib.getByRole('table', { name: 'Inbox' });
+
+  // Grouped by date by default; sorted and grouped on request.
+  await expect(table.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await lib.getByRole('button', { name: 'Sort the Inbox' }).click();
+  await lib.getByRole('menuitemradio', { name: 'Title A–Z' }).click();
+  await expect(table.locator('[data-card-id]').first()).toContainText('Alpha page');
+  await lib.getByRole('button', { name: 'Group the Inbox' }).click();
+  await lib.getByRole('menuitemradio', { name: 'Site' }).click();
+  await expect(table.getByRole('heading', { name: /^desc\.test/ })).toBeVisible();
+  await expect(table.getByRole('heading', { name: /^zeta\.test/ })).toBeVisible();
+
+  // The description of a page is read once the user asks (access to sites is granted in the test build).
+  await lib.getByRole('button', { name: /Load page descriptions/ }).click();
+  await expect(table.locator('[data-card-id]', { hasText: 'Alpha page' })).toContainText('Read on request');
+  await expect(table.locator('[data-card-id]', { hasText: 'Alpha page' })).toContainText('H1: Heading one');
+  // Afterwards new links are read by themselves.
+  await seed([{ title: 'Second page', url: 'https://desc.test/second' }]);
+  await expect(table.locator('[data-card-id]', { hasText: 'Second page' })).toContainText('Read by itself');
+  await lib.close();
+});
+
+test('Inbox page: the AI proposes a tag, hashtags and a collection; new ones are created and the link moves', async () => {
+  await app.context.route('https://api.openai.com/**', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as { messages: { content: string }[] };
+    const sorting = body.messages[0]?.content.includes('sort a personal bookmark library');
+    const text = sorting
+      ? '[{"n":1,"note":"A page about sorting.","tag":"Reference","hashtags":["sorting","algorithms","docs"],"collection":"Triage / Sorted out"}]'
+      : '["Fresh name"]';
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: text } }] }) });
+  });
+  const lib = await openLibraryWithSpace('Triage');
+  lib.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(lib, 'Sorted out', []);
+  await lib.getByRole('button', { name: 'Settings', exact: true }).click();
+  await lib.locator('select:has(option:text("OpenAI"))').selectOption('openai');
+  await lib.getByLabel('Model').fill('test-model');
+  await lib.getByLabel('API key').fill('sk-e2e');
+  await lib.getByRole('button', { name: 'Save AI settings' }).click();
+  await lib.evaluate(
+    (items) => chrome.runtime.sendMessage({ type: 'e2e-save-to-inbox', items }),
+    [{ title: 'Needs sorting', url: web('needs-sorting'), favIconUrl: null }],
+  );
+
+  await lib.getByRole('navigation', { name: 'Spaces' }).getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
+  await lib.getByRole('button', { name: /Suggest labels and collections/ }).click();
+  const dialog = lib.locator('dialog[open]');
+  const proposal = dialog.getByRole('list', { name: 'Suggestions' });
+  await expect(proposal).toContainText('A page about sorting.');
+  await expect(proposal).toContainText('Reference'); // one tag, new
+  await expect(proposal).toContainText('#sorting');
+  await expect(proposal).toContainText('#algorithms');
+  await expect(proposal).toContainText('Triage / Sorted out');
+  await dialog.getByRole('button', { name: /^Apply to 1/ }).click();
+
+  // The link left the Inbox, now sits in the suggested collection and carries the new labels.
+  await expect(lib.getByRole('table', { name: 'Inbox' })).toHaveCount(0);
+  await lib.getByRole('button', { name: 'Triage', exact: true }).click();
+  const row = lib.locator('section[aria-label="Sorted out"] [data-card-id]', { hasText: 'Needs sorting' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Reference');
+  await expect(row).toContainText('#sorting');
   await lib.close();
 });
 

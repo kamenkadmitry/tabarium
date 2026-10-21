@@ -3,6 +3,7 @@ import { dedupeLinks, type ImportedSpace } from './formats';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
 import { normalizeHashtag } from './hashtag';
+import type { PageInfo } from './pageInfo';
 import type { Card, Collection, Hashtag, Space, Tag } from './types';
 import { normalizeUrl } from './url';
 
@@ -77,6 +78,9 @@ export class Repository {
           favIconUrl: item.favIconUrl ?? null,
           customTitle: item.customTitle ?? null,
           note: item.note ?? null,
+          description: null,
+          heading: null,
+          pageInfoAt: null,
           starred: false,
           tagIds: [...(item.tagIds ?? [])],
           hashtagIds: [...(item.hashtagIds ?? [])],
@@ -128,7 +132,16 @@ export class Repository {
     patch: Partial<Pick<Card, 'title' | 'customTitle' | 'note' | 'starred' | 'url'>>,
   ): Promise<void> {
     if (patch.url !== undefined) new URL(patch.url);
-    const updated = await this.db.cards.update(cardId, { ...patch, updatedAt: Date.now() });
+    // A new address is a different page: what was read from the old one no longer applies.
+    const changedUrl = patch.url !== undefined && patch.url !== (await this.db.cards.get(cardId))?.url;
+    const reset = changedUrl ? { description: null, heading: null, pageInfoAt: null } : {};
+    const updated = await this.db.cards.update(cardId, { ...patch, ...reset, updatedAt: Date.now() });
+    if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+  }
+
+  /** Stores what was read from the page; null records that the page was tried and gave nothing. */
+  async setPageInfo(cardId: string, info: PageInfo | null): Promise<void> {
+    const updated = await this.db.cards.update(cardId, { description: info?.description ?? null, heading: info?.heading ?? null, pageInfoAt: Date.now() });
     if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
   }
 

@@ -23,8 +23,8 @@ export function inboxCards(spaces: readonly Space[], collections: readonly Colle
  * Makes sure the Inbox exists and returns it with its default collection ("Saved tabs").
  *
  * Data made before the Inbox became a system space has a plain space holding a "Saved tabs" collection, possibly renamed,
- * possibly with a second empty "Inbox" space that was created by mistake after the rename. The space with the most links
- * becomes the Inbox (named and decorated as such) and the empty duplicates are merged into it.
+ * possibly with a second "Inbox" space that was created by mistake after the rename. The oldest such space becomes the
+ * Inbox (named and decorated as such) and the accidental copies are merged into it.
  *
  * Everything happens in one transaction, so surfaces that start at the same time (library, side panel, worker) end up
  * with exactly one Inbox.
@@ -38,12 +38,8 @@ export async function ensureInbox(db: TabariumDB): Promise<{ space: Space; colle
       const spaces = await db.spaces.toArray();
       const collections = await db.collections.toArray();
       const holding = spaces.filter((s) => collections.some((c) => c.spaceId === s.id && c.title === INBOX_COLLECTION));
-      const linkCount = async (s: Space) => {
-        const ids = collections.filter((c) => c.spaceId === s.id).map((c) => c.id);
-        return db.cards.where('collectionId').anyOf(ids).count();
-      };
-      const counted = await Promise.all(holding.map(async (s) => ({ space: s, links: await linkCount(s) })));
-      counted.sort((a, b) => b.links - a.links || a.space.createdAt - b.space.createdAt);
+      // The oldest one (lowest position) is the original; later ones are copies made after it was renamed.
+      const counted = holding.map((sp) => ({ space: sp })).sort((x, y) => x.space.position - y.space.position);
       const [primary, ...others] = counted;
 
       if (primary) {

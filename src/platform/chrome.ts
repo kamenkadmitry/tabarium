@@ -40,6 +40,8 @@ export function createChromePlatform(): Platform {
       has: (capability) => requireExtension().permissions.contains(toPermissions(capability)),
       request: (capability) => requireExtension().permissions.request(toPermissions(capability)),
       requestOrigin: (origin) => requireExtension().permissions.request({ origins: [`${origin}/*`] }),
+      hasAllSites: () => requireExtension().permissions.contains({ origins: ['https://*/*', 'http://*/*'] }),
+      requestAllSites: () => requireExtension().permissions.request({ origins: ['https://*/*', 'http://*/*'] }),
     },
     backupSchedule: {
       async resync() {

@@ -162,27 +162,51 @@ describe('tasks', () => {
     expect(groups[1]).toMatchObject({ title: 'New one', tags: [], hashtags: [] });
   });
 
-  it('card details: one entry per link, existing tags only, clean hashtags, long notes cut, missing entries empty', async () => {
+  it('card details: one tag (existing or new), several hashtags, a collection; notes cut; missing entries empty', async () => {
     const pages = ['a', 'b', 'c'].map((t) => ({ title: t, url: `https://${t}.dev` }));
     const reply = JSON.stringify([
-      { n: 1, note: 'x'.repeat(300), tags: ['work', 'Invented'], hashtags: ['#Machine Learning', 'ai', 'ai', 'a', 'b'] },
-      { n: 2, note: '  A guide.  ' },
+      { n: 1, note: 'x'.repeat(300), tag: 'work', hashtags: ['#Machine Learning', 'ai', 'ai', 'a', 'b', 'c', 'd', 'e'], collection: 'work / reading' },
+      { n: 2, note: '  A guide.  ', tag: 'Brand new', newCollection: { space: 'work', title: 'Fresh' } },
     ]);
     const { fetch, calls } = fakeFetch(openaiReply(reply));
-    const out = await suggestCardDetails(cfg({}), pages, { tags: ['Work'], hashtags: ['ai'] }, fetch);
+    const context = { tags: ['Work'], hashtags: ['ai'], collections: [{ space: 'Work', title: 'Reading' }] };
+    const out = await suggestCardDetails(cfg({}), pages, context, fetch);
 
     const prompt = JSON.stringify(calls[0]?.body);
     expect(prompt).toContain('Existing tags: Work');
     expect(prompt).toContain('Existing hashtags: ai');
+    expect(prompt).toContain('Existing spaces: Work');
+    expect(prompt).toContain('Existing collections: Work / Reading');
     expect(prompt).toContain('1. a');
     expect(out).toHaveLength(3);
-    expect(out[0]).toEqual({ note: 'x'.repeat(200), tags: ['Work'], hashtags: ['machine-learning', 'ai', 'a'] });
-    expect(out[1]).toEqual({ note: 'A guide.', tags: [], hashtags: [] });
-    expect(out[2]).toEqual({ note: '', tags: [], hashtags: [] });
+    expect(out[0]).toEqual({
+      note: 'x'.repeat(200),
+      tags: ['Work'],
+      newTags: [],
+      hashtags: ['machine-learning', 'ai', 'a', 'b', 'c', 'd'],
+      newHashtags: ['machine-learning', 'a', 'b', 'c', 'd'],
+      destination: { space: 'Work', collection: 'Reading', isNew: false },
+    });
+    expect(out[1]).toEqual({
+      note: 'A guide.',
+      tags: ['Brand new'],
+      newTags: ['Brand new'],
+      hashtags: [],
+      newHashtags: [],
+      destination: { space: 'Work', collection: 'Fresh', isNew: true },
+    });
+    expect(out[2]).toEqual({ note: '', tags: [], newTags: [], hashtags: [], newHashtags: [], destination: null });
+  });
+
+  it('card details: a collection or space that does not exist is not suggested', async () => {
+    const reply = JSON.stringify([{ n: 1, collection: 'Nowhere / Nothing', newCollection: { space: 'Invented', title: 'X' } }]);
+    const { fetch } = fakeFetch(openaiReply(reply));
+    const [one] = await suggestCardDetails(cfg({}), [{ title: 'a', url: 'https://a.dev' }], { tags: [], hashtags: [], collections: [{ space: 'Work', title: 'Reading' }] }, fetch);
+    expect(one?.destination).toBeNull();
   });
 
   it('card details: refuses empty input, too many links and unusable answers', async () => {
-    const ctx = { tags: [], hashtags: [] };
+    const ctx = { tags: [], hashtags: [], collections: [] };
     await expect(suggestCardDetails(cfg({}), [], ctx)).rejects.toThrow('no links');
     const many = Array.from({ length: MAX_DETAILS_PER_REQUEST + 1 }, (_, i) => ({ title: `t${i}`, url: `https://${i}.dev` }));
     await expect(suggestCardDetails(cfg({}), many, ctx)).rejects.toThrow('At most');

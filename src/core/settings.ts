@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { TabariumDB } from './db';
+import { INBOX_GROUPS, INBOX_SORTS } from './inbox';
 
 export const BOARD_VIEWS = ['card', 'compact', 'list', 'grid'] as const;
 export const BOARD_SORTS = ['custom', 'name-asc', 'name-desc', 'newest', 'oldest', 'most-tabs'] as const;
@@ -25,6 +26,11 @@ export const SettingsSchema = z.object({
   boardSort: z.enum(BOARD_SORTS).default('custom'),
   /** Width in pixels of the Open tabs panel in the library; the user drags its left edge to change it. */
   openTabsWidth: z.number().int().min(200).max(720).default(288),
+  /** How the Inbox page orders and groups its links. */
+  inboxSort: z.enum(INBOX_SORTS).default('newest'),
+  inboxGroup: z.enum(INBOX_GROUPS).default('date'),
+  /** Read the description and heading of Inbox links from their pages (needs access to sites). */
+  fetchDescriptions: z.boolean().default(false),
   /** Show the "Open tabs" side panel in the library. */
   openTabsPanel: z.boolean().default(true),
   /** Close browser tabs after they are added to a collection from the Open tabs panel. */
@@ -57,6 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   boardView: {},
   boardSort: 'custom',
   openTabsWidth: 288,
+  inboxSort: 'newest',
+  inboxGroup: 'date',
+  fetchDescriptions: false,
   openTabsPanel: true,
   autoCloseTabs: false,
   profile: { name: '', avatar: null },
