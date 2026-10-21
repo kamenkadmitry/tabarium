@@ -5,19 +5,22 @@ import { Dialog, Field, inputClass, PrimaryButton, SecondaryButton } from '../Di
 interface Props {
   spaces: readonly Space[];
   collections: readonly Collection[];
-  currentCollectionId: string;
+  /** Collection to leave out of the list; null when links from several collections are moved. */
+  currentCollectionId: string | null;
+  /** More than one link is moved. */
+  count?: number;
   onSubmit: (collectionId: string) => Promise<void>;
   onClose: () => void;
 }
 
 /** Keyboard- and screen-reader-friendly alternative to dragging a tab into another collection. */
-export function MoveCardDialog({ spaces, collections, currentCollectionId, onSubmit, onClose }: Props) {
+export function MoveCardDialog({ spaces, collections, currentCollectionId, count = 1, onSubmit, onClose }: Props) {
   const targets = collections.filter((c) => c.id !== currentCollectionId);
   const [target, setTarget] = useState(targets[0]?.id ?? '');
   const [busy, setBusy] = useState(false);
 
   return (
-    <Dialog title="Move tab" onClose={onClose}>
+    <Dialog title={count > 1 ? `Move ${count} links` : 'Move tab'} onClose={onClose}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();

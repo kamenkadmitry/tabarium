@@ -631,6 +631,46 @@ test('space icons: pick a brand icon from the list and it shows in the sidebar',
   await p.close();
 });
 
+test('bulk actions: tick links, range-select with Shift, move, star and delete them', async () => {
+  const p = await openLibraryWithSpace('Bulk');
+  p.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(p, 'First', ['https://example.test/b1', 'https://example.test/b2', 'https://example.test/b3', 'https://example.test/b4']);
+  await addCollectionWithLinks(p, 'Second', []);
+  const first = p.locator('section[aria-label="First"]');
+  const second = p.locator('section[aria-label="Second"]');
+  const bar = p.getByRole('region', { name: 'Selected links' });
+  const boxes = first.getByRole('checkbox', { name: /^Select example/ });
+
+  // One click ticks one link; Shift-click ticks the range up to it.
+  await boxes.nth(0).click();
+  await expect(bar).toContainText('1 selected');
+  await boxes.nth(2).click({ modifiers: ['Shift'] });
+  await expect(bar).toContainText('3 selected');
+  await boxes.nth(1).click(); // untick the middle one again
+  await expect(bar).toContainText('2 selected');
+
+  // Move the two to the other collection.
+  await bar.getByRole('button', { name: 'Move' }).click();
+  const dialog = p.locator('dialog[open]');
+  await dialog.getByLabel('Move to collection').selectOption({ label: 'Second' });
+  await dialog.getByRole('button', { name: 'Move', exact: true }).click();
+  await expect(second.locator('[data-card-id]')).toHaveCount(2);
+  await expect(first.locator('[data-card-id]')).toHaveCount(2);
+  await expect(bar).toHaveCount(0); // the selection is cleared after the action
+
+  // The header checkbox ticks the whole collection; star, then delete.
+  await second.getByRole('checkbox', { name: 'Select all links in Second' }).click();
+  await expect(bar).toContainText('2 selected');
+  await bar.getByRole('button', { name: 'Star', exact: true }).click();
+  await expect(second.getByLabel('Starred')).toHaveCount(2);
+  await second.getByRole('checkbox', { name: 'Select all links in Second' }).click();
+  p.once('dialog', (d) => void d.accept());
+  await bar.getByRole('button', { name: 'Delete' }).click();
+  await expect(second.locator('[data-card-id]')).toHaveCount(0);
+  await expect(first.locator('[data-card-id]')).toHaveCount(2);
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

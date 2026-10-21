@@ -135,6 +135,50 @@ export class Repository {
     });
   }
 
+  /** Moves links to the end of a collection, keeping their order. Links already there stay where they are. */
+  async moveCards(cardIds: readonly string[], targetCollectionId: string): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
+      if (!(await this.db.collections.get(targetCollectionId))) throw new Error(`Collection ${targetCollectionId} does not exist`);
+      const found = await this.db.cards.bulkGet([...cardIds]);
+      const cards = found.flatMap((c) => c ?? []);
+      if (cards.length !== cardIds.length) throw new Error('Some of the links no longer exist');
+      const moving = cards.filter((c) => c.collectionId !== targetCollectionId).sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
+      for (const c of moving) await this.moveCard(c.id, targetCollectionId);
+    });
+  }
+
+  /** Adds tags and hashtags to links; what they already have is kept. */
+  async addLabelsToCards(cardIds: readonly string[], labels: { tagIds: readonly string[]; hashtagIds: readonly string[] }): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.tags, this.db.hashtags, async () => {
+      const tags = new Set(await this.db.tags.toCollection().primaryKeys());
+      const hashtags = new Set(await this.db.hashtags.toCollection().primaryKeys());
+      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(`Tag ${t} does not exist`);
+      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(`Hashtag ${h} does not exist`);
+      const found = await this.db.cards.bulkGet([...cardIds]);
+      if (found.some((c) => !c)) throw new Error('Some of the links no longer exist');
+      for (const c of found) {
+        if (!c) continue;
+        await this.db.cards.update(c.id, {
+          tagIds: [...new Set([...c.tagIds, ...labels.tagIds])],
+          hashtagIds: [...new Set([...c.hashtagIds, ...labels.hashtagIds])],
+          updatedAt: Date.now(),
+        });
+      }
+    });
+  }
+
+  async setStarred(cardIds: readonly string[], starred: boolean): Promise<void> {
+    await this.db.cards.where('id').anyOf([...cardIds]).modify({ starred, updatedAt: Date.now() });
+  }
+
+  /** Deletes links together with their Next entries. */
+  async deleteCards(cardIds: readonly string[]): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
+      await this.db.nexts.where('cardId').anyOf([...cardIds]).delete();
+      await this.db.cards.bulkDelete([...cardIds]);
+    });
+  }
+
   async deleteCard(cardId: string): Promise<void> {
     await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
       await this.db.nexts.where('cardId').equals(cardId).delete();

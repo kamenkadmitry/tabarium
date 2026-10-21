@@ -4,6 +4,7 @@ import type { BoardView } from '../core/boardTypes';
 import type { Card, Collection, Tag } from '../core/types';
 import { CollectionCard, type CollectionActions } from './CollectionCard';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
+import type { CardSelection } from './useCardSelection';
 
 interface Props {
   collections: readonly Collection[];
@@ -15,6 +16,7 @@ interface Props {
   /** True when a filter hides some of the space's collections. */
   filtered: boolean;
   collectionActions: (collection: Collection, cards: readonly Card[]) => CollectionActions;
+  selection: CardSelection;
   /** Inline editor: which collection and card it is open on, and how to draw it. */
   editor: { collectionId: string | null; cardId: string | null; render: (collection: Collection, card: Card | null) => React.ReactNode };
   /** Browser tabs were dropped on empty board space: create a new collection from them. */
@@ -71,6 +73,7 @@ export function SpaceBoard(props: Props) {
                 actions={props.collectionActions(col, list)}
                 view={props.view}
                 reorderable={props.reorderable}
+                selection={props.selection}
                 editor={{
                   cardId: props.editor.collectionId === col.id ? props.editor.cardId : null,
                   adding: props.editor.collectionId === col.id && props.editor.cardId === null,

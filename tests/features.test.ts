@@ -198,3 +198,34 @@ describe('moving an item onto its own spot', () => {
     expect((await db.cards.orderBy('position').toArray()).map((c) => c.id)).toEqual(before);
   });
 });
+
+describe('bulk actions on links', () => {
+  it('moves links in order, labels them without losing labels, stars and deletes them', async () => {
+    const { space, col, cards } = await seed();
+    const other = await repo.createCollection(space.id, 'Other');
+    const [a, b, c] = cards;
+    if (!a || !b || !c) throw new Error('seed must create three cards');
+
+    await repo.moveCards([c.id, a.id], other.id);
+    expect((await db.cards.where('collectionId').equals(other.id).sortBy('position')).map((x) => x.id)).toEqual([a.id, c.id]);
+    expect((await db.cards.where('collectionId').equals(col.id).toArray()).map((x) => x.id)).toEqual([b.id]);
+    await repo.moveCards([a.id], other.id); // already there: nothing changes
+    await expect(repo.moveCards(['nope'], other.id)).rejects.toThrow('no longer exist');
+
+    const tag = await repo.createTag('T', '#0d9488');
+    const old = await repo.ensureHashtag('old');
+    const added = await repo.ensureHashtag('added');
+    await repo.setCardLabels(a.id, { tagIds: [], hashtagIds: [old.id] });
+    await repo.addLabelsToCards([a.id, b.id], { tagIds: [tag.id], hashtagIds: [added.id] });
+    expect((await db.cards.get(a.id))?.hashtagIds.sort()).toEqual([added.id, old.id].sort());
+    expect((await db.cards.get(b.id))?.tagIds).toEqual([tag.id]);
+    await expect(repo.addLabelsToCards([a.id], { tagIds: ['nope'], hashtagIds: [] })).rejects.toThrow('does not exist');
+
+    await repo.setStarred([a.id, b.id], true);
+    expect((await db.cards.toArray()).filter((x) => x.starred).map((x) => x.id).sort()).toEqual([a.id, b.id].sort());
+    await repo.addToNext(a.id);
+    await repo.deleteCards([a.id, b.id]);
+    expect((await db.cards.toArray()).map((x) => x.id)).toEqual([c.id]);
+    expect(await db.nexts.count()).toBe(0);
+  });
+});

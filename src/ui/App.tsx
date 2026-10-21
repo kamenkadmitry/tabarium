@@ -14,10 +14,12 @@ import { createCollectionActions } from './collectionActions';
 import type { OpenTab } from '../platform/ports';
 import type { CardRowActions } from './CardRow';
 import { BoardToolbar } from './BoardToolbar';
+import { BulkBar } from './BulkBar';
 import { CardRow } from './CardRow';
 import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
 import { AiDetailsDialog, type ProposedDetails } from './dialogs/AiDetailsDialog';
+import { BulkLabelsDialog } from './dialogs/BulkLabelsDialog';
 import { CardDialog } from './dialogs/CardDialog';
 import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
@@ -36,6 +38,7 @@ import { parseDraggedLinks } from './dnd';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
+import { useCardSelection } from './useCardSelection';
 import { useInlineEditor } from './useInlineEditor';
 import { useOpenTabsController } from './useOpenTabsController';
 
@@ -46,6 +49,8 @@ type DialogState =
   | { kind: 'rename-collection'; id: string; title: string }
   | { kind: 'card'; card: Card }
   | { kind: 'move'; card: Card }
+  | { kind: 'move-many'; ids: string[] }
+  | { kind: 'bulk-labels'; ids: string[] }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
   | { kind: 'ai-details'; collectionTitle: string; items: ProposedDetails[]; skipped: number }
@@ -92,6 +97,21 @@ export function App() {
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
   const editor = useInlineEditor({ reportError, clearError: () => setError(null) });
+  const picked = useCardSelection();
+  const clearPicked = picked.clear;
+  // Esc drops the selection, unless it is used by something that is open (a field, the editor, a dialog).
+  const hasPicked = picked.selected.size > 0;
+  useEffect(() => {
+    if (!hasPicked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const el = e.target as HTMLElement;
+      if (el.closest('input, textarea, select, form, dialog, [role=menu]')) return;
+      clearPicked();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [hasPicked, clearPicked]);
 
   const plainPage = view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
@@ -129,6 +149,12 @@ export function App() {
   });
 
   const aiReady = settings !== undefined && isAiConfigured(settings.ai);
+
+  // Links ticked on the board; ids of links that no longer exist drop out by themselves.
+  const pickedIds = [...picked.selected].filter((id) => cardById.has(id));
+  const selection = { ...picked, selected: new Set(pickedIds) as ReadonlySet<string> };
+  const pickedCards = pickedIds.flatMap((id) => cardById.get(id) ?? []);
+  const bulk = (what: string, action: () => Promise<void>) => void run(what, action).then(clearPicked);
 
   /** Fills a link's note, tags and hashtags from its title and address. Called straight from a click (permission prompt). */
   const suggestForLink =
@@ -226,6 +252,7 @@ export function App() {
         duplicateCount={data.duplicates.length}
         onSelect={(v) => {
           setView(v);
+          clearPicked();
           setQuery('');
           setFilter(NO_FILTER);
         }}
@@ -393,6 +420,7 @@ export function App() {
                 reorderable={(settings?.boardSort ?? 'custom') === 'custom'}
                 filtered={isFiltering(filter)}
                 collectionActions={collectionActions}
+                selection={selection}
                 editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack', suggestForLink)}
                 onDropLinksAsCollection={(raw) => dropLinksAsCollection(raw, spaceId)}
                 onDropTabsAsCollection={(tabIds) => {
@@ -416,6 +444,26 @@ export function App() {
             </div>
           )}
         </div>
+        {view?.kind === 'space' && pickedIds.length > 0 && (
+          <BulkBar
+            count={pickedIds.length}
+            allStarred={pickedCards.every((c) => c.starred)}
+            onClear={clearPicked}
+            onMove={() => setDialog({ kind: 'move-many', ids: pickedIds })}
+            onLabels={() => setDialog({ kind: 'bulk-labels', ids: pickedIds })}
+            onNext={() =>
+              bulk('Adding to Next', async () => {
+                for (const id of pickedIds) await repo.addToNext(id);
+              })
+            }
+            onStar={() => bulk('Updating tabs', () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
+            onDelete={() => {
+              if (confirm(`Delete ${pickedIds.length} link${pickedIds.length === 1 ? '' : 's'}? This cannot be undone.`)) {
+                bulk('Deleting tabs', () => repo.deleteCards(pickedIds));
+              }
+            }}
+          />
+        )}
       </main>
 
       {panelEnabled && settings?.openTabsPanel !== false && (
@@ -505,6 +553,24 @@ export function App() {
           currentCollectionId={dialog.card.collectionId}
           onClose={() => setDialog(null)}
           onSubmit={(target) => run('Moving tab', () => repo.moveCard(dialog.card.id, target))}
+        />
+      )}
+      {dialog?.kind === 'move-many' && (
+        <MoveCardDialog
+          spaces={spaces}
+          collections={collections}
+          currentCollectionId={null}
+          count={dialog.ids.length}
+          onClose={() => setDialog(null)}
+          onSubmit={(target) => run('Moving tabs', () => repo.moveCards(dialog.ids, target)).then(clearPicked)}
+        />
+      )}
+      {dialog?.kind === 'bulk-labels' && (
+        <BulkLabelsDialog
+          count={dialog.ids.length}
+          labels={labelsApi}
+          onClose={() => setDialog(null)}
+          onSubmit={(labels) => run('Adding labels', () => repo.addLabelsToCards(dialog.ids, labels)).then(clearPicked)}
         />
       )}
       {dialog?.kind === 'add-tabs' && (

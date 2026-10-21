@@ -55,6 +55,11 @@ interface Props extends CardRowActions {
   density?: CardDensity;
   /** The editor is open under this row. */
   editing?: boolean;
+  /** Selection for bulk actions; leave `onSelect` out where links cannot be selected. */
+  selected?: boolean;
+  /** Some link on the board is selected, so every row shows its checkbox. */
+  selectionActive?: boolean;
+  onSelect?: (shift: boolean) => void;
   /** Extra text shown after the host, e.g. where a duplicate lives. */
   meta?: string;
   rowProps?: HTMLAttributes<HTMLLIElement>;
@@ -67,7 +72,15 @@ const LINK: Record<CardDensity, string> = {
   tile: 'flex h-full min-h-24 flex-col items-start gap-2 rounded-xl border border-line px-3 py-3',
 };
 
-export function CardRow({ card, dropAbove, draggable = true, density = 'default', editing = false, meta, rowProps, ...actions }: Props) {
+/** Where the checkbox sits: on top of the site icon, which it hides while it is shown. */
+const BOX: Record<CardDensity, string> = {
+  default: 'left-2 top-1/2 size-5 -translate-y-1/2',
+  compact: 'left-2 top-1/2 size-4 -translate-y-1/2',
+  wide: 'left-3 top-1/2 size-5 -translate-y-1/2',
+  tile: 'left-3 top-3 size-6',
+};
+
+export function CardRow({ card, dropAbove, draggable = true, density = 'default', editing = false, selected = false, selectionActive = false, onSelect, meta, rowProps, ...actions }: Props) {
   const title = card.customTitle ?? card.title;
   const tile = density === 'tile';
   return (
@@ -82,8 +95,23 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
           actions.onEdit();
         }
       }}
-      className={`group relative rounded-lg ${editing ? 'bg-surface-2 ring-1 ring-primary/60' : ''} ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary' : ''}`}
+      className={`group relative rounded-lg ${editing || selected ? 'bg-surface-2 ring-1 ring-primary/60' : ''} ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary' : ''}`}
     >
+      {onSelect && (
+        <label
+          className={`absolute z-[1] grid cursor-pointer place-items-center rounded bg-surface-2 transition-opacity duration-100 focus-within:opacity-100 group-hover:opacity-100 ${BOX[density]} ${
+            selected || selectionActive ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            aria-label={`Select ${title}`}
+            onChange={(e) => onSelect('shiftKey' in e.nativeEvent && e.nativeEvent.shiftKey === true)}
+            className="size-4 cursor-pointer accent-[var(--primary)]"
+          />
+        </label>
+      )}
       <a href={card.url} draggable={false} className={`${LINK[density]} transition-colors duration-150 hover:bg-surface-2`}>
         <Favicon card={card} size={tile ? 24 : density === 'compact' ? 16 : 20} />
         <span className={`min-w-0 ${tile ? 'w-full' : 'flex-1'}`}>

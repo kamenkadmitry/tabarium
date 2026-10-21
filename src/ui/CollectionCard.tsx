@@ -5,6 +5,7 @@ import type { BoardView } from '../core/boardTypes';
 import { CardRow, type CardDensity, type CardRowActions } from './CardRow';
 import { SWATCHES } from './colors';
 import { dragSourceProps, endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
+import type { CardSelection } from './useCardSelection';
 
 export interface CollectionActions {
   /** Fold or unfold the collection's tabs. */
@@ -50,6 +51,7 @@ interface Props {
   /** Manual drag-reordering is offered only while the board uses "Custom order". */
   reorderable: boolean;
   editor: EditorSlot;
+  selection: CardSelection;
 }
 
 const menuItem = 'flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2';
@@ -142,13 +144,16 @@ function TagChips({ tags, className = '' }: { tags: readonly Tag[]; className?: 
   );
 }
 
-export function CollectionCard({ collection, cards, tags, actions, view, reorderable, editor }: Props) {
+export function CollectionCard({ collection, cards, tags, actions, view, reorderable, editor, selection }: Props) {
   const expanded = collection.expanded;
   const density = DENSITY[view];
   const [menuOpen, setMenuOpen] = useState(false);
   /** undefined = no drag over; null = indicator at the end; string = before that card id. */
   const [indicator, setIndicator] = useState<string | null | undefined>(undefined);
   const [collectionOver, setCollectionOver] = useState(false);
+  const ids = cards.map((c) => c.id);
+  const ticked = ids.filter((id) => selection.selected.has(id)).length;
+  const anySelected = selection.selected.size > 0;
 
   const clear = () => {
     setIndicator(undefined);
@@ -202,7 +207,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
       className={`flex break-inside-avoid flex-col rounded-2xl border bg-surface ${collectionOver ? 'border-primary' : 'border-line'}`}
     >
       <div aria-hidden className="h-1 shrink-0 rounded-t-2xl" style={{ background: collection.color ?? 'var(--border)' }} />
-      <header className="relative flex items-center gap-2 border-b border-line px-3 py-3">
+      <header className="group/head relative flex items-center gap-2 border-b border-line px-3 py-3">
         <button
           type="button"
           aria-label={expanded ? `Collapse ${collection.title}` : `Expand ${collection.title}`}
@@ -212,6 +217,18 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
         >
           {expanded ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
         </button>
+        {cards.length > 0 && (
+          <input
+            type="checkbox"
+            aria-label={`Select all links in ${collection.title}`}
+            checked={ticked === cards.length}
+            ref={(el) => {
+              if (el) el.indeterminate = ticked > 0 && ticked < cards.length;
+            }}
+            onChange={() => selection.setMany(ids, ticked !== cards.length)}
+            className={`size-4 shrink-0 cursor-pointer accent-[var(--primary)] transition-opacity duration-100 focus-visible:opacity-100 group-hover/head:opacity-100 ${anySelected ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
         {reorderable && (
           <span
             {...dragSourceProps({ type: 'collection', id: collection.id })}
@@ -250,7 +267,17 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
       {!expanded ? null : cards.length > 0 ? (
         <ul className={view === 'card' ? 'grid grid-cols-2 gap-2 p-3' : 'flex flex-col gap-0.5 p-2'}>
           {cards.flatMap((c, i) => {
-            const rows = [<CardRow key={c.id} card={c} density={density} editing={editor.cardId === c.id} dropAbove={indicator === c.id} {...actions.card(c)} />];
+            const rows = [<CardRow
+                key={c.id}
+                card={c}
+                density={density}
+                editing={editor.cardId === c.id}
+                selected={selection.selected.has(c.id)}
+                selectionActive={anySelected}
+                onSelect={(shift) => selection.toggle(c.id, shift, ids)}
+                dropAbove={indicator === c.id}
+                {...actions.card(c)}
+              />];
             const editedIndex = editor.cardId === null ? -1 : cards.findIndex((x) => x.id === editor.cardId);
             // Tiles sit two to a row: the editor opens below the row that holds the edited tile.
             const after = view === 'card' ? Math.min(cards.length - 1, Math.floor(editedIndex / 2) * 2 + 1) : editedIndex;
