@@ -1,4 +1,4 @@
-import { ArrowUpDown, ChevronLeft, ChevronRight, FolderPlus, LayoutGrid, List, Minus, Palette, PanelTop, Plus, Rows3, SlidersHorizontal, Tag, X } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, FolderPlus, Hash, LayoutGrid, List, Minus, Palette, PanelTop, Plus, Rows3, Search, SlidersHorizontal, Tag, X } from 'lucide-react';
 import { useState } from 'react';
 import { type BoardFilter, isFiltering, NO_FILTER } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
@@ -33,13 +33,16 @@ interface Props {
   tags: readonly TagType[];
   /** Colours used by collections of this space. */
   colors: readonly string[];
+  /** Hashtags used by links of this space, with how many links carry each. */
+  hashtags: readonly { id: string; name: string; count: number }[];
   onExpandAll: () => void;
   onCollapseAll: () => void;
   onNewCollection: () => void;
 }
 
-function FilterMenu({ filter, onFilter, tags, colors, close }: Pick<Props, 'filter' | 'onFilter' | 'tags' | 'colors'> & { close: () => void }) {
-  const [page, setPage] = useState<'root' | 'colour' | 'tags'>('root');
+function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Props, 'filter' | 'onFilter' | 'tags' | 'colors' | 'hashtags'> & { close: () => void }) {
+  const [page, setPage] = useState<'root' | 'colour' | 'tags' | 'hashtags'>('root');
+  const [search, setSearch] = useState('');
   const swatchName = (value: string) => SWATCHES.find((s) => s.value === value)?.name ?? value;
 
   if (page === 'root') {
@@ -51,13 +54,16 @@ function FilterMenu({ filter, onFilter, tags, colors, close }: Pick<Props, 'filt
         <MenuItem icon={<Tag size={16} aria-hidden />} onClick={() => setPage('tags')}>
           Tags <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
         </MenuItem>
+        <MenuItem icon={<Hash size={16} aria-hidden />} onClick={() => setPage('hashtags')}>
+          Hashtags <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
+        </MenuItem>
       </>
     );
   }
   return (
     <>
       <button type="button" onClick={() => setPage('root')} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary hover:bg-surface-2">
-        <ChevronLeft size={15} aria-hidden /> {page === 'colour' ? 'Colour' : 'Tags'}
+        <ChevronLeft size={15} aria-hidden /> {page === 'colour' ? 'Colour' : page === 'tags' ? 'Tags' : 'Hashtags'}
       </button>
       {page === 'colour' && (
         <>
@@ -84,6 +90,51 @@ function FilterMenu({ filter, onFilter, tags, colors, close }: Pick<Props, 'filt
             No colour
           </MenuItem>
         </>
+      )}
+      {page === 'hashtags' && (
+        <div className="w-72">
+          <label className="relative m-1 block">
+            <span className="sr-only">Search hashtags</span>
+            <Search size={14} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search hashtags"
+              className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-2 text-sm placeholder:text-muted"
+            />
+          </label>
+          <div role="group" aria-label="Hashtags" className="max-h-64 overflow-y-auto">
+            {hashtags
+              .filter((h) => h.name.includes(search.trim().toLowerCase().replace(/^#/, '')))
+              .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+              .map((h) => {
+                const on = filter.hashtagIds.includes(h.id);
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={on}
+                    onClick={() => onFilter({ ...filter, hashtagIds: on ? filter.hashtagIds.filter((x) => x !== h.id) : [...filter.hashtagIds, h.id] })}
+                    className={`flex min-h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-surface-2 ${on ? 'bg-surface-2 font-semibold' : ''}`}
+                  >
+                    <span aria-hidden className={`grid size-4 place-items-center rounded border-2 text-[10px] ${on ? 'border-primary bg-primary text-primary-fg' : 'border-line'}`}>
+                      {on ? '✓' : ''}
+                    </span>
+                    <span className="flex-1 truncate text-primary">#{h.name}</span>
+                    <span className="text-xs text-muted">{h.count}</span>
+                  </button>
+                );
+              })}
+            {hashtags.length === 0 && <p className="px-3 py-3 text-sm text-muted">No hashtags used in this space yet.</p>}
+          </div>
+          {filter.hashtagIds.length > 0 && (
+            <button type="button" onClick={() => onFilter({ ...filter, hashtagIds: [] })} className="mt-1 w-full border-t border-line px-3 py-2 text-left text-xs font-bold text-primary">
+              Clear hashtags
+            </button>
+          )}
+        </div>
       )}
       {page === 'tags' && (
         <>
@@ -127,6 +178,14 @@ export function BoardToolbar(props: Props) {
     });
   }
 
+  for (const id of props.filter.hashtagIds) {
+    filterChips.push({
+      key: `hashtag-${id}`,
+      label: `#${props.hashtags.find((h) => h.id === id)?.name ?? 'hashtag'}`,
+      clear: () => props.onFilter({ ...props.filter, hashtagIds: props.filter.hashtagIds.filter((x) => x !== id) }),
+    });
+  }
+
   return (
     <div role="toolbar" aria-label="Board options" className="flex flex-wrap items-center gap-1">
       <Menu label={activeSort?.label ?? 'Custom order'} ariaLabel="Sort collections" icon={<ArrowUpDown size={15} aria-hidden />}>
@@ -147,7 +206,7 @@ export function BoardToolbar(props: Props) {
       </Menu>
 
       <Menu label="Filter" ariaLabel="Filter collections" icon={<SlidersHorizontal size={15} aria-hidden />} active={isFiltering(props.filter)}>
-        {(close) => <FilterMenu filter={props.filter} onFilter={props.onFilter} tags={props.tags} colors={props.colors} close={close} />}
+        {(close) => <FilterMenu filter={props.filter} onFilter={props.onFilter} tags={props.tags} colors={props.colors} hashtags={props.hashtags} close={close} />}
       </Menu>
 
       <Menu label={activeView?.label ?? 'Grid'} ariaLabel="Change view" icon={activeView?.icon}>

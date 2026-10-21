@@ -191,6 +191,7 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await p.getByRole('button', { name: 'Hashtags', exact: true }).click();
   await p.getByLabel('Hashtag name').fill('#Machine Learning');
   await p.getByRole('button', { name: 'Add', exact: true }).click();
+  await p.getByRole('button', { name: /^#machine-learning/ }).click();
   await expect(p.getByLabel('Name of hashtag machine-learning')).toBeVisible();
 
   // Add a link: pick the existing tag and hashtag, and create a new hashtag right there, all with the "+" chips.
@@ -213,6 +214,15 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await expect(row).toContainText('Work');
   await expect(row).toContainText('#machine-learning');
   await expect(row).toContainText('#rust');
+
+  // The board filter keeps only links with the chosen hashtag.
+  await p.getByRole('button', { name: 'Filter collections' }).click();
+  await p.getByRole('menuitem', { name: /Hashtags/ }).click();
+  await p.getByRole('menuitemcheckbox', { name: /#rust/ }).click();
+  await p.keyboard.press('Escape');
+  await expect(p.getByRole('button', { name: 'Clear filter #rust' })).toBeVisible();
+  await expect(p.locator('section[aria-label="Reading"]')).toContainText('Labelled link');
+  await p.getByRole('button', { name: 'Clear filter #rust' }).click();
 
   // Search finds the link by hashtag.
   await p.getByPlaceholder('Search all tabs, notes and links').fill('#rust');

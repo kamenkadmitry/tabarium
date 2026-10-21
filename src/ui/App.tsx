@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { PanelRightOpen, Plus, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { type BoardFilter, filterCollections, NO_FILTER, sortCollections } from '../core/board';
+import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
 import { groupTabs } from '../core/ai/tasks';
@@ -173,7 +173,12 @@ export function App() {
 
   const tabCounts = new Map([...cardsByCollection].map(([id, list]) => [id, list.length]));
   const spaceCollections = collections.filter((c) => spaceId !== undefined && c.spaceId === spaceId);
-  const visibleCollections = sortCollections(filterCollections(spaceCollections, filter), settings?.boardSort ?? 'custom', tabCounts);
+  const visibleCollections = sortCollections(filterCollections(spaceCollections, filter, cardsByCollection), settings?.boardSort ?? 'custom', tabCounts);
+  // With a hashtag filter the board shows only the matching links of each collection.
+  const boardCards = isFiltering(filter) && filter.hashtagIds.length > 0 ? new Map([...cardsByCollection].map(([id, list]) => [id, filterCards(list, filter)])) : cardsByCollection;
+  const spaceHashtags = hashtags
+    .map((h) => ({ id: h.id, name: h.name, count: spaceCollections.reduce((n, c) => n + (cardsByCollection.get(c.id) ?? []).filter((card) => card.hashtagIds.includes(h.id)).length, 0) }))
+    .filter((h) => h.count > 0);
   const spaceTags = tags.filter((t) => spaceCollections.some((c) => c.tagIds.includes(t.id)));
   const spaceColors = [...new Set(spaceCollections.flatMap((c) => (c.color === null ? [] : [c.color])))];
   const boardView: BoardView = (spaceId !== undefined ? settings?.boardView[spaceId] : undefined) ?? 'grid';
@@ -317,16 +322,25 @@ export function App() {
               onCreate={(t, color) => void run('Creating tag', async () => void (await repo.createTag(t, color)))}
               onUpdate={(id, patch) => void run('Updating tag', () => repo.updateTag(id, patch))}
               onDelete={(id) => void run('Deleting tag', () => repo.deleteTag(id))}
+              onDeleteUnused={() => void run('Deleting unused tags', async () => void (await repo.deleteUnusedTags()))}
             />
           )}
 
           {view?.kind === 'hashtags' && (
             <HashtagsPage
               hashtags={hashtags}
+              cards={cards}
               usage={hashtagUsage}
               onCreate={(name) => void run('Creating hashtag', async () => void (await repo.ensureHashtag(name)))}
               onRename={(id, name) => void run('Renaming hashtag', () => repo.renameHashtag(id, name))}
               onDelete={(id) => void run('Deleting hashtag', () => repo.deleteHashtag(id))}
+              onMerge={(from, into) => void run('Merging hashtags', () => repo.mergeHashtag(from, into))}
+              onRemoveFrom={(card, hashtagId) =>
+                void run('Removing hashtag', () =>
+                  repo.setCardLabels(card.id, { tagIds: card.tagIds, hashtagIds: card.hashtagIds.filter((h) => h !== hashtagId) }),
+                )
+              }
+              onDeleteUnused={() => void run('Deleting unused hashtags', async () => void (await repo.deleteUnusedHashtags()))}
             />
           )}
 
@@ -342,6 +356,7 @@ export function App() {
                   onFilter={setFilter}
                   tags={spaceTags}
                   colors={spaceColors}
+                  hashtags={spaceHashtags}
                   onExpandAll={() => void run('Expanding collections', () => repo.setExpandedAll(spaceId, true))}
                   onCollapseAll={() => void run('Collapsing collections', () => repo.setExpandedAll(spaceId, false))}
                   onNewCollection={() => setDialog({ kind: 'collection' })}
@@ -349,11 +364,11 @@ export function App() {
               </div>
               <SpaceBoard
                 collections={visibleCollections}
-                cardsByCollection={cardsByCollection}
+                cardsByCollection={boardCards}
                 tags={tags}
                 view={boardView}
                 reorderable={(settings?.boardSort ?? 'custom') === 'custom'}
-                filtered={filter.color !== null || filter.tagId !== null}
+                filtered={isFiltering(filter)}
                 collectionActions={collectionActions}
                 editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack')}
                 onDropTabsAsCollection={(tabIds) => {

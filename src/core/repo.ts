@@ -211,6 +211,49 @@ export class Repository {
     });
   }
 
+  /** Moves every link from one hashtag to another (no duplicates) and deletes the first. */
+  async mergeHashtag(fromId: string, intoId: string): Promise<void> {
+    if (fromId === intoId) throw new Error('Choose a different hashtag to merge into');
+    await this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+      if (!(await this.db.hashtags.get(fromId))) throw new Error(`Hashtag ${fromId} does not exist`);
+      if (!(await this.db.hashtags.get(intoId))) throw new Error(`Hashtag ${intoId} does not exist`);
+      const cards = await this.db.cards.where('hashtagIds').equals(fromId).toArray();
+      for (const c of cards) {
+        await this.db.cards.update(c.id, { hashtagIds: [...new Set(c.hashtagIds.map((h) => (h === fromId ? intoId : h)))] });
+      }
+      await this.db.hashtags.delete(fromId);
+    });
+  }
+
+  /** Deletes every hashtag no link uses. Returns how many were removed. */
+  async deleteUnusedHashtags(): Promise<number> {
+    return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+      let removed = 0;
+      for (const h of await this.db.hashtags.toArray()) {
+        if ((await this.db.cards.where('hashtagIds').equals(h.id).count()) === 0) {
+          await this.db.hashtags.delete(h.id);
+          removed += 1;
+        }
+      }
+      return removed;
+    });
+  }
+
+  /** Deletes every tag that no collection and no link uses. Returns how many were removed. */
+  async deleteUnusedTags(): Promise<number> {
+    return this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
+      let removed = 0;
+      for (const t of await this.db.tags.toArray()) {
+        const used = (await this.db.collections.where('tagIds').equals(t.id).count()) + (await this.db.cards.where('tagIds').equals(t.id).count());
+        if (used === 0) {
+          await this.db.tags.delete(t.id);
+          removed += 1;
+        }
+      }
+      return removed;
+    });
+  }
+
   async renameHashtag(hashtagId: string, input: string): Promise<void> {
     const name = normalizeHashtag(input);
     if (name === '') throw new Error(`"${input}" is not a valid hashtag`);

@@ -84,6 +84,36 @@ describe('hashtags', () => {
   });
 });
 
+describe('managing many labels', () => {
+  it('merges a hashtag into another without duplicates and removes the first', async () => {
+    const { card } = await oneCard();
+    const a = await repo.ensureHashtag('ml');
+    const b = await repo.ensureHashtag('machine-learning');
+    await repo.setCardLabels(card.id, { tagIds: [], hashtagIds: [a.id, b.id] });
+    await repo.mergeHashtag(a.id, b.id);
+    expect((await db.cards.get(card.id))?.hashtagIds).toEqual([b.id]);
+    expect(await db.hashtags.get(a.id)).toBeUndefined();
+    await expect(repo.mergeHashtag(b.id, b.id)).rejects.toThrow('different hashtag');
+    await expect(repo.mergeHashtag('nope', b.id)).rejects.toThrow('does not exist');
+  });
+
+  it('deletes only unused hashtags and tags', async () => {
+    const { col, card } = await oneCard();
+    const used = await repo.ensureHashtag('used');
+    await repo.ensureHashtag('spare');
+    const usedTag = await repo.createTag('OnCard', '#0d9488');
+    const collTag = await repo.createTag('OnCollection', '#ea580c');
+    await repo.createTag('Spare', '#6366f1');
+    await repo.setCardLabels(card.id, { tagIds: [usedTag.id], hashtagIds: [used.id] });
+    await repo.setCollectionTags(col.id, [collTag.id]);
+
+    expect(await repo.deleteUnusedHashtags()).toBe(1);
+    expect((await db.hashtags.toArray()).map((h) => h.name)).toEqual(['used']);
+    expect(await repo.deleteUnusedTags()).toBe(1);
+    expect((await db.tags.orderBy('position').toArray()).map((t) => t.title)).toEqual(['OnCard', 'OnCollection']);
+  });
+});
+
 describe('AI organising helpers', () => {
   it('loads the existing collections of the space, tags and hashtags', async () => {
     const space = await repo.createSpace('S');
