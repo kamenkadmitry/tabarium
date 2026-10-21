@@ -137,6 +137,8 @@ export class Repository {
 
   /** Moves a card into a collection, directly before `beforeCardId` or at the end when it is null. */
   async moveCard(cardId: string, targetCollectionId: string, beforeCardId: string | null = null): Promise<void> {
+    // Dropping a card on its own spot leaves everything as it is.
+    if (beforeCardId === cardId) return;
     await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
       if (!(await this.db.collections.get(targetCollectionId))) {
         throw new Error(`Collection ${targetCollectionId} does not exist`);
@@ -159,6 +161,7 @@ export class Repository {
 
   /** Moves a collection into a space, directly before `beforeCollectionId` or at the end when it is null. */
   async moveCollection(collectionId: string, targetSpaceId: string, beforeCollectionId: string | null = null): Promise<void> {
+    if (beforeCollectionId === collectionId) return;
     await this.db.transaction('rw', this.db.collections, this.db.spaces, async () => {
       if (!(await this.db.spaces.get(targetSpaceId))) throw new Error(`Space ${targetSpaceId} does not exist`);
       const siblings = (await this.db.collections.where('spaceId').equals(targetSpaceId).toArray()).filter(
@@ -319,6 +322,7 @@ export class Repository {
   }
 
   async moveNext(nextId: string, beforeNextId: string | null): Promise<void> {
+    if (beforeNextId === nextId) return;
     await this.db.transaction('rw', this.db.nexts, async () => {
       const siblings = (await this.db.nexts.toArray()).filter((n) => n.id !== nextId);
       const plan = planInsert(siblings, beforeNextId);

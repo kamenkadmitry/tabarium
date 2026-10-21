@@ -182,3 +182,19 @@ describe('export and import formats', () => {
     expect(() => parseBookmarksHtml('<p>hello</p>')).toThrow(/no <DL>/);
   });
 });
+
+describe('moving an item onto its own spot', () => {
+  it('does nothing instead of failing', async () => {
+    const { space, col, cards } = await seed();
+    const [first, second] = cards;
+    if (!first || !second) throw new Error('seed must create cards');
+    const before = (await db.cards.orderBy('position').toArray()).map((c) => c.id);
+
+    await repo.moveCard(second.id, col.id, second.id);
+    await repo.moveCollection(col.id, space.id, col.id);
+    const next = await repo.addToNext(first.id);
+    await repo.moveNext(next.id, next.id);
+
+    expect((await db.cards.orderBy('position').toArray()).map((c) => c.id)).toEqual(before);
+  });
+});
