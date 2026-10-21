@@ -41,6 +41,7 @@ import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
 import { useDuplicateGuard } from './DuplicateGuard';
 import { buildLabelsApi } from './labelsApi';
+import { BookmarksPage } from './BookmarksPage';
 import { DashboardPage } from './DashboardPage';
 import { InboxPage } from './InboxPage';
 import { SWATCHES } from './colors';
@@ -65,7 +66,7 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
+const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', bookmarks: 'Browser bookmarks', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
 
 export function App() {
   const platform = usePlatform();
@@ -96,14 +97,17 @@ export function App() {
     setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
   }, []);
   /** Runs a user-triggered action; failures are logged with context and shown to the user. */
-  const run = async (what: string, action: () => Promise<void>) => {
-    try {
-      setError(null);
-      await action();
-    } catch (e) {
-      reportError(what, e);
-    }
-  };
+  const run = useCallback(
+    async (what: string, action: () => Promise<void>) => {
+      try {
+        setError(null);
+        await action();
+      } catch (e) {
+        reportError(what, e);
+      }
+    },
+    [reportError],
+  );
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
   const guard = useDuplicateGuard();
   const editor = useInlineEditor({ reportError, clearError: () => setError(null), guard });
@@ -130,7 +134,7 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [hasPicked, clearPicked]);
 
-  const plainPage = view?.kind === 'dashboard' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
+  const plainPage = view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
   const tabsCtl = useOpenTabsController({
     enabled: panelEnabled,
@@ -372,6 +376,8 @@ export function App() {
           {view?.kind === 'dashboard' && (
             <DashboardPage spaces={spaces} collections={collections} cards={cards} tags={tags} hashtags={hashtags} activity={data.activity} />
           )}
+
+          {view?.kind === 'bookmarks' && <BookmarksPage cards={cards} run={run} />}
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 

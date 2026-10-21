@@ -1,4 +1,4 @@
-import { Copy, Hash, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Bookmark, Copy, Hash, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
@@ -10,6 +10,7 @@ export type View =
   | { kind: 'dashboard' }
   | { kind: 'starred' }
   | { kind: 'duplicates' }
+  | { kind: 'bookmarks' }
   | { kind: 'tags' }
   | { kind: 'hashtags' }
   | { kind: 'settings' };
@@ -126,6 +127,9 @@ export function Sidebar(props: Props) {
         </NavButton>
         <NavButton active={view?.kind === 'duplicates'} onClick={() => props.onSelect({ kind: 'duplicates' })} icon={<Copy size={18} aria-hidden />} badge={props.duplicateCount}>
           Duplicates
+        </NavButton>
+        <NavButton active={view?.kind === 'bookmarks'} onClick={() => props.onSelect({ kind: 'bookmarks' })} icon={<Bookmark size={18} aria-hidden />}>
+          Bookmarks
         </NavButton>
         <NavButton active={view?.kind === 'tags'} onClick={() => props.onSelect({ kind: 'tags' })} icon={<Tag size={18} aria-hidden />}>
           Tags

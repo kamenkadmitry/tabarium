@@ -770,6 +770,42 @@ test('dashboard: counts the library and the history, and the period can be switc
   await p.close();
 });
 
+test('bookmarks: browser bookmarks are listed, copied into a collection and removed from the browser', async () => {
+  const p = await openLibraryWithSpace('Marks');
+  p.setDefaultTimeout(10_000);
+  const stamp = Date.now();
+  await p.evaluate(async (n) => {
+    const folder = await chrome.bookmarks.create({ parentId: '1', title: 'E2E folder' });
+    await chrome.bookmarks.create({ parentId: folder.id, title: 'First mark', url: `https://example.test/mark-${n}-1` });
+    await chrome.bookmarks.create({ parentId: folder.id, title: 'Second mark', url: `https://example.test/mark-${n}-2` });
+  }, stamp);
+
+  await p.getByRole('button', { name: 'Bookmarks', exact: true }).click();
+  const list = p.getByRole('region', { name: 'Browser bookmarks' });
+  await list.getByRole('button', { name: /^E2E folder/ }).click();
+  await expect(list.getByText('First mark')).toBeVisible();
+  await expect(list.getByText('Second mark')).toBeVisible();
+  await list.getByRole('textbox', { name: 'Search the bookmarks' }).fill('second mark');
+  await expect(list.getByText('First mark')).toHaveCount(0);
+  await list.getByRole('textbox', { name: 'Search the bookmarks' }).fill('');
+
+  await p.getByRole('button', { name: /^Copy \d+ new links?$/ }).click();
+  await expect(p.getByRole('status')).toContainText(/Imported \d+ links? into/);
+  await list.getByRole('button', { name: /^E2E folder/ }).click().catch(() => undefined);
+  await expect(list.getByText('In Tabarium').first()).toBeVisible();
+
+  p.once('dialog', (d) => void d.accept());
+  await p.getByRole('button', { name: /^Remove \d+ saved from the browser/ }).click();
+  await expect(p.getByRole('status')).toContainText(/Removed \d+ bookmarks? from the browser/);
+  await expect(list.getByRole('button', { name: /^E2E folder/ })).toHaveCount(0);
+  expect(await p.evaluate(async (n) => (await chrome.bookmarks.search({ url: `https://example.test/mark-${n}-1` })).length, stamp)).toBe(0);
+
+  // The links are in the library now, in the space for browser bookmarks.
+  await p.getByRole('button', { name: /^Browser bookmarks\b/ }).click();
+  await expect(p.locator('section[aria-label="Bookmarks from the browser"] [data-card-id]', { hasText: 'First mark' })).toBeVisible();
+  await p.close();
+});
+
 test('links dragged from the side panel can be dropped into a collection', async () => {
   const lib = await openLibraryWithSpace('Dropping');
   await addCollectionWithLinks(lib, 'Target', []);

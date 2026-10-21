@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { BookmarkNode } from '../core/bookmarks';
 import type { Capability, OpenOptions, OpenTab, OpenWindow, Platform } from './ports';
 
 function requireExtension(): typeof browser {
@@ -34,6 +35,11 @@ function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: 
   return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null, active: t.active === true, ...(groupId !== undefined && { groupId }) };
 }
 
+function toBookmarkNode(n: { id: string; title: string; url?: string; children?: unknown[] }): BookmarkNode {
+  const children = n.children?.map((c) => toBookmarkNode(c as Parameters<typeof toBookmarkNode>[0]));
+  return { id: n.id, title: n.title, ...(n.url !== undefined && { url: n.url }), ...(children && { children }) };
+}
+
 export function createChromePlatform(): Platform {
   return {
     permissions: {
@@ -42,6 +48,15 @@ export function createChromePlatform(): Platform {
       requestOrigin: (origin) => requireExtension().permissions.request({ origins: [`${origin}/*`] }),
       hasAllSites: () => requireExtension().permissions.contains({ origins: ['https://*/*', 'http://*/*'] }),
       requestAllSites: () => requireExtension().permissions.request({ origins: ['https://*/*', 'http://*/*'] }),
+    },
+    bookmarks: {
+      async getTree() {
+        return (await requireExtension().bookmarks.getTree()).map(toBookmarkNode);
+      },
+      async remove(ids) {
+        const api = requireExtension();
+        for (const id of ids) await api.bookmarks.remove(id);
+      },
     },
     backupSchedule: {
       async resync() {

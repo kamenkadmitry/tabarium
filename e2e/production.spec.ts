@@ -17,7 +17,7 @@ test('the shipped build starts with only non-warning permissions', async () => {
   expect(new Set(granted.permissions)).toEqual(new Set(['activeTab', 'sidePanel', 'newTabPageOverride']));
   expect(granted.origins ?? []).toEqual([]);
 
-  for (const permission of ['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history']) {
+  for (const permission of ['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history', 'bookmarks']) {
     const has = await app.worker.evaluate((p) => chrome.permissions.contains({ permissions: [p as chrome.runtime.ManifestPermissions] }), permission);
     expect(has, `${permission} must not be granted at install`).toBe(false);
   }
@@ -25,7 +25,7 @@ test('the shipped build starts with only non-warning permissions', async () => {
 
 test('the shipped build declares each optional permission and the library works without them', async () => {
   const manifest = await app.worker.evaluate(() => chrome.runtime.getManifest());
-  expect(new Set(manifest.optional_permissions)).toEqual(new Set(['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history']));
+  expect(new Set(manifest.optional_permissions)).toEqual(new Set(['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history', 'bookmarks']));
 
   const page = await app.context.newPage();
   await page.goto(`chrome-extension://${app.extensionId}/newtab.html`);

@@ -23,6 +23,19 @@ export function createDemoPlatform(): Platform {
         return true;
       },
     },
+    bookmarks: {
+      getTree: async () => [
+        {
+          id: '0',
+          title: '',
+          children: [
+            { id: '1', title: 'Bookmarks bar', children: DEMO_TABS.map((t) => ({ id: `b${t.id}`, title: t.title, url: t.url })) },
+            { id: '2', title: 'Other bookmarks', children: [] },
+          ],
+        },
+      ],
+      remove: async () => undefined,
+    },
     backupSchedule: { resync: async () => undefined },
     tabs: {
       listWindowTabs: async () => [...tabs],

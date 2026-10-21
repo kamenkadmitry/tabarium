@@ -1,3 +1,5 @@
+import type { BookmarkNode } from '../core/bookmarks';
+
 /** Browser capabilities that need a user-granted permission. Everything is optional in the manifest. */
 export type Capability =
   | 'tabs'
@@ -6,7 +8,8 @@ export type Capability =
   | 'downloads'
   | 'alarms'
   | 'tabGroups'
-  | 'history';
+  | 'history'
+  | 'bookmarks';
 
 export interface OpenTab {
   id: number;
@@ -83,6 +86,13 @@ export interface TabsPort {
   openLibrary(): Promise<void>;
 }
 
+export interface BookmarksPort {
+  /** The browser's bookmark tree (a nameless root whose children are the top-level folders). Needs `bookmarks`. */
+  getTree(): Promise<BookmarkNode[]>;
+  /** Removes bookmarks and empty folders, one by one, in the given order. Needs `bookmarks`. */
+  remove(ids: readonly string[]): Promise<void>;
+}
+
 export interface BackupSchedulePort {
   /** Tells the background worker to re-read the auto-backup settings and (re)create or clear its alarm. */
   resync(): Promise<void>;
@@ -92,4 +102,5 @@ export interface Platform {
   permissions: PermissionsPort;
   tabs: TabsPort;
   backupSchedule: BackupSchedulePort;
+  bookmarks: BookmarksPort;
 }
