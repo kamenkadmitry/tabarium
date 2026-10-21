@@ -26,6 +26,7 @@ Deferred by agreement (not part of the local version): sharing and public pages,
 | Next | Queue of cards to look at later; items are `todo` or `done` |
 | Open tabs panel | Right-hand panel of the library listing live browser windows, groups and tabs; supports selection and drag into collections |
 | Quick save | Popup, side panel and context menu saving into the remembered collection, default `Inbox / Saved tabs` |
+| Inbox | The collection `Inbox / Saved tabs`. The side panel's Inbox tab lists it; moving a link out or removing it takes it off the list. Explicit "Add this tab to Inbox" always saves there |
 | Side panel | `sidepanel` entrypoint: Save tab, Group tabs, Next. The toolbar button opens it (setting: popup instead) |
 | Platform | Port interface (`src/platform/ports.ts`) hiding browser APIs so the UI also runs in `?demo=1` without the extension |
 | Profile | Name and avatar shown at the bottom of the sidebar, with a "Local" badge |
@@ -81,6 +82,7 @@ npx playwright test  # drives the e2e build in Chromium
 ```
 
 - CI (`.github/workflows/ci.yml`): typecheck, lint, unit, build, e2e build and Playwright. Keep it green.
+- Fast local run on Windows: the whole set (including the e2e tests in real Chromium) runs in about 35 seconds inside a WSL distro made for the project (`wsl-dev-env` skill: `new-env.ps1 -Name tabarium`, clone the repo in `~/tabarium`, `npm ci`, `npx playwright install --with-deps chromium`). Sync the committed state from the Windows working copy with `git fetch /mnt/c/.../tabarium HEAD && git reset --hard FETCH_HEAD` and run the same commands as CI. The Playwright Chromium on Windows itself does not start on the owner's machine.
 - Build from the project root. If the terminal's working directory is inside `.output`, Windows reports EBUSY.
 - Demo mode: open the library page with `?demo=1` to use the UI without the extension.
 
@@ -112,8 +114,8 @@ Mock-ups are static; the real UI must follow them in structure, not pixel for pi
 
 ## Roadmap
 
-GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, `Later`. Done: inline editor (20), tags and hashtags at scale (21). Next up, in this order: undo for deletes (1), bulk actions (2), interface languages Russian, Polish and Belarusian (3), quick search (4), first-run welcome (6).
+GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, `Later`. Done: inline editor (20), tags and hashtags at scale (21), bulk actions on links (2), space icons, Inbox tab, AI proposing browser tab groups, dragging links from the side panel into the library. Next up, in this order: undo for deletes (1), interface languages Russian, Polish and Belarusian (3), quick search (4), first-run welcome (6).
 
 ## Status of verification
 
-Everything above the roadmap is implemented and green in CI (90 unit tests, 20 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
+Everything above the roadmap is implemented and green in CI (102 unit tests, 26 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.

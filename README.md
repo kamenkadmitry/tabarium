@@ -25,6 +25,9 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | AI (optional) | Suggest a collection name, group a session's tabs into collections, connection test; your provider and key |
 | Tags and hashtags | Own pages with search, sort, usage counts, merge and delete-unused; "+" chips with suggestions when editing a link |
 | Profile | Name and avatar in the sidebar with a "Local" badge |
+| Spaces | Pick an icon for a space from themed icons and brand logos |
+| Bulk actions | Tick links (Shift for a range, or a whole collection) to move, tag, send to Next, star or delete them together |
+| Side panel | Save tab, Group tabs (AI proposes browser tab groups by topic; or save tabs to a collection) and Inbox (links waiting to be sorted); links can be dragged from it into the library |
 | Appearance | Light, dark or system theme |
 
 ## Install (from source)
