@@ -683,6 +683,8 @@ test('Inbox page: the AI proposes a tag, hashtags and a collection; new ones are
   );
 
   await lib.getByRole('navigation', { name: 'Spaces' }).getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
+  // Other tests leave unlabelled links in the Inbox; ticking this one makes it the only link the AI is asked about.
+  await lib.getByRole('table', { name: 'Inbox' }).locator('[data-card-id]', { hasText: 'Needs sorting' }).getByRole('checkbox').click();
   await lib.getByRole('button', { name: /Suggest labels and collections/ }).click();
   const dialog = lib.locator('dialog[open]');
   const proposal = dialog.getByRole('list', { name: 'Suggestions' });
