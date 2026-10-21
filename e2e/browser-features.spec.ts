@@ -158,6 +158,24 @@ test('open tabs panel: width is adjustable by dragging its edge and is remembere
   await p.keyboard.press('ArrowLeft');
   const saved = await width();
   await expect.poll(() => handle.getAttribute('aria-valuenow')).toBe(String(saved));
+  // Wait until the width is really stored before reloading.
+  await expect
+    .poll(() =>
+      p.evaluate(
+        () =>
+          new Promise<number | null>((resolve) => {
+            const open = indexedDB.open('tabarium');
+            open.onsuccess = () => {
+              const get = open.result.transaction('settings').objectStore('settings').get('settings');
+              get.onsuccess = () => {
+                resolve((get.result as { value?: { openTabsWidth?: number } } | undefined)?.value?.openTabsWidth ?? null);
+                open.result.close();
+              };
+            };
+          }),
+      ),
+    )
+    .toBe(saved);
   await p.reload();
   await p.getByRole('button', { name: 'Resize', exact: true }).first().click();
   await expect.poll(async () => Math.round((await p.getByRole('complementary', { name: 'Open tabs' }).boundingBox())?.width ?? 0)).toBe(saved);
@@ -451,7 +469,7 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await expect(popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ })).toBeDisabled();
   await popup.getByLabel('Select all').check();
   await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
-  await popup.getByRole('button', { name: 'Quick', exact: true }).click(); // space row
+  await popup.getByRole('button', { name: /^Quick(?![a-z])/ }).click(); // space row (its name ends with the collection count)
   await popup.getByRole('button', { name: 'Quick target', exact: true }).click(); // collection row (not its expander)
   await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
 
@@ -543,7 +561,7 @@ test('side panel Inbox: a link leaves the list when it is moved or removed', asy
 
   // Move one into a collection: it leaves the Inbox list.
   await panel.getByRole('button', { name: 'Move Inbox item 1 out of Inbox' }).click();
-  await panel.getByRole('button', { name: 'Sorting', exact: true }).click();
+  await panel.getByRole('button', { name: /^Sorting(?![a-z])/ }).click();
   await panel.getByRole('button', { name: 'Sorted', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Moved to Sorting / Sorted');
   await expect(list.getByRole('listitem')).toHaveCount(1);

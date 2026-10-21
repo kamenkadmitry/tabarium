@@ -15,9 +15,11 @@ export function useCardSelection(): CardSelection {
   const anchor = useRef<string | null>(null);
 
   const toggle = useCallback((id: string, shift: boolean, ordered: readonly string[]) => {
+    // Read the anchor now: the updater below may run after the anchor has moved on to this click.
+    const previous = anchor.current;
     setSelected((prev) => {
       const next = new Set(prev);
-      const from = anchor.current === null ? -1 : ordered.indexOf(anchor.current);
+      const from = previous === null ? -1 : ordered.indexOf(previous);
       const to = ordered.indexOf(id);
       if (shift && from !== -1 && to !== -1) {
         for (const x of ordered.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(x);
