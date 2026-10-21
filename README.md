@@ -20,6 +20,9 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Inbox | A system space (envelope icon, cannot be renamed or deleted) where saved tabs wait to be sorted. The side panel's Inbox tab shows the same links, so editing in one place changes both |
 | Inbox page | The Inbox is a table: page, description read from the page itself (meta description, with the first heading below), labels and when it was added. Sort (newest, oldest, title A–Z/Z–A, site), group (date, site, collection), select links for bulk actions, and let the AI propose one tag, several hashtags and a collection for what is unsorted (new tags, hashtags and collections only when nothing existing fits) |
 | Finding things | Search across all spaces including notes; Duplicates view |
+| Duplicate guard | Adding a link by hand, by drag and drop (tabs, side panel, other pages) or from the popup first checks the whole library. If the address is already saved you are asked: cancel (nothing is added) or add the copy on purpose. The right-click menu and background saves are not guarded |
+| Dashboard | Totals (links, collections, tags, hashtags, starred, labelled, duplicates now) and a daily history over Today, 7 days, 30 days or All time: links added and deleted, duplicates removed, stopped at the guard or added on purpose, with a chart and top sites, tags, hashtags and spaces |
+| Browser bookmarks | A read-only "Bookmarks" page shows the browser's bookmark tree (search, "In Tabarium" badge). Copy the new ones into the space "Browser bookmarks" as one collection or one per folder; links already in the library are skipped. Afterwards the saved bookmarks and emptied folders can be removed from the browser, after a confirmation |
 | Restoring | Open all, open as a browser tab group, or replace the current window's tabs |
 | Data | JSON backup/restore, Netscape bookmarks HTML export and import, plain-text export |
 | Toby files | Import Toby exports (.json v4 and older, .txt, .html) with notes, custom titles and tags; export a Toby-compatible .json |
@@ -49,6 +52,7 @@ Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked** 
 | `contextMenus` | Enabling the right-click menu in Settings | Save page, link or window from the browser menu |
 | `alarms`, `downloads` | Enabling automatic backup in Settings | Run on a schedule and write backup files |
 | `tabGroups` | Enabling "Open collections as tab groups" | Group the tabs of an opened collection |
+| `bookmarks` | Opening the Bookmarks page | Read the bookmark tree; remove bookmarks only when you confirm it |
 | One web origin (your AI provider) | First AI action or "Test connection" | Send the prompt to the provider you configured |
 | Access to websites | "Load page descriptions" on the Inbox page | Read the description and heading of the pages you saved. Only the address of each saved page is requested, with no cookies |
 

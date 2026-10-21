@@ -8,7 +8,7 @@ A local-first tab and session manager for Chromium browsers (Manifest V3), in th
 
 Principles (agreed with the owner, do not weaken them):
 - **Local only.** No account, no server, no payments, no analytics. Data lives in IndexedDB in the user's browser.
-- **Permissions on request.** Only `activeTab` (plus the side panel) at install. Everything else (`tabs`, `tabGroups`, `contextMenus`, `downloads`, `alarms`, host access for AI providers) is requested at the moment a feature needs it, from a user click.
+- **Permissions on request.** Only `activeTab` (plus the side panel) at install. Everything else (`tabs`, `tabGroups`, `bookmarks`, `contextMenus`, `downloads`, `alarms`, host access for AI providers) is requested at the moment a feature needs it, from a user click.
 - **Bring your own AI key (optional).** The user picks a provider and pastes a key in Settings. The key is never written to backups and never logged.
 - **Own design and code.** This is a clean-room product with its own name and look; license MPL-2.0. Reference material about the original product lives outside this repository and must not be copied into it.
 
@@ -25,6 +25,9 @@ Deferred by agreement (not part of the local version): sharing and public pages,
 | Hashtag | Free-form `#label` for cards only, stored lowercase without `#` (`normalizeHashtag`) |
 | Open tabs panel | Right-hand panel of the library listing live browser windows, groups and tabs; supports selection and drag into collections |
 | Quick save | Popup, side panel and context menu saving into the remembered collection, default `Inbox / Saved tabs` |
+| Activity | Daily counters (`Activity`, id `day|type`): `added`, `deleted`, `duplicates-removed`, `duplicates-skipped`, `duplicates-created`. Written inside the same transaction as the change (`bumpActivity`); v5 seeds `added` from card creation dates. The dashboard (`core/stats.ts`, `DashboardPage.tsx`) reads them. Deleting copies as duplicates passes `repo.deleteCard(id, 'duplicate')` |
+| Duplicate guard | `DuplicateGuardProvider`/`useDuplicateGuard()` (promise based dialog) over `findExistingLinks` (`core/duplicates.ts`, normalised URL, first copy in reading order). Used by the inline editor, open-tabs controller, collection drops, Inbox page drops, popup views. Background/context-menu saves are not guarded |
+| Browser bookmarks | Optional `bookmarks` permission, `platform.bookmarks` (`getTree`, `remove`). `core/bookmarks.ts` `planBookmarkImport` decides what is imported (one collection or per folder), what is skipped, and which bookmarks/emptied folders may be removed. `BookmarksPage.tsx` |
 | Inbox | The one system space (`Space.kind === 'inbox'`): fixed name, envelope icon, cannot be renamed, edited or deleted. Its default collection is "Saved tabs". The side panel's Inbox tab lists every link in it, so library and side panel are the same data. The Inbox page (`InboxPage.tsx`) is a table with sorting, grouping, page descriptions (needs the optional access to websites, asked on "Load page descriptions"; afterwards new links are read while the page is open) and an AI button. `ensureInbox` creates it, adopts an older plain "Saved tabs" space (even renamed) and merges the accidental empty copy. The old Next queue is retired: its rows stay in the database and backups but nothing shows them |
 | Side panel | `sidepanel` entrypoint: Save tab, Group tabs, Inbox. The toolbar button opens it (setting: popup instead) |
 | Platform | Port interface (`src/platform/ports.ts`) hiding browser APIs so the UI also runs in `?demo=1` without the extension |
