@@ -527,7 +527,8 @@ test('AI: suggest details in the editor and fill a whole collection', async () =
 test('side panel Inbox: a link leaves the list when it is moved or removed', async () => {
   const lib = await openLibraryWithSpace('Sorting');
   await addCollectionWithLinks(lib, 'Sorted', []);
-  await app.worker.evaluate(async (urls) => {
+  // The message goes from a page: a service worker cannot message itself.
+  await lib.evaluate(async (urls) => {
     for (const [i, url] of urls.entries()) {
       await chrome.runtime.sendMessage({ type: 'e2e-context-click', info: { menuItemId: 'tabarium-save-page' }, tab: { url, title: `Inbox item ${i + 1}` } });
     }
@@ -601,7 +602,7 @@ test('Group tabs: the AI proposes browser tab groups and they are created', asyn
   await panel.getByRole('tab', { name: 'Group tabs' }).click();
   await panel.getByText('Page group-a').waitFor();
   await panel.getByRole('button', { name: /Organise with AI/ }).click();
-  await expect(panel.getByRole('list', { name: 'Proposed groups' })).toContainText('Everything');
+  await expect(panel.getByLabel('Name of group 1')).toHaveValue('Everything');
   // Nothing was added to the library: the proposal is only about how the open tabs belong together.
   await panel.getByRole('button', { name: /^Group in the browser/ }).click();
   await expect(panel.getByRole('status')).toContainText('browser tab groups');
