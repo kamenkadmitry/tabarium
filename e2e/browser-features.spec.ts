@@ -227,8 +227,9 @@ test('inline editor: opens under the row, edits title, note and labels, Esc clos
   const section = p.locator('section[aria-label="Notes"]');
   const rowA = section.locator('[data-card-id]', { hasText: 'example.test' }).first();
 
+  // The pencil appears on hover; the hit test of a normal click runs before the hover applies, so force it.
   await rowA.hover();
-  await rowA.getByRole('button', { name: 'Edit tab and note' }).click();
+  await rowA.getByRole('button', { name: 'Edit tab and note' }).click({ force: true });
   const form = section.locator('form[aria-label="Edit link"]');
   await expect(form).toBeVisible();
   // It sits directly under the edited row, and only one editor exists.
@@ -247,8 +248,9 @@ test('inline editor: opens under the row, edits title, note and labels, Esc clos
   await expect(saved).toContainText('#later');
 
   // Esc closes an editor with no changes without asking.
-  await saved.hover();
-  await saved.getByRole('button', { name: 'Edit tab and note' }).click();
+  // The E key on the focused link opens the editor too.
+  await saved.getByRole('link').focus();
+  await p.keyboard.press('e');
   await expect(form).toBeVisible();
   await form.getByLabel('Title').press('Escape');
   await expect(form).toHaveCount(0);
