@@ -95,3 +95,23 @@ a {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* The inline editor slides in under its row; reduced motion gets no animation. */
+@keyframes editor-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.editor-in {
+  animation: editor-in 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-in {
+    animation: none;
+  }
+}

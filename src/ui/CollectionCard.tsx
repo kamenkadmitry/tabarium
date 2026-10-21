@@ -28,6 +28,15 @@ export interface CollectionActions {
   dropCollection: (collectionId: string) => void;
 }
 
+/** Where the inline editor is open on the board, and how to draw it. */
+export interface EditorSlot {
+  /** Card being edited, if the editor is open on a row of this collection. */
+  cardId: string | null;
+  /** The "add link" editor is open at the end of this collection. */
+  adding: boolean;
+  render: (card: Card | null) => React.ReactNode;
+}
+
 interface Props {
   collection: Collection;
   cards: readonly Card[];
@@ -36,6 +45,7 @@ interface Props {
   view: BoardView;
   /** Manual drag-reordering is offered only while the board uses "Custom order". */
   reorderable: boolean;
+  editor: EditorSlot;
 }
 
 const menuItem = 'flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2';
@@ -123,7 +133,7 @@ function TagChips({ tags, className = '' }: { tags: readonly Tag[]; className?: 
   );
 }
 
-export function CollectionCard({ collection, cards, tags, actions, view, reorderable }: Props) {
+export function CollectionCard({ collection, cards, tags, actions, view, reorderable, editor }: Props) {
   const expanded = collection.expanded;
   const density = DENSITY[view];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -225,9 +235,20 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
 
       {!expanded ? null : cards.length > 0 ? (
         <ul className={view === 'card' ? 'grid grid-cols-2 gap-2 p-3' : 'flex flex-col gap-0.5 p-2'}>
-          {cards.map((c) => (
-            <CardRow key={c.id} card={c} density={density} dropAbove={indicator === c.id} {...actions.card(c)} />
-          ))}
+          {cards.flatMap((c, i) => {
+            const rows = [<CardRow key={c.id} card={c} density={density} editing={editor.cardId === c.id} dropAbove={indicator === c.id} {...actions.card(c)} />];
+            const editedIndex = editor.cardId === null ? -1 : cards.findIndex((x) => x.id === editor.cardId);
+            // Tiles sit two to a row: the editor opens below the row that holds the edited tile.
+            const after = view === 'card' ? Math.min(cards.length - 1, Math.floor(editedIndex / 2) * 2 + 1) : editedIndex;
+            if (editedIndex >= 0 && i === after) {
+              rows.push(
+                <li key={`${c.id}-editor`} className={view === 'card' ? 'col-span-2' : ''}>
+                  {editor.render(cards[editedIndex] ?? null)}
+                </li>,
+              );
+            }
+            return rows;
+          })}
           {indicator === null && <li aria-hidden className="mx-1 h-0.5 rounded bg-primary" />}
         </ul>
       ) : (
@@ -236,11 +257,15 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
         </p>
       )}
       {expanded && (
-      <footer className="border-t border-line p-2">
-        <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
-          <Plus size={15} aria-hidden /> Add link
-        </button>
-      </footer>
+        <footer className="border-t border-line p-2">
+          {editor.adding ? (
+            editor.render(null)
+          ) : (
+            <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
+              <Plus size={15} aria-hidden /> Add link
+            </button>
+          )}
+        </footer>
       )}
     </section>
   );

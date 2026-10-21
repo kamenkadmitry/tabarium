@@ -53,6 +53,8 @@ interface Props extends CardRowActions {
   dropAbove?: boolean;
   draggable?: boolean;
   density?: CardDensity;
+  /** The editor is open under this row. */
+  editing?: boolean;
   /** Extra text shown after the host, e.g. where a duplicate lives. */
   meta?: string;
   rowProps?: HTMLAttributes<HTMLLIElement>;
@@ -65,7 +67,7 @@ const LINK: Record<CardDensity, string> = {
   tile: 'flex h-full min-h-24 flex-col items-start gap-2 rounded-xl border border-line px-3 py-3',
 };
 
-export function CardRow({ card, dropAbove, draggable = true, density = 'default', meta, rowProps, ...actions }: Props) {
+export function CardRow({ card, dropAbove, draggable = true, density = 'default', editing = false, meta, rowProps, ...actions }: Props) {
   const title = card.customTitle ?? card.title;
   const tile = density === 'tile';
   return (
@@ -73,20 +75,25 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
       {...rowProps}
       {...(draggable ? dragSourceProps({ type: 'card', id: card.id }) : {})}
       data-card-id={card.id}
-      className={`group relative rounded-lg ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary' : ''}`}
+      onKeyDown={(e) => {
+        // E on the focused link opens the editor, like the pencil.
+        if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey && (e.target as HTMLElement).tagName === 'A') {
+          e.preventDefault();
+          actions.onEdit();
+        }
+      }}
+      className={`group relative rounded-lg ${editing ? 'bg-surface-2 ring-1 ring-primary/60' : ''} ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary' : ''}`}
     >
       <a href={card.url} draggable={false} className={`${LINK[density]} transition-colors duration-150 hover:bg-surface-2`}>
         <Favicon card={card} size={tile ? 24 : density === 'compact' ? 16 : 20} />
         <span className={`min-w-0 ${tile ? 'w-full' : 'flex-1'}`}>
           <span className={`block text-sm font-medium ${tile ? 'line-clamp-2' : 'truncate'}`}>{title}</span>
-          {density !== 'compact' && density !== 'wide' && (
-            <span className="block truncate text-xs text-muted">
-              {hostOf(card.url)}
-              {meta ? ` · ${meta}` : ''}
-            </span>
+          {(density === 'default' || density === 'tile') && (
+            <CardLabels card={card} lead={`${hostOf(card.url)}${meta ? ` · ${meta}` : ''}`} limitHashtags={density === 'tile' ? 1 : 2} />
           )}
-          {density !== 'compact' && <CardLabels card={card} />}
         </span>
+        {density === 'compact' && <CardLabels card={card} variant="dots" />}
+        {density === 'wide' && <CardLabels card={card} limitHashtags={2} className="hidden w-56 shrink-0 justify-end sm:flex" />}
         {density === 'wide' && <span className="hidden max-w-[30%] shrink-0 truncate text-xs text-muted sm:block">{hostOf(card.url)}</span>}
         {card.note && !tile && <NotebookText size={14} aria-label="Has a note" className="shrink-0 text-muted" />}
         {card.starred && !tile && <Star size={14} aria-label="Starred" className="shrink-0 text-accent" fill="currentColor" />}

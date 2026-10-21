@@ -37,7 +37,7 @@ test('new tab page: create a space, a collection and a link, then reload and kee
 
   await page.getByRole('button', { name: 'Add link' }).click();
   await page.getByLabel('Address').fill('example.com/article');
-  await page.getByRole('button', { name: 'Add link', exact: true }).last().click();
+  await page.locator('form[aria-label="Add link"]').getByRole('button', { name: 'Add link', exact: true }).click();
   await expect(page.getByRole('link', { name: /example\.com/ })).toBeVisible();
 
   await page.reload();

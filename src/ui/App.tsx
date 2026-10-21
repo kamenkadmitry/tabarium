@@ -15,7 +15,6 @@ import type { OpenTab } from '../platform/ports';
 import type { CardRowActions } from './CardRow';
 import { BoardToolbar } from './BoardToolbar';
 import { CardRow } from './CardRow';
-import { AddLinkDialog } from './dialogs/AddLinkDialog';
 import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
 import { CardDialog } from './dialogs/CardDialog';
@@ -34,6 +33,7 @@ import { Sidebar, type View } from './Sidebar';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
+import { useInlineEditor } from './useInlineEditor';
 import { useOpenTabsController } from './useOpenTabsController';
 
 type DialogState =
@@ -41,7 +41,6 @@ type DialogState =
   | { kind: 'rename-space'; space: Space }
   | { kind: 'collection' }
   | { kind: 'rename-collection'; id: string; title: string }
-  | { kind: 'link'; collectionId: string; title: string }
   | { kind: 'card'; card: Card }
   | { kind: 'move'; card: Card }
   | { kind: 'tags'; collectionId?: string }
@@ -88,6 +87,7 @@ export function App() {
     }
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
+  const editor = useInlineEditor({ reportError, clearError: () => setError(null) });
 
   const plainPage = view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
@@ -111,7 +111,8 @@ export function App() {
   const cardActions = (c: Card): CardRowActions => ({
     onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
     onDelete: act('Deleting tab', () => repo.deleteCard(c.id)),
-    onEdit: () => setDialog({ kind: 'card', card: c }),
+    // On the board the editor opens under the row; lists without a board (Starred, Duplicates, search) use a dialog.
+    onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
     onNext: act('Adding to Next', async () => void (await repo.addToNext(c.id))),
   });
@@ -125,6 +126,12 @@ export function App() {
     aiReady,
     cardActions,
     setDialog: (d) => setDialog(d),
+    openAddLink: (collectionId) =>
+      void run('Opening the editor', async () => {
+        const target = collectionById.get(collectionId);
+        if (target && !target.expanded) await repo.updateCollection(collectionId, { expanded: true });
+        editor.openAdd(collectionId);
+      }),
     addTabs: tabsCtl.addTabs,
   });
 
@@ -146,7 +153,10 @@ export function App() {
   const labelsApi: LabelsApi = {
     tags,
     hashtags,
-    createTag: async (name) => (await repo.createTag(name, (SWATCHES[tags.length % SWATCHES.length] ?? SWATCHES[0]).value)).id,
+    tagUsage: new Map(tags.map((t) => [t.id, cards.filter((c) => c.tagIds.includes(t.id)).length])),
+    hashtagUsage: new Map(hashtags.map((h) => [h.id, cards.filter((c) => c.hashtagIds.includes(h.id)).length])),
+    swatches: SWATCHES.map((sw) => sw.value),
+    createTag: async (name, color) => (await repo.createTag(name, color ?? (SWATCHES[tags.length % SWATCHES.length] ?? SWATCHES[0]).value)).id,
     createHashtag: async (name) => (await repo.ensureHashtag(name)).id,
   };
   const tagUsage = new Map(
@@ -345,6 +355,7 @@ export function App() {
                 reorderable={(settings?.boardSort ?? 'custom') === 'custom'}
                 filtered={filter.color !== null || filter.tagId !== null}
                 collectionActions={collectionActions}
+                editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack')}
                 onDropTabsAsCollection={(tabIds) => {
                   void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
                 }}
@@ -442,25 +453,12 @@ export function App() {
           onSubmit={(t) => run('Renaming collection', () => repo.updateCollection(dialog.id, { title: t }))}
         />
       )}
-      {dialog?.kind === 'link' && (
-        <AddLinkDialog
-          collectionTitle={dialog.title}
-          labels={labelsApi}
-          onClose={() => setDialog(null)}
-          onSubmit={(link) => run('Adding link', async () => void (await repo.addCards(dialog.collectionId, [link])))}
-        />
-      )}
       {dialog?.kind === 'card' && (
         <CardDialog
           card={dialog.card}
           labels={labelsApi}
           onClose={() => setDialog(null)}
-          onSubmit={({ tagIds, hashtagIds, ...patch }) =>
-            run('Saving tab', async () => {
-              await repo.updateCard(dialog.card.id, patch);
-              await repo.setCardLabels(dialog.card.id, { tagIds, hashtagIds });
-            })
-          }
+          onSubmit={(values) => editor.saveEdit(dialog.card, values)}
         />
       )}
       {dialog?.kind === 'move' && (

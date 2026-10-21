@@ -116,6 +116,18 @@ export class Repository {
     if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
   }
 
+  /** Saves the fields and the labels of a card together: either both are stored or neither. */
+  async saveCard(
+    cardId: string,
+    patch: Partial<Pick<Card, 'title' | 'customTitle' | 'note' | 'starred' | 'url'>>,
+    labels: { tagIds: readonly string[]; hashtagIds: readonly string[] },
+  ): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.tags, this.db.hashtags, async () => {
+      await this.updateCard(cardId, patch);
+      await this.setCardLabels(cardId, labels);
+    });
+  }
+
   async deleteCard(cardId: string): Promise<void> {
     await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
       await this.db.nexts.where('cardId').equals(cardId).delete();

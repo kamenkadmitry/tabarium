@@ -31,7 +31,7 @@ async function addCollectionWithLinks(p: Page, title: string, links: string[]): 
   for (const url of links) {
     await p.locator(`section[aria-label="${title}"]`).getByRole('button', { name: 'Add link' }).click();
     await p.getByLabel('Address').fill(url);
-    await p.getByRole('button', { name: 'Add link', exact: true }).last().click();
+    await p.locator('form[aria-label="Add link"]').getByRole('button', { name: 'Add link', exact: true }).click();
     await expect(p.locator(`section[aria-label="${title}"] a[href="${url}"]`)).toBeVisible();
   }
 }
@@ -193,18 +193,21 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await p.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(p.getByLabel('Name of hashtag machine-learning')).toBeVisible();
 
-  // Add a link: pick the existing tag and hashtag, and create a new hashtag right there.
+  // Add a link: pick the existing tag and hashtag, and create a new hashtag right there, all with the "+" chips.
   await p.getByRole('button', { name: /^L\s*Labels/ }).first().click();
   await p.locator('section[aria-label="Reading"]').getByRole('button', { name: 'Add link' }).click();
-  await p.getByLabel('Address').fill('https://example.test/labelled');
-  await p.locator('dialog[open]').getByLabel('Title').fill('Labelled link');
-  await p.getByLabel('Tags', { exact: true }).fill('wor');
-  await p.getByRole('button', { name: 'Work', exact: true }).click();
-  await p.getByLabel('Hashtags', { exact: true }).fill('machine');
-  await p.getByRole('button', { name: '#machine-learning' }).click();
-  await p.getByLabel('Hashtags', { exact: true }).fill('rust');
-  await p.getByRole('button', { name: 'Create #rust' }).click();
-  await p.getByRole('button', { name: 'Add link', exact: true }).last().click();
+  const form = p.locator('form[aria-label="Add link"]');
+  await form.getByLabel('Address').fill('https://example.test/labelled');
+  await form.getByLabel('Title').fill('Labelled link');
+  await form.getByRole('button', { name: 'Add tag' }).click();
+  await form.getByRole('combobox', { name: 'Add tag' }).fill('wor');
+  await form.getByRole('option', { name: /Work/ }).click();
+  await form.getByRole('button', { name: 'Add hashtag' }).click();
+  await form.getByRole('combobox', { name: 'Add hashtag' }).fill('machine');
+  await form.getByRole('option', { name: /#machine-learning/ }).click();
+  await form.getByRole('combobox', { name: 'Add hashtag' }).fill('rust');
+  await form.getByRole('option', { name: /Create #rust/ }).click();
+  await form.getByRole('button', { name: 'Add link', exact: true }).click();
 
   const row = p.locator('section[aria-label="Reading"] li', { hasText: 'Labelled link' });
   await expect(row).toContainText('Work');
@@ -214,6 +217,40 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   // Search finds the link by hashtag.
   await p.getByPlaceholder('Search all tabs, notes and links').fill('#rust');
   await expect(p.getByText('Labelled link').first()).toBeVisible();
+  await p.close();
+});
+
+test('inline editor: opens under the row, edits title, note and labels, Esc closes it', async () => {
+  const p = await openLibraryWithSpace('Inline');
+  await addCollectionWithLinks(p, 'Notes', ['https://example.test/inline-a', 'https://example.test/inline-b']);
+  const section = p.locator('section[aria-label="Notes"]');
+  const rowA = section.locator('[data-card-id]', { hasText: 'example.test' }).first();
+
+  await rowA.hover();
+  await rowA.getByRole('button', { name: 'Edit tab and note' }).click();
+  const form = section.locator('form[aria-label="Edit link"]');
+  await expect(form).toBeVisible();
+  // It sits directly under the edited row, and only one editor exists.
+  await expect(p.locator('form[aria-label="Edit link"]')).toHaveCount(1);
+
+  await form.getByLabel('Title').fill('First link, renamed');
+  await form.getByLabel('Note').fill('remember this');
+  await form.getByRole('button', { name: 'Add hashtag' }).click();
+  await form.getByRole('combobox', { name: 'Add hashtag' }).fill('later');
+  await form.getByRole('combobox', { name: 'Add hashtag' }).press('Enter');
+  await expect(form.getByRole('list', { name: 'Chosen hashtags' })).toContainText('#later');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+
+  await expect(form).toHaveCount(0);
+  const saved = section.locator('[data-card-id]', { hasText: 'First link, renamed' });
+  await expect(saved).toContainText('#later');
+
+  // Esc closes an editor with no changes without asking.
+  await saved.hover();
+  await saved.getByRole('button', { name: 'Edit tab and note' }).click();
+  await expect(form).toBeVisible();
+  await form.getByLabel('Title').press('Escape');
+  await expect(form).toHaveCount(0);
   await p.close();
 });
 

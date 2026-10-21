@@ -37,7 +37,7 @@ test('the shipped build declares each optional permission and the library works 
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.getByRole('button', { name: 'Add link' }).click();
   await page.getByLabel('Address').fill('example.org');
-  await page.getByRole('button', { name: 'Add link', exact: true }).last().click();
+  await page.locator('form[aria-label="Add link"]').getByRole('button', { name: 'Add link', exact: true }).click();
   await expect(page.locator('section[aria-label="Manual"] a')).toHaveCount(1);
   expect(app.workerErrors).toEqual([]);
 });

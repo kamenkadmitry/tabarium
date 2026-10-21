@@ -9,7 +9,6 @@ import type { CollectionActions } from './CollectionCard';
 import type { Runner, TabTarget } from './useOpenTabsController';
 
 export type CollectionDialog =
-  | { kind: 'link'; collectionId: string; title: string }
   | { kind: 'rename-collection'; id: string; title: string }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] };
@@ -21,6 +20,8 @@ interface Deps {
   aiReady: boolean;
   cardActions: (card: Card) => CardRowActions;
   setDialog: (dialog: CollectionDialog) => void;
+  /** Opens the "add link" editor at the end of the collection. */
+  openAddLink: (collectionId: string) => void;
   addTabs: (tabIds: readonly number[], target: TabTarget) => Promise<void>;
 }
 
@@ -32,7 +33,7 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
 
   return (col: Collection, list: readonly Card[]): CollectionActions => ({
     toggleExpanded: act('Updating collection', () => repo.updateCollection(col.id, { expanded: !col.expanded })),
-    addLink: () => deps.setDialog({ kind: 'link', collectionId: col.id, title: col.title }),
+    addLink: () => deps.openAddLink(col.id),
     openAll: act('Opening tabs', () =>
       deps.platform.tabs.openUrls(
         list.map((c) => c.url),
