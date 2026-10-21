@@ -545,31 +545,35 @@ test('AI: suggest details in the editor and fill a whole collection', async () =
 test('side panel Inbox: a link leaves the list when it is moved or removed', async () => {
   const lib = await openLibraryWithSpace('Sorting');
   await addCollectionWithLinks(lib, 'Sorted', []);
-  // The message goes from a page: a service worker cannot message itself.
-  await lib.evaluate(async (urls) => {
-    for (const [i, url] of urls.entries()) {
-      await chrome.runtime.sendMessage({ type: 'e2e-context-click', info: { menuItemId: 'tabarium-save-page' }, tab: { url, title: `Inbox item ${i + 1}` } });
-    }
-  }, [web('inbox-1'), web('inbox-2')]);
+  // The message goes from a page: a service worker cannot message itself. Other tests leave links in the Inbox too.
+  await lib.evaluate(
+    (items) => chrome.runtime.sendMessage({ type: 'e2e-save-to-inbox', items }),
+    [
+      { title: 'Inbox item 1', url: web('inbox-1'), favIconUrl: null },
+      { title: 'Inbox item 2', url: web('inbox-2'), favIconUrl: null },
+    ],
+  );
 
   const panel = await app.context.newPage();
   panel.setDefaultTimeout(10_000);
   await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
   await panel.getByRole('tab', { name: /^Inbox/ }).click();
   const list = panel.getByRole('list', { name: 'Inbox' });
-  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await expect(list).toContainText('Inbox item 1');
+  await expect(list).toContainText('Inbox item 2');
 
   // Move one into a collection: it leaves the Inbox list.
   await panel.getByRole('button', { name: 'Move Inbox item 1 out of Inbox' }).click();
   await panel.getByRole('button', { name: /^Sorting(?![a-z])/ }).click();
   await panel.getByRole('button', { name: 'Sorted', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Moved to Sorting / Sorted');
-  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list).not.toContainText('Inbox item 1');
+  await expect(list).toContainText('Inbox item 2');
 
-  // Remove the other one: the list is empty.
+  // Remove the other one: it is gone from the list as well.
   panel.once('dialog', (d) => void d.accept());
   await panel.getByRole('button', { name: 'Remove Inbox item 2 from Inbox' }).click();
-  await expect(panel.getByText('Inbox is empty')).toBeVisible();
+  await expect(list).not.toContainText('Inbox item 2');
 
   await lib.reload();
   await lib.getByRole('button', { name: 'Sorting', exact: true }).first().click();

@@ -2,6 +2,8 @@ import { browser } from 'wxt/browser';
 import { attachAlarmHandler, syncBackupAlarm } from '../background/backupAlarm';
 import { attachContextMenuHandler, handleClick, syncContextMenu } from '../background/contextMenu';
 import { applyToolbarBehavior } from '../background/toolbar';
+import { db } from '../core/instance';
+import { saveToInbox } from '../core/quicksave';
 
 /** Re-applies everything that depends on optional permissions or settings. Safe to call repeatedly. */
 async function syncAll(): Promise<void> {
@@ -23,7 +25,13 @@ export default defineBackground(() => {
     // Test-only hook: native context menus cannot be clicked by test drivers, so tests invoke the handler here.
     // Compiled out of every other build mode.
     browser.runtime.onMessage.addListener((message: unknown) => {
-      const m = message as { type?: string; info?: Parameters<typeof handleClick>[0]; tab?: Parameters<typeof handleClick>[1] };
+      const m = message as {
+        type?: string;
+        info?: Parameters<typeof handleClick>[0];
+        tab?: Parameters<typeof handleClick>[1];
+        items?: Parameters<typeof saveToInbox>[1];
+      };
+      if (m.type === 'e2e-save-to-inbox' && m.items) return saveToInbox(db, m.items); // puts links into the Inbox on purpose
       return m.type === 'e2e-context-click' && m.info ? handleClick(m.info, m.tab) : undefined;
     });
   }
