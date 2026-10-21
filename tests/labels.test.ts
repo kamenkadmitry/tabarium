@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { exportBackup, parseBackup, restoreBackup } from '../src/core/backup';
 import { TabariumDB } from '../src/core/db';
 import { normalizeHashtag } from '../src/core/hashtag';
-import { applyGroups, loadLibraryContext } from '../src/core/organise';
+import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../src/core/organise';
 import { Repository } from '../src/core/repo';
 
 let db: TabariumDB;
@@ -140,5 +140,35 @@ describe('AI organising helpers', () => {
     const ai = await db.hashtags.where('name').equals('ai').first();
     expect((await db.cards.where('collectionId').equals(reading.id).toArray())[0]?.hashtagIds).toEqual([ai?.id]);
     expect(await db.hashtags.count()).toBe(2);
+  });
+});
+
+describe('applying suggested details', () => {
+  it('adds labels, fills only an empty note and reports how many links changed', async () => {
+    const space = await repo.createSpace('S');
+    const col = await repo.createCollection(space.id, 'C');
+    const [a, b] = await repo.addCards(col.id, [
+      { title: 'A', url: 'https://a.dev/' },
+      { title: 'B', url: 'https://b.dev/', note: 'mine' },
+    ]);
+    if (!a || !b) throw new Error('cards were not added');
+    const work = await repo.createTag('Work', '#0d9488');
+    const keep = await repo.ensureHashtag('keep');
+    await repo.setCardLabels(b.id, { tagIds: [], hashtagIds: [keep.id] });
+
+    expect(await loadLabelContext(db)).toEqual({ tags: ['Work'], hashtags: ['keep'] });
+    const changed = await applyCardDetails(db, repo, [
+      { cardId: a.id, note: 'About A', tags: ['work'], hashtags: ['new'] },
+      { cardId: b.id, note: 'Replaced?', tags: [], hashtags: ['keep'] },
+    ]);
+
+    expect(changed).toBe(1);
+    const afterA = await db.cards.get(a.id);
+    expect(afterA?.note).toBe('About A');
+    expect(afterA?.tagIds).toEqual([work.id]);
+    expect(afterA?.hashtagIds).toHaveLength(1);
+    const afterB = await db.cards.get(b.id);
+    expect(afterB?.note).toBe('mine');
+    expect(afterB?.hashtagIds).toEqual([keep.id]);
   });
 });

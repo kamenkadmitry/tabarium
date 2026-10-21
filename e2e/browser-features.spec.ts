@@ -482,6 +482,48 @@ test('AI: connection test, naming and grouping through a provider', async () => 
   await p.close();
 });
 
+test('AI: suggest details in the editor and fill a whole collection', async () => {
+  await app.context.route('https://api.openai.com/**', async (route) => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as { messages: { content: string }[] };
+    const details = body.messages[0]?.content.includes('organise a personal bookmark library');
+    const text = details ? '[{"n":1,"note":"About one.","tags":[],"hashtags":["suggested"]},{"n":2,"note":"About two.","tags":[],"hashtags":["suggested"]}]' : '["Fresh name"]';
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: text } }] }) });
+  });
+
+  const p = await openLibraryWithSpace('Fill');
+  p.setDefaultTimeout(10_000);
+  await p.getByRole('button', { name: 'Settings', exact: true }).click();
+  await p.locator('select:has(option:text("OpenAI"))').selectOption('openai');
+  await p.getByLabel('Model').fill('test-model');
+  await p.getByLabel('API key').fill('sk-e2e');
+  await p.getByRole('button', { name: 'Save AI settings' }).click();
+  await p.getByRole('button', { name: /^F\s*Fill/ }).first().click();
+
+  await addCollectionWithLinks(p, 'Fillme', ['https://example.test/fill-a', 'https://example.test/fill-b']);
+  const section = p.locator('section[aria-label="Fillme"]');
+  const rows = section.locator('[data-card-id]');
+
+  // One link: the button in the editor adds a note and a hashtag to the form; Save stores them.
+  await rows.first().getByRole('button', { name: 'Edit tab and note' }).focus();
+  await p.keyboard.press('Enter');
+  const form = section.locator('form[aria-label="Edit link"]');
+  await form.getByRole('button', { name: 'Suggest with AI' }).click();
+  await expect(form.getByRole('status')).toContainText('Added');
+  await expect(form.getByLabel('Note')).toHaveValue('About one.');
+  await expect(form.getByRole('list', { name: 'Chosen hashtags' })).toContainText('#suggested');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(rows.first()).toContainText('#suggested');
+
+  // A whole collection: only links without labels are sent, and the proposals are reviewed first.
+  await section.getByRole('button', { name: 'Collection menu' }).click();
+  await p.getByRole('menuitem', { name: /Fill details/ }).click();
+  const dialog = p.locator('dialog[open]');
+  await expect(dialog.getByRole('list', { name: 'Suggestions' })).toContainText('About one.');
+  await dialog.getByRole('button', { name: 'Apply to 1' }).click();
+  await expect(rows.nth(1)).toContainText('#suggested');
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

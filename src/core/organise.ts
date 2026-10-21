@@ -1,6 +1,6 @@
 import type { TabariumDB } from './db';
 import { normalizeHashtag } from './hashtag';
-import type { LibraryContext } from './ai/tasks';
+import type { LabelContext, LibraryContext } from './ai/tasks';
 import type { NewCard, Repository } from './repo';
 
 /** What the model should know about a space before it proposes groups. */
@@ -58,4 +58,44 @@ export async function applyGroups(
     }
   }
   return { collections: groups.length, created, cards };
+}
+
+/** Existing tags and hashtags, for suggesting details of single links. */
+export async function loadLabelContext(db: TabariumDB): Promise<LabelContext> {
+  const [tags, hashtags] = await Promise.all([db.tags.orderBy('position').toArray(), db.hashtags.orderBy('name').toArray()]);
+  return { tags: tags.map((t) => t.title), hashtags: hashtags.map((h) => h.name) };
+}
+
+export interface DetailsToApply {
+  cardId: string;
+  note: string;
+  /** Titles of existing tags. */
+  tags: readonly string[];
+  /** Hashtag names; created when missing. */
+  hashtags: readonly string[];
+}
+
+/**
+ * Applies suggested details to links without taking anything away: labels are added to the ones a link already has,
+ * and a note is written only when the link has none. Returns how many links changed.
+ */
+export async function applyCardDetails(db: TabariumDB, repo: Repository, items: readonly DetailsToApply[]): Promise<number> {
+  const allTags = await db.tags.toArray();
+  let changed = 0;
+  for (const item of items) {
+    const card = await db.cards.get(item.cardId);
+    if (!card) throw new Error(`Card ${item.cardId} does not exist`);
+    const wanted = new Set(item.tags.map((t) => t.toLowerCase()));
+    const tagIds = [...new Set([...card.tagIds, ...allTags.filter((t) => wanted.has(t.title.toLowerCase())).map((t) => t.id)])];
+    const hashtagIds = [...card.hashtagIds];
+    for (const name of item.hashtags) {
+      const id = (await repo.ensureHashtag(name)).id;
+      if (!hashtagIds.includes(id)) hashtagIds.push(id);
+    }
+    const fillNote = (card.note ?? '').trim() === '' && item.note.trim() !== '';
+    if (!fillNote && tagIds.length === card.tagIds.length && hashtagIds.length === card.hashtagIds.length) continue;
+    await repo.saveCard(card.id, fillNote ? { note: item.note.trim() } : {}, { tagIds, hashtagIds });
+    changed += 1;
+  }
+  return changed;
 }

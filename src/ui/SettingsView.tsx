@@ -397,6 +397,9 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
         title="AI assistant"
         description="Optional. Bring your own provider and key; requests go straight from your browser to the provider."
       >
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
+          Any model that follows instructions works. Tabarium asks for plain JSON and reads it itself, so special JSON modes are not needed: free OpenRouter models, a Google Gemini key, or a local model through "Custom" (OpenAI-compatible, e.g. Ollama) all fit. Very small models may answer badly; you will see an error and nothing is saved.
+        </p>
         <label className="block">
           <span className="mb-1.5 block text-sm font-semibold">Provider</span>
           <select

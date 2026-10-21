@@ -13,6 +13,8 @@ export interface CollectionActions {
   openAll: () => void;
   /** Present only when an AI provider is configured. */
   suggestName?: () => void;
+  /** Present only when an AI provider is configured: propose notes, tags and hashtags for links that have none. */
+  suggestDetails?: () => void;
   /** Close the other tabs of this window and open this collection instead. */
   replaceWindow: () => void;
   rename: () => void;
@@ -81,6 +83,11 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
       {actions.suggestName && (
         <button role="menuitem" type="button" onClick={run(actions.suggestName)} className={menuItem}>
           <Sparkles size={15} aria-hidden /> Suggest name (AI)
+        </button>
+      )}
+      {actions.suggestDetails && (
+        <button role="menuitem" type="button" onClick={run(actions.suggestDetails)} className={menuItem}>
+          <Sparkles size={15} aria-hidden /> Fill details (AI)
         </button>
       )}
       <button role="menuitem" type="button" onClick={run(actions.editTags)} className={menuItem}>

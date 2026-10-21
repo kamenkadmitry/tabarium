@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AiError, assertConfigured, complete, detectProviderFromKey, type FetchLike, providerOrigin } from '../src/core/ai/client';
-import { extractJson, groupTabs, suggestCollectionNames, testConnection } from '../src/core/ai/tasks';
+import { extractJson, groupTabs, MAX_DETAILS_PER_REQUEST, suggestCardDetails, suggestCollectionNames, testConnection } from '../src/core/ai/tasks';
 import type { Settings } from '../src/core/settings';
 
 type Ai = Settings['ai'];
@@ -160,6 +160,34 @@ describe('tasks', () => {
     expect(prompt).toContain('Existing hashtags: ai, rust');
     expect(groups[0]).toEqual({ title: 'Reading List', indexes: [0], tags: ['Work'], hashtags: ['machine-learning', 'ai', 'x-y-z'] });
     expect(groups[1]).toMatchObject({ title: 'New one', tags: [], hashtags: [] });
+  });
+
+  it('card details: one entry per link, existing tags only, clean hashtags, long notes cut, missing entries empty', async () => {
+    const pages = ['a', 'b', 'c'].map((t) => ({ title: t, url: `https://${t}.dev` }));
+    const reply = JSON.stringify([
+      { n: 1, note: 'x'.repeat(300), tags: ['work', 'Invented'], hashtags: ['#Machine Learning', 'ai', 'ai', 'a', 'b'] },
+      { n: 2, note: '  A guide.  ' },
+    ]);
+    const { fetch, calls } = fakeFetch(openaiReply(reply));
+    const out = await suggestCardDetails(cfg({}), pages, { tags: ['Work'], hashtags: ['ai'] }, fetch);
+
+    const prompt = JSON.stringify(calls[0]?.body);
+    expect(prompt).toContain('Existing tags: Work');
+    expect(prompt).toContain('Existing hashtags: ai');
+    expect(prompt).toContain('1. a');
+    expect(out).toHaveLength(3);
+    expect(out[0]).toEqual({ note: 'x'.repeat(200), tags: ['Work'], hashtags: ['machine-learning', 'ai', 'a'] });
+    expect(out[1]).toEqual({ note: 'A guide.', tags: [], hashtags: [] });
+    expect(out[2]).toEqual({ note: '', tags: [], hashtags: [] });
+  });
+
+  it('card details: refuses empty input, too many links and unusable answers', async () => {
+    const ctx = { tags: [], hashtags: [] };
+    await expect(suggestCardDetails(cfg({}), [], ctx)).rejects.toThrow('no links');
+    const many = Array.from({ length: MAX_DETAILS_PER_REQUEST + 1 }, (_, i) => ({ title: `t${i}`, url: `https://${i}.dev` }));
+    await expect(suggestCardDetails(cfg({}), many, ctx)).rejects.toThrow('At most');
+    const { fetch } = fakeFetch(openaiReply('{"nope":true}'));
+    await expect(suggestCardDetails(cfg({}), [{ title: 'a', url: 'https://a.dev' }], ctx, fetch)).rejects.toThrow('valid suggestions');
   });
 
   it('connection test succeeds on a reply with no text', async () => {

@@ -1,4 +1,6 @@
+import { Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { CardDetails } from '../core/ai/tasks';
 import { LabelFields, type LabelsApi } from './labels';
 import { type LinkValues, parseUserUrl } from './linkInput';
 
@@ -12,6 +14,8 @@ interface Props {
   /** Resolves to false when saving failed, so the editor stays open and keeps what was typed. */
   onSubmit: (values: LinkValues) => Promise<boolean>;
   onCancel: () => void;
+  /** Present when an AI provider is configured: proposes a note, tags and hashtags for the link. */
+  suggest?: (input: { title: string; url: string }) => Promise<CardDetails>;
   /** Reports whether something was changed, so the board can ask before throwing it away. */
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -21,13 +25,15 @@ const field = 'h-10 w-full rounded-lg border border-line bg-bg px-3 text-sm plac
 const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 /** Edit or add a link in place. Ctrl+Enter saves, Esc cancels. */
-export function LinkEditor({ mode, initial, labels, layout, onSubmit, onCancel, onDirtyChange }: Props) {
+export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, onCancel, onDirtyChange }: Props) {
   const [title, setTitle] = useState(initial.title);
   const [rawUrl, setRawUrl] = useState(initial.url);
   const [note, setNote] = useState(initial.note);
   const [tagIds, setTagIds] = useState(initial.tagIds);
   const [hashtagIds, setHashtagIds] = useState(initial.hashtagIds);
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const form = useRef<HTMLFormElement>(null);
 
   const url = parseUserUrl(rawUrl);
@@ -47,6 +53,34 @@ export function LinkEditor({ mode, initial, labels, layout, onSubmit, onCancel, 
       await onSubmit({ title, url, note, tagIds, hashtagIds });
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Adds what the AI proposes to the form. Nothing is saved until Save, and nothing already typed is replaced. */
+  const runSuggest = async () => {
+    if (!suggest || url === null) return;
+    setSuggesting(true);
+    setSuggestNote(null);
+    try {
+      const details = await suggest({ title: title.trim() || new URL(url).hostname, url });
+      const tagByTitle = new Map(labels.tags.map((t) => [t.title.toLowerCase(), t.id]));
+      const addTags = details.tags.flatMap((t) => tagByTitle.get(t.toLowerCase()) ?? []);
+      const addHashtags: string[] = [];
+      for (const name of details.hashtags) {
+        const known = labels.hashtags.find((h) => h.name === name);
+        addHashtags.push(known ? known.id : await labels.createHashtag(name));
+      }
+      const fillNote = note.trim() === '' && details.note !== '';
+      if (fillNote) setNote(details.note);
+      setTagIds((prev) => [...new Set([...prev, ...addTags])]);
+      setHashtagIds((prev) => [...new Set([...prev, ...addHashtags])]);
+      const parts = [fillNote ? 'a note' : '', addTags.length > 0 ? `${addTags.length} tag${addTags.length === 1 ? '' : 's'}` : '', addHashtags.length > 0 ? `${addHashtags.length} hashtag${addHashtags.length === 1 ? '' : 's'}` : ''].filter((x) => x !== '');
+      setSuggestNote({ tone: 'ok', text: parts.length > 0 ? `Added ${parts.join(', ')}. Review it and press Save.` : 'Nothing to suggest for this link.' });
+    } catch (e) {
+      console.error('Tabarium: the AI suggestion failed', e);
+      setSuggestNote({ tone: 'error', text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSuggesting(false);
     }
   };
 
@@ -87,7 +121,28 @@ export function LinkEditor({ mode, initial, labels, layout, onSubmit, onCancel, 
       />
     </label>
   );
-  const labelFields = <LabelFields api={labels} tagIds={tagIds} hashtagIds={hashtagIds} onTags={setTagIds} onHashtags={setHashtagIds} />;
+  const labelFields = (
+    <>
+      {suggest && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={url === null || suggesting}
+            onClick={() => void runSuggest()}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold transition-colors duration-150 hover:bg-bg disabled:opacity-50"
+          >
+            <Sparkles size={13} aria-hidden className="text-accent" /> {suggesting ? 'Asking the AI…' : 'Suggest with AI'}
+          </button>
+          {suggestNote && (
+            <span role="status" className={`text-xs ${suggestNote.tone === 'error' ? 'text-danger' : 'text-muted'}`}>
+              {suggestNote.text}
+            </span>
+          )}
+        </div>
+      )}
+      <LabelFields api={labels} tagIds={tagIds} hashtagIds={hashtagIds} onTags={setTagIds} onHashtags={setHashtagIds} />
+    </>
+  );
 
   return (
     <form

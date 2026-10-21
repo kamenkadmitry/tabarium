@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
-import { groupTabs } from '../core/ai/tasks';
-import { applyGroups, loadLibraryContext } from '../core/organise';
+import { groupTabs, suggestCardDetails } from '../core/ai/tasks';
+import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../core/organise';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card, Space } from '../core/types';
 import { usePlatform } from '../platform/context';
@@ -17,6 +17,7 @@ import { BoardToolbar } from './BoardToolbar';
 import { CardRow } from './CardRow';
 import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
+import { AiDetailsDialog, type ProposedDetails } from './dialogs/AiDetailsDialog';
 import { CardDialog } from './dialogs/CardDialog';
 import { MoveCardDialog } from './dialogs/MoveCardDialog';
 import { PromptDialog } from './dialogs/PromptDialog';
@@ -45,6 +46,7 @@ type DialogState =
   | { kind: 'move'; card: Card }
   | { kind: 'tags'; collectionId?: string }
   | { kind: 'ai-names'; collectionId: string; suggestions: string[] }
+  | { kind: 'ai-details'; collectionTitle: string; items: ProposedDetails[]; skipped: number }
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
@@ -118,6 +120,17 @@ export function App() {
   });
 
   const aiReady = settings !== undefined && isAiConfigured(settings.ai);
+
+  /** Fills a link's note, tags and hashtags from its title and address. Called straight from a click (permission prompt). */
+  const suggestForLink =
+    aiReady && settings
+      ? (input: { title: string; url: string }) =>
+          withProviderAccess(platform, settings.ai, async () => {
+            const [details] = await suggestCardDetails(settings.ai, [input], await loadLabelContext(db));
+            if (!details) throw new Error('The AI returned nothing for this link.');
+            return details;
+          })
+      : undefined;
 
   const collectionActions = createCollectionActions({
     platform,
@@ -370,7 +383,7 @@ export function App() {
                 reorderable={(settings?.boardSort ?? 'custom') === 'custom'}
                 filtered={isFiltering(filter)}
                 collectionActions={collectionActions}
-                editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack')}
+                editor={editor.slot(labelsApi, boardView === 'list' ? 'columns' : 'stack', suggestForLink)}
                 onDropTabsAsCollection={(tabIds) => {
                   void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId, title: newCollectionTitle() });
                 }}
@@ -472,6 +485,7 @@ export function App() {
         <CardDialog
           card={dialog.card}
           labels={labelsApi}
+          suggest={suggestForLink}
           onClose={() => setDialog(null)}
           onSubmit={(values) => editor.saveEdit(dialog.card, values)}
         />
@@ -507,6 +521,23 @@ export function App() {
           suggestions={dialog.suggestions}
           onClose={() => setDialog(null)}
           onPick={(title) => run('Renaming collection', () => repo.updateCollection(dialog.collectionId, { title }))}
+        />
+      )}
+      {dialog?.kind === 'ai-details' && (
+        <AiDetailsDialog
+          collectionTitle={dialog.collectionTitle}
+          items={dialog.items}
+          skipped={dialog.skipped}
+          onClose={() => setDialog(null)}
+          onApply={(selected) =>
+            run('Applying suggestions', async () => {
+              await applyCardDetails(
+                db,
+                repo,
+                selected.map((i) => ({ cardId: i.card.id, ...i.details })),
+              );
+            })
+          }
         />
       )}
       {dialog?.kind === 'tags' && (

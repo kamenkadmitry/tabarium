@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { repo } from '../core/instance';
+import type { CardDetails } from '../core/ai/tasks';
 import type { Card, Collection } from '../core/types';
 import type { LabelsApi } from './labels';
 import { LinkEditor } from './LinkEditor';
@@ -79,7 +80,7 @@ export function useInlineEditor({ reportError, clearError }: Deps) {
     close,
     saveEdit,
     /** What the board needs to draw the editor in the right place. */
-    slot: (labels: LabelsApi, layout: 'stack' | 'columns') => ({
+    slot: (labels: LabelsApi, layout: 'stack' | 'columns', suggest?: (input: { title: string; url: string }) => Promise<CardDetails>) => ({
       collectionId: open?.collectionId ?? null,
       cardId: open?.cardId ?? null,
       render: (collection: Collection, card: Card | null) => (
@@ -88,6 +89,7 @@ export function useInlineEditor({ reportError, clearError }: Deps) {
           mode={card ? 'edit' : 'add'}
           layout={layout}
           labels={labels}
+          suggest={suggest}
           initial={
             card
               ? { title: card.customTitle ?? card.title, url: card.url, note: card.note ?? '', tagIds: card.tagIds, hashtagIds: card.hashtagIds }

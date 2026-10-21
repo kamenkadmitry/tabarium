@@ -122,6 +122,77 @@ export async function groupTabs(
   return groups;
 }
 
+export interface CardDetails {
+  /** One short sentence about the page; empty when the model is not sure what the page is. */
+  note: string;
+  /** Titles of existing tags. */
+  tags: string[];
+  /** Hashtags without "#": existing ones when they fit, new ones otherwise. */
+  hashtags: string[];
+}
+
+/** The tags and hashtags that already exist, so suggestions reuse them. */
+export interface LabelContext {
+  tags: readonly string[];
+  hashtags: readonly string[];
+}
+
+export const MAX_DETAILS_PER_REQUEST = 30;
+const NOTE_LIMIT = 200;
+
+const DetailsSchema = z
+  .array(
+    z.object({
+      n: z.number().int().min(1),
+      note: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+      hashtags: z.array(z.string()).optional(),
+    }),
+  )
+  .min(1);
+
+/**
+ * Proposes a short note, tags and hashtags for links. The model sees only each title and address, so it is told to
+ * leave the note empty when it cannot tell what the page is. Returns one entry per input page, in order.
+ */
+export async function suggestCardDetails(
+  config: AiConfig,
+  pages: readonly PageRef[],
+  context: LabelContext,
+  fetchImpl?: FetchLike,
+): Promise<CardDetails[]> {
+  if (pages.length === 0) throw new AiError('There are no links to describe.');
+  if (pages.length > MAX_DETAILS_PER_REQUEST) throw new AiError(`At most ${MAX_DETAILS_PER_REQUEST} links can be described at a time.`);
+  const answer = await complete(
+    config,
+    {
+      system:
+        'You help to organise a personal bookmark library. For each numbered link you know only its title and address. ' +
+        'Reply with only JSON: [{"n":1,"note":"...","tags":["Existing tag"],"hashtags":["topic"]}]. ' +
+        'Rules: "note" is one short sentence (at most 140 characters) saying what the page is, in the language of its title; ' +
+        'use an empty string when you are not sure what the page is, never guess or invent details. ' +
+        '"tags" may contain only names from the existing tags list and is empty when none fits. ' +
+        '"hashtags" holds 0 to 3 lowercase single-word topics: reuse an existing hashtag when one fits and create a new one only when none does. ' +
+        'Give one entry per link. No commentary.',
+      prompt: `${named('Existing tags', context.tags)}\n${named('Existing hashtags', context.hashtags)}\n\nLinks:\n${list(pages)}`,
+      maxTokens: 500 + pages.length * 150,
+    },
+    fetchImpl,
+  );
+  const parsed = DetailsSchema.safeParse(extractJson(answer));
+  if (!parsed.success) throw new AiError('The model did not return valid suggestions.');
+
+  const tagByLower = new Map(context.tags.map((t) => [t.toLowerCase(), t]));
+  return pages.map((_, i) => {
+    const entry = parsed.data.find((e) => e.n === i + 1);
+    return {
+      note: (entry?.note ?? '').trim().slice(0, NOTE_LIMIT),
+      tags: [...new Set((entry?.tags ?? []).flatMap((t) => tagByLower.get(t.trim().toLowerCase()) ?? []))],
+      hashtags: [...new Set((entry?.hashtags ?? []).map(normalizeHashtag).filter((h) => h !== ''))].slice(0, 3),
+    };
+  });
+}
+
 /**
  * Cheap call used by the "Test connection" button. A successful HTTP answer proves the key, model and network
  * work, so a reply without text (a reasoning model that used its small budget) still counts as connected.
