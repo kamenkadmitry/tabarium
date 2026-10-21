@@ -222,6 +222,7 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
 
 test('inline editor: opens under the row, edits title, note and labels, Esc closes it', async () => {
   const p = await openLibraryWithSpace('Inline');
+  p.setDefaultTimeout(10_000); // a stuck locator should fail with its name, not hang until the test timeout
   await addCollectionWithLinks(p, 'Notes', ['https://example.test/inline-a', 'https://example.test/inline-b']);
   const section = p.locator('section[aria-label="Notes"]');
   const rowA = section.locator('[data-card-id]', { hasText: 'example.test' }).first();
