@@ -227,9 +227,9 @@ test('inline editor: opens under the row, edits title, note and labels, Esc clos
   const section = p.locator('section[aria-label="Notes"]');
   const rowA = section.locator('[data-card-id]', { hasText: 'example.test' }).first();
 
-  // The pencil appears on hover; the hit test of a normal click runs before the hover applies, so force it.
-  await rowA.hover();
-  await rowA.getByRole('button', { name: 'Edit tab and note' }).click({ force: true });
+  // The pencil is revealed by hover (not available to the test driver) or by keyboard focus, so use the keyboard.
+  await rowA.getByRole('button', { name: 'Edit tab and note' }).focus();
+  await p.keyboard.press('Enter');
   const form = section.locator('form[aria-label="Edit link"]');
   await expect(form).toBeVisible();
   // It sits directly under the edited row, and only one editor exists.
