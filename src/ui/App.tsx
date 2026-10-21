@@ -39,6 +39,7 @@ import { parseDraggedLinks } from './dnd';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
 import { useLibraryData } from './useLibraryData';
+import { useDuplicateGuard } from './DuplicateGuard';
 import { buildLabelsApi } from './labelsApi';
 import { InboxPage } from './InboxPage';
 import { SWATCHES } from './colors';
@@ -103,7 +104,8 @@ export function App() {
     }
   };
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
-  const editor = useInlineEditor({ reportError, clearError: () => setError(null) });
+  const guard = useDuplicateGuard();
+  const editor = useInlineEditor({ reportError, clearError: () => setError(null), guard });
   // Creates the Inbox on first use and adopts an older one, so it exists before anything is saved to it.
   useEffect(() => {
     ensureInbox(db).catch((e: unknown) => reportError('Preparing the Inbox', e));
@@ -134,12 +136,14 @@ export function App() {
     settings,
     spaceId: view?.kind === 'space' ? view.spaceId : undefined,
     run,
+    guard,
   });
   const newCollectionTitle = () => `Saved ${new Date().toLocaleDateString()}`;
   /** Links dragged out of the side panel become a new collection in the given space. */
   const dropLinksAsCollection = (raw: string, targetSpaceId: string) =>
     void run('Adding the dropped links', async () => {
-      const links = parseDraggedLinks(raw);
+      const links = await guard(parseDraggedLinks(raw));
+      if (!links || links.length === 0) return;
       const col = await repo.createCollection(targetSpaceId, newCollectionTitle());
       await repo.addCards(col.id, links);
     });
@@ -201,6 +205,7 @@ export function App() {
         editor.openAdd(collectionId);
       }),
     addTabs: tabsCtl.addTabs,
+    guard,
   });
 
   const openSaveSession = () =>
@@ -424,7 +429,12 @@ export function App() {
               pagesBusy={reading.busy}
               pagesNote={reading.note}
               onDropTabs={(tabIds) => void tabsCtl.addTabs(tabIds, { kind: 'collection', collectionId: inboxDefault.id, before: null })}
-              onDropLinks={(raw) => void run('Adding the dropped links', async () => void (await repo.addCards(inboxDefault.id, parseDraggedLinks(raw))))}
+              onDropLinks={(raw) =>
+                void run('Adding the dropped links', async () => {
+                  const links = await guard(parseDraggedLinks(raw));
+                  if (links && links.length > 0) await repo.addCards(inboxDefault.id, links);
+                })
+              }
             />
           )}
 
@@ -683,18 +693,21 @@ export function App() {
           onSave={({ tabs, collectionId, newTitle, closeTabs, groups }) =>
             run('Saving session', async () => {
               const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
+              const approved = await guard(tabs);
+              if (!approved || approved.length === 0) return;
+              const keep = new Set(approved.map((t) => t.id));
               if (groups) {
                 await applyGroups(
                   db,
                   repo,
                   spaceId,
-                  groups.map((g) => ({ title: g.title, cards: g.tabs.map(toCard), tags: g.tags, hashtags: g.hashtags })),
+                  groups.map((g) => ({ title: g.title, cards: g.tabs.filter((t) => keep.has(t.id)).map(toCard), tags: g.tags, hashtags: g.hashtags })),
                 );
               } else {
                 const targetId = collectionId ?? (await repo.createCollection(spaceId, newTitle)).id;
-                await repo.addCards(targetId, tabs.map(toCard));
+                await repo.addCards(targetId, approved.map(toCard));
               }
-              if (closeTabs) await platform.tabs.closeTabs(tabs.map((t) => t.id));
+              if (closeTabs) await platform.tabs.closeTabs(approved.map((t) => t.id));
             })
           }
         />

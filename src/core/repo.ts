@@ -2,9 +2,10 @@ import type { TabariumDB } from './db';
 import { dedupeLinks, type ImportedSpace } from './formats';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
+import { bumpActivity } from './activity';
 import { normalizeHashtag } from './hashtag';
 import type { PageInfo } from './pageInfo';
-import type { Card, Collection, Hashtag, Space, Tag } from './types';
+import type { ActivityType, Card, Collection, Hashtag, Space, Tag } from './types';
 import { normalizeUrl } from './url';
 
 export interface NewCard {
@@ -18,6 +19,9 @@ export interface NewCard {
 }
 
 export { normalizeUrl };
+
+/** Why a link is deleted, when that matters for the dashboard. */
+export type DeleteReason = 'duplicate';
 
 export class Repository {
   constructor(private readonly db: TabariumDB) {}
@@ -57,7 +61,7 @@ export class Repository {
 
   /** Adds cards to a collection; URLs already present in it are skipped. Returns the cards actually added. */
   async addCards(collectionId: string, items: readonly NewCard[]): Promise<Card[]> {
-    return this.db.transaction('rw', this.db.collections, this.db.cards, async () => {
+    return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.activity, async () => {
       if (!(await this.db.collections.get(collectionId))) {
         throw new Error(`Collection ${collectionId} does not exist`);
       }
@@ -91,6 +95,7 @@ export class Repository {
         position += POSITION_STEP;
       }
       await this.db.cards.bulkAdd(added);
+      await bumpActivity(this.db, 'added', added.length);
       return added;
     });
   }
@@ -193,19 +198,24 @@ export class Repository {
     await this.db.cards.where('id').anyOf([...cardIds]).modify({ starred, updatedAt: Date.now() });
   }
 
-  /** Deletes links together with their Next entries. */
-  async deleteCards(cardIds: readonly string[]): Promise<void> {
-    await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
+  /** Deletes links together with their Next entries. A deleted duplicate is counted as such on the dashboard. */
+  async deleteCards(cardIds: readonly string[], reason?: DeleteReason): Promise<void> {
+    await this.db.transaction('rw', this.db.cards, this.db.nexts, this.db.activity, async () => {
+      const existing = (await this.db.cards.bulkGet([...cardIds])).filter((c) => c !== undefined).length;
       await this.db.nexts.where('cardId').anyOf([...cardIds]).delete();
       await this.db.cards.bulkDelete([...cardIds]);
+      await bumpActivity(this.db, 'deleted', existing);
+      if (reason === 'duplicate') await bumpActivity(this.db, 'duplicates-removed', existing);
     });
   }
 
-  async deleteCard(cardId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.cards, this.db.nexts, async () => {
-      await this.db.nexts.where('cardId').equals(cardId).delete();
-      await this.db.cards.delete(cardId);
-    });
+  async deleteCard(cardId: string, reason?: DeleteReason): Promise<void> {
+    await this.deleteCards([cardId], reason);
+  }
+
+  /** Records something that happened outside the data itself (a duplicate was skipped or created on purpose). */
+  async recordActivity(type: ActivityType, count: number): Promise<void> {
+    await this.db.transaction('rw', this.db.activity, () => bumpActivity(this.db, type, count));
   }
 
   /** Moves a card into a collection, directly before `beforeCardId` or at the end when it is null. */
@@ -432,8 +442,9 @@ export class Repository {
   }
 
   async deleteCollection(collectionId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, async () => {
+    await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
       const cardIds = await this.db.cards.where('collectionId').equals(collectionId).primaryKeys();
+      await bumpActivity(this.db, 'deleted', cardIds.length);
       await this.db.nexts.where('cardId').anyOf(cardIds).delete();
       await this.db.cards.bulkDelete(cardIds);
       await this.db.collections.delete(collectionId);

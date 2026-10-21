@@ -6,6 +6,7 @@ import type { Card, Collection, Space } from '../../core/types';
 import { normalizeUrl } from '../../core/url';
 import { usePlatform } from '../../platform/context';
 import { hostOf, PageFavicon } from '../CardRow';
+import { useDuplicateGuard } from '../DuplicateGuard';
 import { linkDragProps } from '../dnd';
 import type { LabelsApi } from '../labels';
 import { LinkEditor } from '../LinkEditor';
@@ -31,6 +32,7 @@ interface Props {
  */
 export function InboxView({ spaces, collections, cardsByCollection, items, labels, onStatus }: Props) {
   const platform = usePlatform();
+  const guard = useDuplicateGuard();
   const { hasAccess, allow } = useActiveTab();
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<Card | null>(null);
@@ -55,7 +57,9 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
       if (!hasAccess && !(await allow())) throw new Error('Tabarium needs the "tabs" permission to see which page you are on.');
       const tab = await platform.tabs.getActiveTab();
       if (!tab) throw new Error('This page cannot be saved (only http and https pages can).');
-      const added = await saveToInbox(db, [{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
+      const approved = await guard([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
+      if (!approved) return 'Not added: the link is already in your library.';
+      const added = await saveToInbox(db, approved);
       return added > 0 ? 'Added to Inbox.' : 'Already in Inbox.';
     });
 

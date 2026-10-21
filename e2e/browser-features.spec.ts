@@ -705,6 +705,50 @@ test('Inbox page: the AI proposes a tag, hashtags and a collection; new ones are
   await lib.close();
 });
 
+test('duplicate guard: a link that is already saved is confirmed before it is added again', async () => {
+  const p = await openLibraryWithSpace('Dupes');
+  p.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(p, 'First', ['https://example.test/dupe']);
+  await addCollectionWithLinks(p, 'Second', []);
+  await addCollectionWithLinks(p, 'Third', []);
+  const second = p.locator('section[aria-label="Second"]');
+  const dialog = p.locator('dialog[open]');
+
+  // By hand: cancelling adds nothing, confirming creates the duplicate on purpose.
+  await second.getByRole('button', { name: 'Add link' }).click();
+  const form = p.locator('form[aria-label="Add link"]');
+  await form.getByLabel('Address').fill('https://example.test/dupe#part');
+  await form.getByRole('button', { name: 'Add link', exact: true }).click();
+  await expect(dialog).toContainText('already saved');
+  await expect(dialog).toContainText('Dupes / First');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(second.locator('[data-card-id]')).toHaveCount(0);
+  await form.getByRole('button', { name: 'Add link', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Add duplicate' }).click();
+  await expect(second.locator('[data-card-id]')).toHaveCount(1);
+
+  // Dropped links: two arrive, one of them is already saved, so only the new one is added.
+  const third = p.locator('section[aria-label="Third"]');
+  const dt = await p.evaluateHandle(() => {
+    const d = new DataTransfer();
+    d.setData(
+      'application/x-tabarium-links',
+      JSON.stringify([
+        { title: 'Old one', url: 'https://example.test/dupe', favIconUrl: null },
+        { title: 'Brand new', url: 'https://example.test/brand-new', favIconUrl: null },
+      ]),
+    );
+    return d;
+  });
+  await third.dispatchEvent('dragover', { dataTransfer: dt });
+  await third.dispatchEvent('drop', { dataTransfer: dt });
+  await expect(dialog).toContainText('1 of 2 links are already saved');
+  await dialog.getByRole('button', { name: 'Add only the 1 new' }).click();
+  await expect(third.locator('[data-card-id]')).toHaveCount(1);
+  await expect(third.locator('a[href="https://example.test/brand-new"]')).toBeVisible();
+  await p.close();
+});
+
 test('links dragged from the side panel can be dropped into a collection', async () => {
   const lib = await openLibraryWithSpace('Dropping');
   await addCollectionWithLinks(lib, 'Target', []);

@@ -5,6 +5,7 @@ import { setQuickTarget } from '../../core/quicksave';
 import type { Card, Collection, Space } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { hostOf } from '../CardRow';
+import { useDuplicateGuard } from '../DuplicateGuard';
 import { linkDragProps } from '../dnd';
 import { inputClass } from '../Dialog';
 import { type Destination, DestinationPicker } from './DestinationPicker';
@@ -22,6 +23,7 @@ interface Props {
 /** "Saving this tab" card plus a space/collection picker: choosing a collection saves the tab there. */
 export function SaveTabView({ spaces, collections, cardsByCollection, autoClose, onAutoClose, onStatus }: Props) {
   const platform = usePlatform();
+  const guard = useDuplicateGuard();
   const { tab, hasAccess: hasTabsAccess, error: tabError, allow } = useActiveTab();
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,7 +47,12 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
     try {
       const collectionId =
         dest.kind === 'collection' ? dest.collectionId : (await repo.createCollection(dest.spaceId, dest.title)).id;
-      const added = await repo.addCards(collectionId, [{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
+      const approved = await guard([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
+      if (!approved) {
+        onStatus({ tone: 'ok', text: 'Not saved: the link is already in your library.' });
+        return;
+      }
+      const added = await repo.addCards(collectionId, approved);
       await setQuickTarget(db, collectionId);
       if (autoClose && added.length > 0) await platform.tabs.closeTabs([tab.id]);
       onStatus({ tone: 'ok', text: added.length > 0 ? `Saved to ${dest.label}.` : `Already in ${dest.label}.` });

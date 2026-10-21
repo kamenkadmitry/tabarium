@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { repo } from '../core/instance';
 import type { CardDetails } from '../core/ai/tasks';
 import type { Card, Collection } from '../core/types';
+import type { DuplicateGuard } from './DuplicateGuard';
 import type { LabelsApi } from './labels';
 import { LinkEditor } from './LinkEditor';
 import { cardPatch, type LinkValues } from './linkInput';
@@ -15,6 +16,8 @@ interface Open {
 interface Deps {
   reportError: (what: string, e: unknown) => void;
   clearError: () => void;
+  /** Asks before a link that is already in the library is added again. */
+  guard: DuplicateGuard;
 }
 
 const BLANK: LinkValues = { title: '', url: '', note: '', tagIds: [], hashtagIds: [] };
@@ -23,7 +26,7 @@ const BLANK: LinkValues = { title: '', url: '', note: '', tagIds: [], hashtagIds
  * The editor that opens under a link (or at the end of a collection) on the board. Only one is open at a time;
  * opening another one while something is typed asks before it is thrown away.
  */
-export function useInlineEditor({ reportError, clearError }: Deps) {
+export function useInlineEditor({ reportError, clearError, guard }: Deps) {
   const [open, setOpen] = useState<Open | null>(null);
   const dirty = useRef(false);
   const setDirty = useCallback((value: boolean) => {
@@ -56,9 +59,12 @@ export function useInlineEditor({ reportError, clearError }: Deps) {
   const saveNew = async (collectionId: string, values: LinkValues): Promise<boolean> => {
     try {
       clearError();
+      const title = values.title.trim() || new URL(values.url).hostname;
+      // Cancelling leaves the editor open: nothing is added and what was typed is kept.
+      if (!(await guard([{ url: values.url, title }]))) return false;
       const added = await repo.addCards(collectionId, [
         {
-          title: values.title.trim() || new URL(values.url).hostname,
+          title,
           url: values.url,
           note: values.note.trim() === '' ? null : values.note,
           tagIds: values.tagIds,

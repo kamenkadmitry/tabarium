@@ -4,6 +4,7 @@ import { createChromePlatform } from '../../platform/chrome';
 import { PlatformProvider } from '../../platform/context';
 import { createDemoPlatform } from '../../platform/demo';
 import { App } from '../../ui/App';
+import { DuplicateGuardProvider } from '../../ui/DuplicateGuard';
 import { seedDemo } from '../../ui/seed';
 import '../../ui/styles.css';
 
@@ -16,7 +17,9 @@ async function start(container: HTMLElement): Promise<void> {
   if (demo) await seedDemo(db);
   createRoot(container).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
-      <App />
+      <DuplicateGuardProvider>
+        <App />
+      </DuplicateGuardProvider>
     </PlatformProvider>,
   );
 }

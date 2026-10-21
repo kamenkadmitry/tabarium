@@ -6,6 +6,7 @@ import type { Settings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import { withProviderAccess } from './ai';
+import type { DuplicateGuard } from './DuplicateGuard';
 import { useOpenTabs } from './useOpenTabs';
 
 export type Runner = (what: string, action: () => Promise<void>) => Promise<void>;
@@ -20,13 +21,14 @@ interface Args {
   /** Space shown in the library; receives collections created from window actions. */
   spaceId: string | undefined;
   run: Runner;
+  guard: DuplicateGuard;
 }
 
 const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
 const stamp = () => new Date().toLocaleDateString();
 
 /** State and actions behind the Open tabs panel: selection, adding tabs to collections, window actions. */
-export function useOpenTabsController({ enabled, settings, spaceId, run }: Args) {
+export function useOpenTabsController({ enabled, settings, spaceId, run, guard }: Args) {
   const platform = usePlatform();
   const tabs = useOpenTabs(enabled);
   const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
@@ -47,8 +49,12 @@ export function useOpenTabsController({ enabled, settings, spaceId, run }: Args)
   /** Adds the given open tabs to a collection (existing or new) and, if enabled, closes them. */
   const addTabs = (tabIds: readonly number[], target: TabTarget) =>
     run('Adding tabs', async () => {
-      const chosen = tabIds.flatMap((id) => byId.get(id) ?? []);
-      if (chosen.length === 0) throw new Error('Those tabs are no longer open.');
+      const wanted = tabIds.flatMap((id) => byId.get(id) ?? []);
+      if (wanted.length === 0) throw new Error('Those tabs are no longer open.');
+      // Links already in the library are confirmed first; cancelling adds nothing (and creates no collection).
+      const chosen = await guard(wanted);
+      if (!chosen) return;
+      if (chosen.length === 0) return;
       if (target.kind === 'collection') {
         await repo.addCardsBefore(target.collectionId, chosen.map(toCard), target.before);
       } else {
@@ -102,18 +108,21 @@ export function useOpenTabsController({ enabled, settings, spaceId, run }: Args)
             await loadLibraryContext(db, target),
           ),
         );
+        const approved = await guard(w.tabs);
+        if (!approved) return;
+        const keep = new Set(approved.map((t) => t.id));
         await applyGroups(
           db,
           repo,
           target,
           groups.map((g) => ({
             title: g.title,
-            cards: g.indexes.map((i) => toCard(w.tabs[i] as OpenTab)),
+            cards: g.indexes.flatMap((i) => (keep.has((w.tabs[i] as OpenTab).id) ? [toCard(w.tabs[i] as OpenTab)] : [])),
             tags: g.tags,
             hashtags: g.hashtags,
           })),
         );
-        if (settings.autoCloseTabs) await platform.tabs.closeTabs(w.tabs.map((t) => t.id));
+        if (settings.autoCloseTabs) await platform.tabs.closeTabs(approved.map((t) => t.id));
       }),
   };
 }

@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
+import { dayKey } from './activity';
+import type { Activity, Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
 
 export interface SettingRow {
   key: string;
@@ -12,6 +13,7 @@ export class TabariumDB extends Dexie {
   cards!: EntityTable<Card, 'id'>;
   tags!: EntityTable<Tag, 'id'>;
   hashtags!: EntityTable<Hashtag, 'id'>;
+  activity!: EntityTable<Activity, 'id'>;
   nexts!: EntityTable<NextItem, 'id'>;
   settings!: EntityTable<SettingRow, 'key'>;
 
@@ -53,5 +55,17 @@ export class TabariumDB extends Dexie {
             space.icon ??= null;
           }),
       );
+    // v5: daily counters for the dashboard. The history starts from the links that exist now.
+    this.version(5)
+      .stores({ activity: 'id, day, type' })
+      .upgrade(async (tx) => {
+        const perDay = new Map<string, number>();
+        await tx.table('cards').each((card: { createdAt: number }) => {
+          const day = dayKey(card.createdAt);
+          perDay.set(day, (perDay.get(day) ?? 0) + 1);
+        });
+        const rows: Activity[] = [...perDay].map(([day, count]) => ({ id: `${day}|added`, day, type: 'added', count }));
+        if (rows.length > 0) await tx.table('activity').bulkAdd(rows);
+      });
   }
 }

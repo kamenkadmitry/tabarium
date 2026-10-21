@@ -4,6 +4,7 @@ import { loadSettings } from '../core/settings';
 import { createChromePlatform } from '../platform/chrome';
 import { PlatformProvider } from '../platform/context';
 import { createDemoPlatform } from '../platform/demo';
+import { DuplicateGuardProvider } from './DuplicateGuard';
 import { QuickSave } from './QuickSave';
 import { seedDemo } from './seed';
 import './styles.css';
@@ -18,7 +19,9 @@ export async function mountQuickSave(surface: 'popup' | 'sidepanel'): Promise<vo
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
   createRoot(root).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
-      <QuickSave surface={surface} />
+      <DuplicateGuardProvider>
+        <QuickSave surface={surface} />
+      </DuplicateGuardProvider>
     </PlatformProvider>,
   );
 }

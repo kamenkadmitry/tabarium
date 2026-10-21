@@ -65,6 +65,19 @@ export const HashtagSchema = z.object({
   createdAt: timestamp,
 });
 
+/** Things the dashboard counts over time. */
+export const ACTIVITY_TYPES = ['added', 'deleted', 'duplicates-removed', 'duplicates-skipped', 'duplicates-created'] as const;
+
+/** How many times something happened on one local day. The history is kept as these daily counters. */
+export const ActivitySchema = z.object({
+  /** `${day}|${type}` */
+  id: z.string().min(1),
+  /** Local calendar day, YYYY-MM-DD. */
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  type: z.enum(ACTIVITY_TYPES),
+  count: z.number().int().positive(),
+});
+
 export const NextItemSchema = z.object({
   id,
   cardId: id,
@@ -77,4 +90,6 @@ export type Collection = z.infer<typeof CollectionSchema>;
 export type Card = z.infer<typeof CardSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type Hashtag = z.infer<typeof HashtagSchema>;
+export type Activity = z.infer<typeof ActivitySchema>;
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export type NextItem = z.infer<typeof NextItemSchema>;

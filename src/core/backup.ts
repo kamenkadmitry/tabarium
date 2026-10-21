@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { TabariumDB } from './db';
 import {
+  ActivitySchema,
   CardSchema,
   CollectionSchema,
   HashtagSchema,
@@ -19,18 +20,20 @@ export const BackupSchema = z.object({
   cards: z.array(CardSchema),
   tags: z.array(TagSchema),
   hashtags: z.array(HashtagSchema).default([]),
+  activity: z.array(ActivitySchema).default([]),
   nexts: z.array(NextItemSchema),
 });
 
 export type Backup = z.infer<typeof BackupSchema>;
 
 export async function exportBackup(db: TabariumDB): Promise<Backup> {
-  const [spaces, collections, cards, tags, hashtags, nexts] = await Promise.all([
+  const [spaces, collections, cards, tags, hashtags, activity, nexts] = await Promise.all([
     db.spaces.toArray(),
     db.collections.toArray(),
     db.cards.toArray(),
     db.tags.toArray(),
     db.hashtags.toArray(),
+    db.activity.toArray(),
     db.nexts.toArray(),
   ]);
   return {
@@ -42,6 +45,7 @@ export async function exportBackup(db: TabariumDB): Promise<Backup> {
     cards,
     tags,
     hashtags,
+    activity,
     nexts,
   };
 }
@@ -84,13 +88,14 @@ function assertReferentialIntegrity(b: Backup): void {
 
 /** Replaces ALL data with the backup contents in a single transaction (all-or-nothing). */
 export async function restoreBackup(db: TabariumDB, backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.spaces, db.collections, db.cards, db.tags, db.hashtags, db.nexts], async () => {
+  await db.transaction('rw', [db.spaces, db.collections, db.cards, db.tags, db.hashtags, db.activity, db.nexts], async () => {
     await Promise.all([
       db.spaces.clear(),
       db.collections.clear(),
       db.cards.clear(),
       db.tags.clear(),
       db.hashtags.clear(),
+      db.activity.clear(),
       db.nexts.clear(),
     ]);
     await db.spaces.bulkAdd(backup.spaces);
@@ -98,6 +103,7 @@ export async function restoreBackup(db: TabariumDB, backup: Backup): Promise<voi
     await db.cards.bulkAdd(backup.cards);
     await db.tags.bulkAdd(backup.tags);
     await db.hashtags.bulkAdd(backup.hashtags);
+    await db.activity.bulkAdd(backup.activity);
     await db.nexts.bulkAdd(backup.nexts);
   });
 }

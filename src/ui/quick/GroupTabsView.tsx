@@ -9,6 +9,7 @@ import type { Card, Collection, Space } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { type OpenTab, TAB_GROUP_COLORS } from '../../platform/ports';
 import { PageFavicon } from '../CardRow';
+import { useDuplicateGuard } from '../DuplicateGuard';
 import { GROUP_COLORS } from '../openTabsModel';
 import { TabsByWindow } from '../TabsByWindow';
 import { useOpenTabs } from '../useOpenTabs';
@@ -41,6 +42,7 @@ const colorOf = (index: number) => GROUP_COLORS[TAB_GROUP_COLORS[index % TAB_GRO
  */
 export function GroupTabsView({ spaces, collections, cardsByCollection, settings, onStatus }: Props) {
   const platform = usePlatform();
+  const guard = useDuplicateGuard();
   const { access, groupsAccess, windows, error, grant, grantGroups } = useOpenTabs(true);
   // Nothing is selected until the user picks tabs (or ticks "Select all").
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
@@ -65,11 +67,17 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
   const saveTogether = async (dest: Destination) => {
     setBusy(true);
     try {
+      const approved = await guard(chosen);
+      if (!approved || approved.length === 0) {
+        onStatus({ tone: 'ok', text: 'Nothing was saved.' });
+        setMode('idle');
+        return;
+      }
       const id = dest.kind === 'collection' ? dest.collectionId : (await repo.createCollection(dest.spaceId, dest.title)).id;
-      const added = await repo.addCards(id, chosen.map(toCard));
+      const added = await repo.addCards(id, approved.map(toCard));
       await setQuickTarget(db, id);
-      if (settings.autoCloseTabs) await platform.tabs.closeTabs(chosen.map((t) => t.id));
-      onStatus({ tone: 'ok', text: `Saved ${added.length} of ${chosen.length} tabs to ${dest.label}.` });
+      if (settings.autoCloseTabs) await platform.tabs.closeTabs(approved.map((t) => t.id));
+      onStatus({ tone: 'ok', text: `Saved ${added.length} of ${approved.length} tabs to ${dest.label}.` });
       setMode('idle');
     } catch (e) {
       fail('Saving the tabs', e);
@@ -128,11 +136,17 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
     setBusy(true);
     try {
       if (dest.kind !== 'new') throw new Error('Pick a space for the new collections.');
+      const approved = await guard(included.flatMap((g) => g.tabs));
+      if (!approved || approved.length === 0) {
+        onStatus({ tone: 'ok', text: 'Nothing was saved.' });
+        return;
+      }
+      const keep = new Set(approved.map((t) => t.id));
       await applyGroups(
         db,
         repo,
         dest.spaceId,
-        included.map((g) => ({ title: g.title.trim(), cards: g.tabs.map(toCard) })),
+        included.map((g) => ({ title: g.title.trim(), cards: g.tabs.filter((t) => keep.has(t.id)).map(toCard) })),
       );
       if (settings.autoCloseTabs) await platform.tabs.closeTabs(included.flatMap((g) => g.tabs.map((t) => t.id)));
       onStatus({ tone: 'ok', text: `Saved ${included.length} groups as collections in ${dest.label}.` });

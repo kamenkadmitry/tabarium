@@ -7,6 +7,7 @@ import type { Platform } from '../platform/ports';
 import { withProviderAccess } from './ai';
 import type { CardRowActions } from './CardRow';
 import type { ProposedDetails } from './dialogs/AiDetailsDialog';
+import type { DuplicateGuard } from './DuplicateGuard';
 import { proposeDetails } from './suggestDetails';
 import type { CollectionActions } from './CollectionCard';
 import type { Runner, TabTarget } from './useOpenTabsController';
@@ -27,6 +28,7 @@ interface Deps {
   /** Opens the "add link" editor at the end of the collection. */
   openAddLink: (collectionId: string) => void;
   addTabs: (tabIds: readonly number[], target: TabTarget) => Promise<void>;
+  guard: DuplicateGuard;
 }
 
 /** Builds the per-collection action set used by every board layout. */
@@ -90,8 +92,8 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
     dropTabs: (tabIds, before) => void deps.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),
     dropLinks: (raw, before) =>
       void deps.run('Adding the dropped links', async () => {
-        const links = parseDraggedLinks(raw);
-        await repo.addCardsBefore(col.id, links, before);
+        const links = await deps.guard(parseDraggedLinks(raw));
+        if (links && links.length > 0) await repo.addCardsBefore(col.id, links, before);
       }),
     dropCollection: (id) => void deps.run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
   });
