@@ -50,8 +50,9 @@ src/entrypoints  newtab (library), popup, sidepanel, background
 src/ui           React 19 + Tailwind v4 components; tokens in styles.css
   App.tsx          wires the library; Sidebar, SpaceBoard, CollectionCard, CardRow, OpenTabsPanel
   quick/           side panel and popup views
-  dialogs/         modal dialogs (to be replaced by the inline editor, see issue 20)
-  LabelPicker.tsx, labels.tsx, LabelPages.tsx   tags and hashtags
+  dialogs/         modal dialogs; link editing uses LinkEditor (inline under the row on the board, in a dialog elsewhere)
+  LinkEditor.tsx, useInlineEditor.tsx   the editor under a link and where it opens
+  LabelChips.tsx, labels.tsx, LabelPages.tsx   "+" chips, one-line labels on rows, Tags and Hashtags pages
 tests            Vitest unit tests (fake-indexeddb)
 e2e              Playwright tests against the built extension
 scripts/live     helpers for driving a live Chrome over CDP (manual checks, not CI)
@@ -111,8 +112,8 @@ Mock-ups are static; the real UI must follow them in structure, not pixel for pi
 
 ## Roadmap
 
-GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, `Later`. Next up, in this order: inline editor under the link (issue 20), tags and hashtags at scale (21), undo for deletes (1), bulk actions (2), interface languages Russian, Polish and Belarusian (3), quick search (4).
+GitHub Issues, milestones `v0.2 - safety and speed`, `v0.3 - reach and polish`, `Later`. Done: inline editor (20), tags and hashtags at scale (21). Next up, in this order: undo for deletes (1), bulk actions (2), interface languages Russian, Polish and Belarusian (3), quick search (4), first-run welcome (6).
 
 ## Status of verification
 
-Everything above the roadmap is implemented and green in CI. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.
+Everything above the roadmap is implemented and green in CI (90 unit tests, 20 e2e). The inline editor, one-line labels, Tags and Hashtags pages and the hashtag filter are verified by CI only; the owner has not opened them in Chrome yet. The owner confirmed in a real Chrome: panel resize, Next, Group Tabs, Import from file, profile badge and avatar, tags and hashtags pages, label pickers, AI organising, and that a Tabarium export imports into the real Toby.

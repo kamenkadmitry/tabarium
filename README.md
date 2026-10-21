@@ -12,17 +12,19 @@ Local-first tab and session manager for Chromium browsers. Save your open tabs i
 | Area | What you can do |
 | --- | --- |
 | Library | Spaces → collections → tabs; create, rename, recolour, delete; add links by hand |
-| Open tabs panel | A panel beside the library lists every browser window and its tabs, live. Drag tabs (or a selection) into a collection, between cards, onto a space, or onto empty space for a new collection; merge windows; close tabs after adding |
+| Open tabs panel | A panel beside the library (resizable by its left edge) lists every browser window and its tabs, live. Drag tabs (or a selection) into a collection, between cards, onto a space, or onto empty space for a new collection; merge windows; close tabs after adding |
 | Saving | Save session (all tabs of a window, keep or close them), right-click menu, and the toolbar button opens a side panel (switchable to a classic popup) with Save tab (spaces → collections, follows the tab you are on), Group tabs (one collection or AI-organised) and Next |
 | Board | Space heading with collection and tab counts; sort (custom, name, age, size), filter by colour or tag, four layouts (Card, Compact, List, Grid, remembered per space), expand or collapse all collections |
-| Organising | Drag and drop tabs and collections (also between spaces), move via dialog, tags with colours, filter by tag |
-| Notes and stars | Edit a tab's title, address and note; star tabs; Starred view |
+| Organising | Drag and drop tabs and collections (also between spaces), move via dialog, coloured tags (on collections and links), #hashtags on links, filter by colour, tag or hashtag |
+| Notes and stars | Edit a tab's title, address, note, tags and hashtags in an editor that opens under the link (Ctrl+Enter saves, Esc cancels, E opens it); star tabs; Starred view |
 | Next | A queue of tabs to look at: reorder, mark done |
 | Finding things | Search across all spaces including notes; Duplicates view |
 | Restoring | Open all, open as a browser tab group, or replace the current window's tabs |
 | Data | JSON backup/restore, Netscape bookmarks HTML export and import, plain-text export |
 | Toby files | Import Toby exports (.json v4 and older, .txt, .html) with notes, custom titles and tags; export a Toby-compatible .json |
 | AI (optional) | Suggest a collection name, group a session's tabs into collections, connection test; your provider and key |
+| Tags and hashtags | Own pages with search, sort, usage counts, merge and delete-unused; "+" chips with suggestions when editing a link |
+| Profile | Name and avatar in the sidebar with a "Local" badge |
 | Appearance | Light, dark or system theme |
 
 ## Install (from source)

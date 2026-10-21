@@ -187,6 +187,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
       onDrop={onDrop}
       className={`flex break-inside-avoid flex-col rounded-2xl border bg-surface ${collectionOver ? 'border-primary' : 'border-line'}`}
     >
+      <div aria-hidden className="h-1 shrink-0 rounded-t-2xl" style={{ background: collection.color ?? 'var(--border)' }} />
       <header className="relative flex items-center gap-2 border-b border-line px-3 py-3">
         <button
           type="button"
@@ -206,7 +207,6 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
             <GripVertical size={16} aria-hidden />
           </span>
         )}
-        <span aria-hidden className="h-5 w-1.5 shrink-0 rounded-full" style={{ background: collection.color ?? 'var(--border)' }} />
         <h2 className={`min-w-0 truncate text-base font-bold ${view === 'list' ? '' : 'flex-1'}`}>{collection.title}</h2>
         {view === 'list' && <TagChips tags={tags} className="min-w-0 flex-1" />}
         <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">{cards.length}</span>
@@ -261,7 +261,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
           {editor.adding ? (
             editor.render(null)
           ) : (
-            <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
+            <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-line text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
               <Plus size={15} aria-hidden /> Add link
             </button>
           )}
