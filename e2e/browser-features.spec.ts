@@ -63,7 +63,7 @@ test('open all as a tab group, then replace the window tabs', async () => {
   await p.getByRole('button', { name: 'Settings' }).click();
   await p.getByRole('switch', { name: 'Open collections as tab groups' }).click();
   await expect(p.getByRole('status')).toContainText('tab groups');
-  await p.getByRole('button', { name: 'B Browse', exact: true }).click();
+  await p.getByRole('button', { name: 'Browse', exact: true }).click();
 
   await p.locator('section[aria-label="Docs"]').getByRole('button', { name: 'Open all tabs' }).click();
   const diagnostics = async () =>
@@ -159,7 +159,7 @@ test('open tabs panel: width is adjustable by dragging its edge and is remembere
   const saved = await width();
   await expect.poll(() => handle.getAttribute('aria-valuenow')).toBe(String(saved));
   await p.reload();
-  await p.getByRole('button', { name: /^R\s*Resize/ }).first().click();
+  await p.getByRole('button', { name: 'Resize', exact: true }).first().click();
   await expect.poll(async () => Math.round((await p.getByRole('complementary', { name: 'Open tabs' }).boundingBox())?.width ?? 0)).toBe(saved);
   await p.close();
 });
@@ -195,7 +195,7 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await expect(p.getByLabel('Name of hashtag machine-learning')).toBeVisible();
 
   // Add a link: pick the existing tag and hashtag, and create a new hashtag right there, all with the "+" chips.
-  await p.getByRole('button', { name: /^L\s*Labels/ }).first().click();
+  await p.getByRole('button', { name: 'Labels', exact: true }).first().click();
   await p.locator('section[aria-label="Reading"]').getByRole('button', { name: 'Add link' }).click();
   const form = p.locator('form[aria-label="Add link"]');
   await form.getByLabel('Address').fill('https://example.test/labelled');
@@ -312,7 +312,7 @@ test('board toolbar: view, sort, colour filter and collapse all', async () => {
   // The button label comes from the stored setting, so once it reads "List" the choice is saved.
   await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
   await p.reload();
-  await p.getByRole('button', { name: /^B\s*Board(?![a-z])/ }).first().click(); // a reload shows the first space again
+  await p.getByRole('button', { name: 'Board', exact: true }).first().click(); // a reload shows the first space again
   await expect(p.getByRole('button', { name: 'Change view' })).toContainText('List');
 
   await p.getByRole('button', { name: 'Sort collections' }).click();
@@ -422,7 +422,7 @@ test('right-click menu: items are registered and saving goes to the Inbox', asyn
   }, web('menu-page'));
 
   await p.reload();
-  await p.getByRole('button', { name: 'I Inbox', exact: true }).click();
+  await p.getByRole('button', { name: 'Inbox', exact: true }).click();
   const saved = p.locator('section[aria-label="Saved tabs"]');
   await expect(saved.getByText('Saved from menu')).toBeVisible();
   await expect(saved.getByText('A link')).toBeVisible();
@@ -451,12 +451,12 @@ test('popup: Group tabs saves the window into a collection picked space by space
   await expect(popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ })).toBeDisabled();
   await popup.getByLabel('Select all').check();
   await popup.getByRole('button', { name: /^Save \d+ tabs? to a collection$/ }).click();
-  await popup.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).click(); // space row
+  await popup.getByRole('button', { name: 'Quick', exact: true }).click(); // space row
   await popup.getByRole('button', { name: 'Quick target', exact: true }).click(); // collection row (not its expander)
   await expect(popup.getByRole('status')).toContainText('to Quick / Quick target');
 
   await lib.reload();
-  await lib.getByRole('button', { name: /^Q\s*Quick(?![a-z])/ }).first().click(); // show the space the popup saved into
+  await lib.getByRole('button', { name: 'Quick', exact: true }).first().click(); // show the space the popup saved into
   const target = lib.locator('section[aria-label="Quick target"]');
   await expect(target.getByText('Page popup-a')).toBeVisible();
   await expect(target.getByText('Page popup-b')).toBeVisible();
@@ -497,7 +497,7 @@ test('AI: suggest details in the editor and fill a whole collection', async () =
   await p.getByLabel('Model').fill('test-model');
   await p.getByLabel('API key').fill('sk-e2e');
   await p.getByRole('button', { name: 'Save AI settings' }).click();
-  await p.getByRole('button', { name: /^F\s*Fill/ }).first().click();
+  await p.getByRole('button', { name: 'Fill', exact: true }).first().click();
 
   await addCollectionWithLinks(p, 'Fillme', ['https://example.test/fill-a', 'https://example.test/fill-b']);
   const section = p.locator('section[aria-label="Fillme"]');
@@ -543,7 +543,7 @@ test('side panel Inbox: a link leaves the list when it is moved or removed', asy
 
   // Move one into a collection: it leaves the Inbox list.
   await panel.getByRole('button', { name: 'Move Inbox item 1 out of Inbox' }).click();
-  await panel.getByRole('button', { name: /^S\s*Sorting(?![a-z])/ }).click();
+  await panel.getByRole('button', { name: 'Sorting', exact: true }).click();
   await panel.getByRole('button', { name: 'Sorted', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Moved to Sorting / Sorted');
   await expect(list.getByRole('listitem')).toHaveCount(1);
@@ -554,7 +554,7 @@ test('side panel Inbox: a link leaves the list when it is moved or removed', asy
   await expect(panel.getByText('Inbox is empty')).toBeVisible();
 
   await lib.reload();
-  await lib.getByRole('button', { name: /^S\s*Sorting(?![a-z])/ }).first().click();
+  await lib.getByRole('button', { name: 'Sorting', exact: true }).first().click();
   await expect(lib.locator('section[aria-label="Sorted"]').getByText('Inbox item 1')).toBeVisible();
   await panel.close();
   await lib.close();

@@ -107,7 +107,9 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
             type="checkbox"
             checked={selected}
             aria-label={`Select ${title}`}
-            onChange={(e) => onSelect('shiftKey' in e.nativeEvent && e.nativeEvent.shiftKey === true)}
+            // The click carries the Shift key; the change event does not, so the click does the work.
+            onClick={(e) => onSelect(e.shiftKey)}
+            onChange={() => undefined}
             className="size-4 cursor-pointer accent-[var(--primary)]"
           />
         </label>
