@@ -802,7 +802,6 @@ test('bookmarks: browser bookmarks are listed, copied into a collection and remo
 
   await p.getByRole('button', { name: /^Copy \d+ new links?$/ }).click();
   await expect(p.getByRole('status')).toContainText(/Imported \d+ links? into/);
-  await list.getByRole('button', { name: /^E2E folder/ }).click().catch(() => undefined);
   const folderButton = list.getByRole('button', { name: /^E2E folder/ });
   if ((await folderButton.getAttribute('aria-expanded')) !== 'true') await folderButton.click();
   await expect(list.getByText('In Tabarium').first()).toBeVisible();
@@ -815,7 +814,7 @@ test('bookmarks: browser bookmarks are listed, copied into a collection and remo
 
   // The links are in the library now, in the space for browser bookmarks.
   await p.getByRole('button', { name: /^Browser bookmarks\b/ }).click();
-  await expect(p.locator('section[aria-label="Bookmarks from the browser"] [data-card-id]', { hasText: 'First mark' })).toBeVisible();
+  await expect(p.locator('section[aria-label="Bookmarks from the browser"] [data-card-id]', { hasText: 'Second mark' })).toBeVisible(); // the first one went to the Inbox by hand
   await p.close();
 });
 
