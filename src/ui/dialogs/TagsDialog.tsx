@@ -43,9 +43,7 @@ export function TagsDialog({ tags, collection, onCreate, onDelete, onAssign, onC
             <button
               type="button"
               aria-label={`Delete tag ${t.title}`}
-              onClick={() => {
-                if (confirm(`Delete the tag “${t.title}”? It will be removed from all collections.`)) void onDelete(t.id);
-              }}
+              onClick={() => void onDelete(t.id)}
               className="grid size-8 place-items-center rounded-md text-muted hover:text-danger"
             >
               <Trash2 size={15} aria-hidden />

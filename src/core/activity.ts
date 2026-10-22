@@ -17,3 +17,13 @@ export async function bumpActivity(db: TabariumDB, type: ActivityType, count: nu
   const row = await db.activity.get(id);
   await db.activity.put({ id, day, type, count: (row?.count ?? 0) + count });
 }
+
+/** Takes back today's counter of a kind of event (an undone delete). The row is removed when nothing is left. */
+export async function unbumpActivity(db: TabariumDB, type: ActivityType, count: number, at: number = Date.now()): Promise<void> {
+  if (count <= 0) return;
+  const id = `${dayKey(at)}|${type}`;
+  const row = await db.activity.get(id);
+  if (!row) return;
+  if (row.count <= count) await db.activity.delete(id);
+  else await db.activity.put({ ...row, count: row.count - count });
+}

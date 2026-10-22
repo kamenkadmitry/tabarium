@@ -10,6 +10,8 @@ import { useDuplicateGuard } from '../DuplicateGuard';
 import { linkDragProps } from '../dnd';
 import type { LabelsApi } from '../labels';
 import { LinkEditor } from '../LinkEditor';
+import type { Deletion } from '../../core/undo';
+import { UndoToast } from '../UndoToast';
 import { cardPatch } from '../linkInput';
 import { useActiveTab } from './useActiveTab';
 import { type Destination, DestinationPicker } from './DestinationPicker';
@@ -37,6 +39,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<Card | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [undo, setUndo] = useState<Deletion | null>(null);
 
   const run = async (what: string, action: () => Promise<string>) => {
     setBusy(true);
@@ -70,7 +73,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
       const already = (cardsByCollection.get(targetId) ?? []).some((c) => normalizeUrl(c.url) === key);
       if (already) {
         // The link is already there: only take it out of the Inbox instead of creating a second copy.
-        await repo.deleteCard(card.id, 'duplicate');
+        setUndo(await repo.deleteCard(card.id, 'duplicate'));
         setMoving(null);
         return `Already in ${dest.label}. Removed from Inbox.`;
       }
@@ -80,9 +83,8 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
     });
 
   const remove = (card: Card) => {
-    if (!confirm(`Remove “${card.customTitle ?? card.title}” from Inbox? The link is deleted from the library.`)) return;
     void run('Removing the link', async () => {
-      await repo.deleteCard(card.id);
+      setUndo(await repo.deleteCard(card.id));
       return 'Removed from Inbox.';
     });
   };
@@ -180,6 +182,17 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
           {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">Inbox is empty. Tabs you add here wait until you sort them into a collection.</li>}
         </ul>
       )}
+      <UndoToast
+        deletion={undo}
+        onUndo={(deletion) =>
+          void run('Restoring', async () => {
+            setUndo(null);
+            await repo.restoreDeletion(deletion);
+            return 'Restored.';
+          })
+        }
+        onDismiss={() => setUndo(null)}
+      />
     </div>
   );
 }

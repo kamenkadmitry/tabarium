@@ -55,7 +55,6 @@ test('settings: export produces a valid backup that restores after deletion', as
   await download.saveAs(file);
 
   await page.getByRole('button', { name: 'Work', exact: true }).click();
-  page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Collection menu' }).click();
   await page.getByRole('menuitem', { name: 'Delete collection' }).click();
   await expect(page.getByRole('heading', { name: 'Reading' })).toHaveCount(0);
@@ -63,7 +62,7 @@ test('settings: export produces a valid backup that restores after deletion', as
   await page.getByRole('button', { name: 'Settings' }).click();
   page.once('dialog', (d) => void d.accept());
   await page.getByLabel('Backup file').setInputFiles(file);
-  await expect(page.getByRole('status')).toContainText('Restored');
+  await expect(page.getByRole('status').filter({ hasText: 'Restored' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Work', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Reading' })).toBeVisible();

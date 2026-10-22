@@ -573,7 +573,6 @@ test('side panel Inbox: a link leaves the list when it is moved or removed', asy
   await expect(list).toContainText('Inbox item 2');
 
   // Remove the other one: it is gone from the list as well.
-  panel.once('dialog', (d) => void d.accept());
   await panel.getByRole('button', { name: 'Remove Inbox item 2 from Inbox' }).click();
   await expect(list).not.toContainText('Inbox item 2');
 
@@ -614,7 +613,6 @@ test('Inbox is a system space shared by the library and the side panel', async (
   await expect(lib.locator('main').getByText('Renamed in the panel')).toBeVisible();
 
   // Moving it to the Inbox space from elsewhere and removing it in the library empties the panel list too.
-  lib.once('dialog', (d) => void d.accept());
   const row = lib.locator('[data-card-id]', { hasText: 'Renamed in the panel' });
   await row.getByRole('button', { name: 'Delete tab' }).focus();
   await lib.keyboard.press('Enter');
@@ -923,10 +921,31 @@ test('bulk actions: tick links, range-select with Shift, move, star and delete t
   await bar.getByRole('button', { name: 'Star', exact: true }).click();
   await expect(second.getByLabel('Starred')).toHaveCount(2);
   await second.getByRole('checkbox', { name: 'Select all links in Second' }).click();
-  p.once('dialog', (d) => void d.accept());
   await bar.getByRole('button', { name: 'Delete' }).click();
   await expect(second.locator('[data-card-id]')).toHaveCount(0);
   await expect(first.locator('[data-card-id]')).toHaveCount(2);
+  await p.close();
+});
+
+test('deleting a link offers Undo that puts it back where it was', async () => {
+  const p = await openLibraryWithSpace('Undoable');
+  p.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(p, 'Pile', [web('first'), web('second'), web('third')]);
+
+  const section = p.locator('section[aria-label="Pile"]');
+  const secondRow = section.locator('[data-card-id]').filter({ has: p.locator(`a[href="${web('second')}"]`) });
+  await secondRow.getByRole('button', { name: 'Delete tab' }).focus();
+  await p.keyboard.press('Enter');
+  await expect(section.locator('[data-card-id]')).toHaveCount(2);
+
+  const toast = p.getByRole('status').filter({ hasText: 'Link deleted.' });
+  await expect(toast).toBeVisible();
+  // The toast lives in the top layer so it stays usable above modal dialogs — visibility alone doesn't prove that.
+  await expect(p.locator('[popover]:popover-open')).toHaveCount(1);
+  await toast.getByRole('button', { name: 'Undo' }).click();
+
+  await expect(section.locator('[data-card-id]')).toHaveCount(3);
+  await expect(section.locator('[data-card-id]').nth(1).locator(`a[href="${web('second')}"]`)).toBeVisible();
   await p.close();
 });
 

@@ -10,6 +10,7 @@ import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } f
 import { ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card, Space } from '../core/types';
+import type { Deletion } from '../core/undo';
 import { usePlatform } from '../platform/context';
 import { isAiConfigured, withProviderAccess } from './ai';
 import { createCollectionActions } from './collectionActions';
@@ -28,6 +29,7 @@ import { PromptDialog } from './dialogs/PromptDialog';
 import { SaveSessionDialog } from './dialogs/SaveSessionDialog';
 import { SpaceDialog } from './dialogs/SpaceDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
+import { UndoToast } from './UndoToast';
 import { HashtagsPage, TagsPage } from './LabelPages';
 import { LabelsProvider } from './labels';
 import { DuplicatesView, SearchResults } from './LibraryViews';
@@ -79,6 +81,16 @@ export function App() {
   const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The last delete's snapshot, held while the undo toast is up. A new delete replaces (and finalizes) it. */
+  const [undo, setUndo] = useState<Deletion | null>(null);
+  /** Offers undo for a delete that actually removed rows; a delete that matched nothing shows no toast. */
+  const undoable = (d: Deletion) => {
+    const empty =
+      (d.kind === 'cards' && d.cards.length === 0) ||
+      (d.kind === 'tags' && d.tags.length === 0) ||
+      (d.kind === 'hashtags' && d.hashtags.length === 0);
+    setUndo(empty ? null : d);
+  };
 
   const theme = settings?.theme;
   useEffect(() => {
@@ -170,7 +182,7 @@ export function App() {
 
   const cardActions = (c: Card): CardRowActions => ({
     onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
-    onDelete: act('Deleting tab', () => repo.deleteCard(c.id, view?.kind === 'duplicates' ? 'duplicate' : undefined)),
+    onDelete: act('Deleting tab', async () => undoable(await repo.deleteCard(c.id, view?.kind === 'duplicates' ? 'duplicate' : undefined))),
     // On the board the editor opens under the row; lists without a board (Starred, Duplicates, search) use a dialog.
     onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
@@ -211,6 +223,7 @@ export function App() {
       }),
     addTabs: tabsCtl.addTabs,
     guard,
+    onDeleted: undoable,
   });
 
   const openSaveSession = () =>
@@ -281,7 +294,7 @@ export function App() {
           const n = collections.filter((c) => c.spaceId === space.id).length;
           if (confirm(`Delete the space “${space.name}” with its ${n} collections and all their tabs?`)) {
             void run('Deleting space', async () => {
-              await repo.deleteSpace(space.id);
+              undoable(await repo.deleteSpace(space.id));
               if (view?.kind === 'space' && view.spaceId === space.id) setView(null);
             });
           }
@@ -387,8 +400,8 @@ export function App() {
               usage={tagUsage}
               onCreate={(t, color) => void run('Creating tag', async () => void (await repo.createTag(t, color)))}
               onUpdate={(id, patch) => void run('Updating tag', () => repo.updateTag(id, patch))}
-              onDelete={(id) => void run('Deleting tag', () => repo.deleteTag(id))}
-              onDeleteUnused={() => void run('Deleting unused tags', async () => void (await repo.deleteUnusedTags()))}
+              onDelete={(id) => void run('Deleting tag', async () => undoable(await repo.deleteTag(id)))}
+              onDeleteUnused={() => void run('Deleting unused tags', async () => undoable(await repo.deleteUnusedTags()))}
             />
           )}
 
@@ -399,14 +412,14 @@ export function App() {
               usage={hashtagUsage}
               onCreate={(name) => void run('Creating hashtag', async () => void (await repo.ensureHashtag(name)))}
               onRename={(id, name) => void run('Renaming hashtag', () => repo.renameHashtag(id, name))}
-              onDelete={(id) => void run('Deleting hashtag', () => repo.deleteHashtag(id))}
-              onMerge={(from, into) => void run('Merging hashtags', () => repo.mergeHashtag(from, into))}
+              onDelete={(id) => void run('Deleting hashtag', async () => undoable(await repo.deleteHashtag(id)))}
+              onMerge={(from, into) => void run('Merging hashtags', async () => undoable(await repo.mergeHashtag(from, into)))}
               onRemoveFrom={(card, hashtagId) =>
                 void run('Removing hashtag', () =>
                   repo.setCardLabels(card.id, { tagIds: card.tagIds, hashtagIds: card.hashtagIds.filter((h) => h !== hashtagId) }),
                 )
               }
-              onDeleteUnused={() => void run('Deleting unused hashtags', async () => void (await repo.deleteUnusedHashtags()))}
+              onDeleteUnused={() => void run('Deleting unused hashtags', async () => undoable(await repo.deleteUnusedHashtags()))}
             />
           )}
 
@@ -509,11 +522,7 @@ export function App() {
             onInbox={() => bulk('Moving to Inbox', () => moveToInbox(db, pickedIds))}
             hideInbox={inboxViewActive}
             onStar={() => bulk('Updating tabs', () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
-            onDelete={() => {
-              if (confirm(`Delete ${pickedIds.length} link${pickedIds.length === 1 ? '' : 's'}? This cannot be undone.`)) {
-                bulk('Deleting tabs', () => repo.deleteCards(pickedIds));
-              }
-            }}
+            onDelete={() => bulk('Deleting tabs', async () => undoable(await repo.deleteCards(pickedIds)))}
           />
         )}
       </main>
@@ -673,7 +682,7 @@ export function App() {
           collection={tagsDialogCollection}
           onClose={() => setDialog(null)}
           onCreate={(t, color) => run('Creating tag', async () => void (await repo.createTag(t, color)))}
-          onDelete={(id) => run('Deleting tag', () => repo.deleteTag(id))}
+          onDelete={(id) => run('Deleting tag', async () => undoable(await repo.deleteTag(id)))}
           onAssign={(id, tagIds) => run('Updating tags', () => repo.setCollectionTags(id, tagIds))}
         />
       )}
@@ -723,6 +732,14 @@ export function App() {
           }
         />
       )}
+      <UndoToast
+        deletion={undo}
+        onUndo={(deletion) => {
+          setUndo(null);
+          void run('Restoring', () => repo.restoreDeletion(deletion));
+        }}
+        onDismiss={() => setUndo(null)}
+      />
     </div>
     </LabelsProvider>
   );

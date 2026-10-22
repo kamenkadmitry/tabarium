@@ -252,7 +252,7 @@ export function BoardToolbar(props: Props) {
       <button
         type="button"
         onClick={props.onNewCollection}
-        className="ml-auto flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
+        className="anchor-undo ml-auto flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
       >
         <FolderPlus size={16} aria-hidden /> New collection
       </button>

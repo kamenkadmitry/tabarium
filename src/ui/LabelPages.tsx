@@ -152,9 +152,7 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
         {unused.length > 0 && (
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Delete ${unused.length} unused tags?`)) onDeleteUnused();
-            }}
+            onClick={onDeleteUnused}
             className="ml-auto h-9 rounded-lg border border-line px-3 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-surface-2"
           >
             Delete {unused.length} unused
@@ -193,9 +191,7 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
                 <button
                   type="button"
                   aria-label={`Delete tag ${t.title}`}
-                  onClick={() => {
-                    if (confirm(`Delete the tag “${t.title}”? It will be removed from ${u.collections} collections and ${u.links} links.`)) onDelete(t.id);
-                  }}
+                  onClick={() => onDelete(t.id)}
                   className={trash}
                 >
                   <Trash2 size={15} aria-hidden />
@@ -331,9 +327,7 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
         {unused.length > 0 && (
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Delete ${unused.length} unused hashtags?`)) onDeleteUnused();
-            }}
+            onClick={onDeleteUnused}
             className="ml-auto h-9 rounded-lg border border-line px-3 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-surface-2"
           >
             Delete {unused.length} unused
@@ -414,7 +408,7 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                 disabled={mergeInto === ''}
                 onClick={() => {
                   const target = hashtags.find((h) => h.id === mergeInto);
-                  if (target && confirm(`Move all links from #${selected.name} to #${target.name} and delete #${selected.name}?`)) {
+                  if (target) {
                     onMerge(selected.id, target.id);
                     setSelectedId(target.id);
                     setMergeInto('');
@@ -428,10 +422,8 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                 type="button"
                 aria-label={`Delete hashtag ${selected.name}`}
                 onClick={() => {
-                  if (confirm(`Delete #${selected.name}? It will be removed from ${links.length} links.`)) {
-                    onDelete(selected.id);
-                    setSelectedId(null);
-                  }
+                  onDelete(selected.id);
+                  setSelectedId(null);
                 }}
                 className="grid size-10 place-items-center rounded-lg border border-line text-danger hover:bg-surface-2"
               >

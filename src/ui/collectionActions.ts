@@ -10,6 +10,7 @@ import type { ProposedDetails } from './dialogs/AiDetailsDialog';
 import type { DuplicateGuard } from './DuplicateGuard';
 import { proposeDetails } from './suggestDetails';
 import type { CollectionActions } from './CollectionCard';
+import type { Deletion } from '../core/undo';
 import type { Runner, TabTarget } from './useOpenTabsController';
 
 export type CollectionDialog =
@@ -29,6 +30,8 @@ interface Deps {
   openAddLink: (collectionId: string) => void;
   addTabs: (tabIds: readonly number[], target: TabTarget) => Promise<void>;
   guard: DuplicateGuard;
+  /** Hands a delete's snapshot to the undo toast. */
+  onDeleted: (deletion: Deletion) => void;
 }
 
 /** Builds the per-collection action set used by every board layout. */
@@ -80,11 +83,7 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
       });
     },
     rename: () => deps.setDialog({ kind: 'rename-collection', id: col.id, title: col.title }),
-    remove: () => {
-      if (confirm(`Delete “${col.title}” and its ${list.length} tabs?`)) {
-        void deps.run('Deleting collection', () => repo.deleteCollection(col.id));
-      }
-    },
+    remove: () => void deps.run('Deleting collection', async () => deps.onDeleted(await repo.deleteCollection(col.id))),
     editTags: () => deps.setDialog({ kind: 'tags', collectionId: col.id }),
     setColor: (color) => void deps.run('Setting colour', () => repo.updateCollection(col.id, { color })),
     card: deps.cardActions,

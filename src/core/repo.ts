@@ -6,6 +6,7 @@ import { bumpActivity } from './activity';
 import { normalizeHashtag } from './hashtag';
 import type { PageInfo } from './pageInfo';
 import type { ActivityType, Card, Collection, Hashtag, Space, Tag } from './types';
+import { restoreDeletion, type Deletion } from './undo';
 import { normalizeUrl } from './url';
 
 export interface NewCard {
@@ -117,11 +118,24 @@ export class Repository {
     if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(`Space ${spaceId} does not exist`);
   }
 
-  async deleteSpace(spaceId: string): Promise<void> {
+  /** Deletes a space with all its collections, links and Next entries in one transaction. */
+  async deleteSpace(spaceId: string): Promise<Deletion> {
     await this.assertUserSpace(spaceId, 'deleted');
-    const ids = await this.db.collections.where('spaceId').equals(spaceId).primaryKeys();
-    for (const id of ids) await this.deleteCollection(id);
-    await this.db.spaces.delete(spaceId);
+    return this.db.transaction('rw', this.db.spaces, this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
+      const space = await this.db.spaces.get(spaceId);
+      if (!space) throw new Error(`Space ${spaceId} does not exist`);
+      const collections = await this.db.collections.where('spaceId').equals(spaceId).toArray();
+      const collectionIds = collections.map((c) => c.id);
+      const cards = await this.db.cards.where('collectionId').anyOf(collectionIds).toArray();
+      const cardIds = cards.map((c) => c.id);
+      const nexts = await this.db.nexts.where('cardId').anyOf(cardIds).toArray();
+      await bumpActivity(this.db, 'deleted', cardIds.length);
+      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
+      await this.db.cards.bulkDelete(cardIds);
+      await this.db.collections.bulkDelete(collectionIds);
+      await this.db.spaces.delete(spaceId);
+      return { kind: 'space', space, collections, cards, nexts };
+    });
   }
 
   async updateCollection(
@@ -199,18 +213,25 @@ export class Repository {
   }
 
   /** Deletes links together with their Next entries. A deleted duplicate is counted as such on the dashboard. */
-  async deleteCards(cardIds: readonly string[], reason?: DeleteReason): Promise<void> {
-    await this.db.transaction('rw', this.db.cards, this.db.nexts, this.db.activity, async () => {
-      const existing = (await this.db.cards.bulkGet([...cardIds])).filter((c) => c !== undefined).length;
-      await this.db.nexts.where('cardId').anyOf([...cardIds]).delete();
+  async deleteCards(cardIds: readonly string[], reason?: DeleteReason): Promise<Deletion> {
+    return this.db.transaction('rw', this.db.cards, this.db.nexts, this.db.activity, async () => {
+      const cards = (await this.db.cards.bulkGet([...cardIds])).flatMap((c) => c ?? []);
+      const nexts = await this.db.nexts.where('cardId').anyOf([...cardIds]).toArray();
+      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
       await this.db.cards.bulkDelete([...cardIds]);
-      await bumpActivity(this.db, 'deleted', existing);
-      if (reason === 'duplicate') await bumpActivity(this.db, 'duplicates-removed', existing);
+      await bumpActivity(this.db, 'deleted', cards.length);
+      if (reason === 'duplicate') await bumpActivity(this.db, 'duplicates-removed', cards.length);
+      return { kind: 'cards', cards, nexts, duplicates: reason === 'duplicate' };
     });
   }
 
-  async deleteCard(cardId: string, reason?: DeleteReason): Promise<void> {
-    await this.deleteCards([cardId], reason);
+  async deleteCard(cardId: string, reason?: DeleteReason): Promise<Deletion> {
+    return this.deleteCards([cardId], reason);
+  }
+
+  /** Puts back what a delete returned, while the returned snapshot is still held (the undo toast is up). */
+  async restoreDeletion(deletion: Deletion): Promise<void> {
+    await restoreDeletion(this.db, deletion);
   }
 
   /** Records something that happened outside the data itself (a duplicate was skipped or created on purpose). */
@@ -274,13 +295,21 @@ export class Repository {
     if ((await this.db.tags.update(tagId, patch)) === 0) throw new Error(`Tag ${tagId} does not exist`);
   }
 
-  async deleteTag(tagId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
+  async deleteTag(tagId: string): Promise<Deletion> {
+    return this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
+      const tag = await this.db.tags.get(tagId);
+      if (!tag) throw new Error(`Tag ${tagId} does not exist`);
       const affected = await this.db.collections.where('tagIds').equals(tagId).toArray();
       for (const c of affected) await this.db.collections.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
       const cards = await this.db.cards.where('tagIds').equals(tagId).toArray();
       for (const c of cards) await this.db.cards.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
       await this.db.tags.delete(tagId);
+      return {
+        kind: 'tag',
+        tag,
+        collections: affected.map(({ id, tagIds }) => ({ id, tagIds })),
+        cards: cards.map(({ id, tagIds }) => ({ id, tagIds })),
+      };
     });
   }
 
@@ -298,45 +327,47 @@ export class Repository {
   }
 
   /** Moves every link from one hashtag to another (no duplicates) and deletes the first. */
-  async mergeHashtag(fromId: string, intoId: string): Promise<void> {
+  async mergeHashtag(fromId: string, intoId: string): Promise<Deletion> {
     if (fromId === intoId) throw new Error('Choose a different hashtag to merge into');
-    await this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
-      if (!(await this.db.hashtags.get(fromId))) throw new Error(`Hashtag ${fromId} does not exist`);
+    return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+      const hashtag = await this.db.hashtags.get(fromId);
+      if (!hashtag) throw new Error(`Hashtag ${fromId} does not exist`);
       if (!(await this.db.hashtags.get(intoId))) throw new Error(`Hashtag ${intoId} does not exist`);
       const cards = await this.db.cards.where('hashtagIds').equals(fromId).toArray();
       for (const c of cards) {
         await this.db.cards.update(c.id, { hashtagIds: [...new Set(c.hashtagIds.map((h) => (h === fromId ? intoId : h)))] });
       }
       await this.db.hashtags.delete(fromId);
+      return { kind: 'hashtag', hashtag, cards: cards.map(({ id, hashtagIds }) => ({ id, hashtagIds })), mergedInto: intoId };
     });
   }
 
-  /** Deletes every hashtag no link uses. Returns how many were removed. */
-  async deleteUnusedHashtags(): Promise<number> {
+  /** Deletes every hashtag no link uses. */
+  async deleteUnusedHashtags(): Promise<Deletion> {
     return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
-      let removed = 0;
+      const removed: Hashtag[] = [];
       for (const h of await this.db.hashtags.toArray()) {
         if ((await this.db.cards.where('hashtagIds').equals(h.id).count()) === 0) {
           await this.db.hashtags.delete(h.id);
-          removed += 1;
+          removed.push(h);
         }
       }
-      return removed;
+      return { kind: 'hashtags', hashtags: removed };
     });
   }
 
-  /** Deletes every tag that no collection and no link uses. Returns how many were removed. */
-  async deleteUnusedTags(): Promise<number> {
+  /** Deletes every tag that no collection and no link uses. */
+  async deleteUnusedTags(): Promise<Deletion> {
     return this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
-      let removed = 0;
+      const removed: Tag[] = [];
       for (const t of await this.db.tags.toArray()) {
         const used = (await this.db.collections.where('tagIds').equals(t.id).count()) + (await this.db.cards.where('tagIds').equals(t.id).count());
         if (used === 0) {
           await this.db.tags.delete(t.id);
-          removed += 1;
+          removed.push(t);
         }
       }
-      return removed;
+      return { kind: 'tags', tags: removed };
     });
   }
 
@@ -348,11 +379,14 @@ export class Repository {
     if ((await this.db.hashtags.update(hashtagId, { name })) === 0) throw new Error(`Hashtag ${hashtagId} does not exist`);
   }
 
-  async deleteHashtag(hashtagId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+  async deleteHashtag(hashtagId: string): Promise<Deletion> {
+    return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
+      const hashtag = await this.db.hashtags.get(hashtagId);
+      if (!hashtag) throw new Error(`Hashtag ${hashtagId} does not exist`);
       const cards = await this.db.cards.where('hashtagIds').equals(hashtagId).toArray();
       for (const c of cards) await this.db.cards.update(c.id, { hashtagIds: c.hashtagIds.filter((h) => h !== hashtagId) });
       await this.db.hashtags.delete(hashtagId);
+      return { kind: 'hashtag', hashtag, cards: cards.map(({ id, hashtagIds }) => ({ id, hashtagIds })) };
     });
   }
 
@@ -441,13 +475,18 @@ export class Repository {
     await this.db.collections.where('spaceId').equals(spaceId).modify({ expanded, updatedAt: Date.now() });
   }
 
-  async deleteCollection(collectionId: string): Promise<void> {
-    await this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
-      const cardIds = await this.db.cards.where('collectionId').equals(collectionId).primaryKeys();
+  async deleteCollection(collectionId: string): Promise<Deletion> {
+    return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
+      const collection = await this.db.collections.get(collectionId);
+      if (!collection) throw new Error(`Collection ${collectionId} does not exist`);
+      const cards = await this.db.cards.where('collectionId').equals(collectionId).toArray();
+      const cardIds = cards.map((c) => c.id);
+      const nexts = await this.db.nexts.where('cardId').anyOf(cardIds).toArray();
       await bumpActivity(this.db, 'deleted', cardIds.length);
-      await this.db.nexts.where('cardId').anyOf(cardIds).delete();
+      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
       await this.db.cards.bulkDelete(cardIds);
       await this.db.collections.delete(collectionId);
+      return { kind: 'collection', collection, cards, nexts };
     });
   }
 }

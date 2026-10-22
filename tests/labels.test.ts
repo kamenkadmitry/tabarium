@@ -109,9 +109,9 @@ describe('managing many labels', () => {
     await repo.setCardLabels(card.id, { tagIds: [usedTag.id], hashtagIds: [used.id] });
     await repo.setCollectionTags(col.id, [collTag.id]);
 
-    expect(await repo.deleteUnusedHashtags()).toBe(1);
+    expect(await repo.deleteUnusedHashtags()).toEqual({ kind: 'hashtags', hashtags: [expect.objectContaining({ name: 'spare' })] });
     expect((await db.hashtags.toArray()).map((h) => h.name)).toEqual(['used']);
-    expect(await repo.deleteUnusedTags()).toBe(1);
+    expect(await repo.deleteUnusedTags()).toEqual({ kind: 'tags', tags: [expect.objectContaining({ title: 'Spare' })] });
     expect((await db.tags.orderBy('position').toArray()).map((t) => t.title)).toEqual(['OnCard', 'OnCollection']);
   });
 });

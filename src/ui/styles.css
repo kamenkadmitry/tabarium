@@ -96,6 +96,11 @@ a {
   }
 }
 
+/* The "New collection" button anchors the undo toast, which hangs 50px to its left (UndoToast.tsx). */
+.anchor-undo {
+  anchor-name: --undo-anchor;
+}
+
 /* The inline editor slides in under its row; reduced motion gets no animation. */
 @keyframes editor-in {
   from {
