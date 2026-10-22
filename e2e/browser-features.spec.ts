@@ -803,6 +803,8 @@ test('bookmarks: browser bookmarks are listed, copied into a collection and remo
   await p.getByRole('button', { name: /^Copy \d+ new links?$/ }).click();
   await expect(p.getByRole('status')).toContainText(/Imported \d+ links? into/);
   await list.getByRole('button', { name: /^E2E folder/ }).click().catch(() => undefined);
+  const folderButton = list.getByRole('button', { name: /^E2E folder/ });
+  if ((await folderButton.getAttribute('aria-expanded')) !== 'true') await folderButton.click();
   await expect(list.getByText('In Tabarium').first()).toBeVisible();
 
   p.once('dialog', (d) => void d.accept());
