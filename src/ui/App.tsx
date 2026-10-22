@@ -187,6 +187,15 @@ export function App() {
     onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
     onInbox: inboxCollectionIds.has(c.collectionId) ? undefined : act('Moving to Inbox', () => moveToInbox(db, [c.id])),
+    // Label chips filter only where a board toolbar exists; elsewhere they stay plain text.
+    onFilterLabel:
+      view?.kind === 'space' && !inboxViewActive && q === ''
+        ? (kind, id) =>
+            setFilter((f) => {
+              const toggle = (list: readonly string[]) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+              return kind === 'hashtag' ? { ...f, hashtagIds: toggle(f.hashtagIds) } : { ...f, cardTagIds: toggle(f.cardTagIds) };
+            })
+        : undefined,
   });
 
   const aiReady = settings !== undefined && isAiConfigured(settings.ai);
@@ -258,8 +267,11 @@ export function App() {
   const tabCounts = new Map([...cardsByCollection].map(([id, list]) => [id, list.length]));
   const spaceCollections = collections.filter((c) => spaceId !== undefined && c.spaceId === spaceId);
   const visibleCollections = sortCollections(filterCollections(spaceCollections, filter, cardsByCollection), settings?.boardSort ?? 'custom', tabCounts);
-  // With a hashtag filter the board shows only the matching links of each collection.
-  const boardCards = isFiltering(filter) && filter.hashtagIds.length > 0 ? new Map([...cardsByCollection].map(([id, list]) => [id, filterCards(list, filter)])) : cardsByCollection;
+  // With a hashtag or link-tag filter the board shows only the matching links of each collection.
+  const boardCards =
+    isFiltering(filter) && (filter.hashtagIds.length > 0 || filter.cardTagIds.length > 0)
+      ? new Map([...cardsByCollection].map(([id, list]) => [id, filterCards(list, filter)]))
+      : cardsByCollection;
   const spaceHashtags = hashtags
     .map((h) => ({ id: h.id, name: h.name, count: spaceCollections.reduce((n, c) => n + (cardsByCollection.get(c.id) ?? []).filter((card) => card.hashtagIds.includes(h.id)).length, 0) }))
     .filter((h) => h.count > 0);

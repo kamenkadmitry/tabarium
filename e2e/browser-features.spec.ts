@@ -248,6 +248,54 @@ test('tags and hashtags: own pages, picked or created while adding and editing a
   await p.close();
 });
 
+test('clicking a tag or hashtag chip on a link filters the board to links that have it', async () => {
+  const p = await openLibraryWithSpace('Chips');
+  p.setDefaultTimeout(10_000);
+  await addCollectionWithLinks(p, 'Pile', []);
+
+  const form = p.locator('form[aria-label="Add link"]');
+  const addLink = async (url: string, title: string, withLabels: boolean) => {
+    await p.locator('section[aria-label="Pile"]').getByRole('button', { name: 'Add link' }).click();
+    await form.getByLabel('Address').fill(url);
+    await form.getByLabel('Title').fill(title);
+    if (withLabels) {
+      await form.getByRole('button', { name: 'Add tag' }).click();
+      await form.getByRole('combobox', { name: 'Add tag' }).fill('chiptag');
+      await form.getByRole('option', { name: /Create chiptag/ }).click();
+      await form.getByRole('button', { name: 'Add hashtag' }).click();
+      await form.getByRole('combobox', { name: 'Add hashtag' }).fill('chiprust');
+      await form.getByRole('option', { name: /Create #chiprust/ }).click();
+    }
+    await form.getByRole('button', { name: 'Add link', exact: true }).click();
+    await expect(p.locator(`section[aria-label="Pile"] a[href="${url}"]`)).toBeVisible();
+  };
+  await addLink(web('rusty'), 'Rusty', true);
+  await addLink(web('other'), 'Other', false);
+
+  // List view keeps the label chips inside the row bounds so they are really clickable.
+  await p.getByRole('button', { name: 'Change view' }).click();
+  await p.getByRole('menuitemradio', { name: 'List' }).click();
+
+  const section = p.locator('section[aria-label="Pile"]');
+
+  // Clicking the hashtag chip on the link keeps only matching links.
+  await section.locator('li', { hasText: 'Rusty' }).getByRole('button', { name: 'Filter by hashtag #chiprust' }).click();
+  await expect(p.getByRole('button', { name: 'Clear filter #chiprust' })).toBeVisible();
+  await expect(section).toContainText('Rusty');
+  await expect(section).not.toContainText('Other');
+  await p.getByRole('button', { name: 'Clear filter #chiprust' }).click();
+  await expect(section).toContainText('Other');
+
+  // Clicking the tag chip filters by the link's tag.
+  await section.locator('li', { hasText: 'Rusty' }).getByRole('button', { name: 'Filter by tag chiptag' }).click();
+  await expect(p.getByRole('button', { name: 'Clear filter chiptag' })).toBeVisible();
+  await expect(section).toContainText('Rusty');
+  await expect(section).not.toContainText('Other');
+  await p.getByRole('button', { name: 'Clear filter chiptag' }).click();
+  await expect(section).toContainText('Other');
+  await p.close();
+});
+
 test('inline editor: opens under the row, edits title, note and labels, Esc closes it', async () => {
   const p = await openLibraryWithSpace('Inline');
   p.setDefaultTimeout(10_000); // a stuck locator should fail with its name, not hang until the test timeout

@@ -48,17 +48,18 @@ describe('filterCollections', () => {
     expect(isFiltering(NO_FILTER)).toBe(false);
   });
   it('filters by colour, "none" and tag, alone or combined', () => {
-    expect(filterCollections(sample, { color: '#0d9488', tagId: null, hashtagIds: [] }, new Map()).map((c) => c.id)).toEqual(['c']);
-    expect(filterCollections(sample, { color: 'none', tagId: null, hashtagIds: [] }, new Map()).map((c) => c.id)).toEqual(['b']);
-    expect(filterCollections(sample, { color: null, tagId: 't1', hashtagIds: [] }, new Map()).map((c) => c.id)).toEqual(['a', 'b']);
-    expect(filterCollections(sample, { color: '#ea580c', tagId: 't1', hashtagIds: [] }, new Map()).map((c) => c.id)).toEqual(['a']);
-    expect(isFiltering({ color: 'none', tagId: null, hashtagIds: [] })).toBe(true);
+    expect(filterCollections(sample, { color: '#0d9488', tagId: null, hashtagIds: [], cardTagIds: [] }, new Map()).map((c) => c.id)).toEqual(['c']);
+    expect(filterCollections(sample, { color: 'none', tagId: null, hashtagIds: [], cardTagIds: [] }, new Map()).map((c) => c.id)).toEqual(['b']);
+    expect(filterCollections(sample, { color: null, tagId: 't1', hashtagIds: [], cardTagIds: [] }, new Map()).map((c) => c.id)).toEqual(['a', 'b']);
+    expect(filterCollections(sample, { color: '#ea580c', tagId: 't1', hashtagIds: [], cardTagIds: [] }, new Map()).map((c) => c.id)).toEqual(['a']);
+    expect(isFiltering({ color: 'none', tagId: null, hashtagIds: [], cardTagIds: [] })).toBe(true);
     expect(isFiltering({ ...NO_FILTER, hashtagIds: ['h1'] })).toBe(true);
+    expect(isFiltering({ ...NO_FILTER, cardTagIds: ['t1'] })).toBe(true);
   });
 });
 
 describe('hashtag filter', () => {
-  const card = (id: string, collectionId: string, hashtagIds: string[]): Card => ({
+  const card = (id: string, collectionId: string, hashtagIds: string[], tagIds: string[] = []): Card => ({
     id,
     collectionId,
     title: id,
@@ -70,7 +71,7 @@ describe('hashtag filter', () => {
     heading: null,
     pageInfoAt: null,
     starred: false,
-    tagIds: [],
+    tagIds,
     hashtagIds,
     position: 0,
     createdAt: 0,
@@ -93,6 +94,44 @@ describe('hashtag filter', () => {
   it('combines with colour and tag filters and never hides anything without hashtags', () => {
     expect(filterCards(byCollection.get('a') ?? [], NO_FILTER)).toHaveLength(2);
     expect(filterCollections(sample, { ...NO_FILTER, color: '#ea580c', hashtagIds: ['css'] }, byCollection)).toEqual([]);
+  });
+});
+
+describe('link tag filter', () => {
+  const card = (id: string, collectionId: string, tagIds: string[], hashtagIds: string[] = []): Card => ({
+    id,
+    collectionId,
+    title: id,
+    url: `https://${id}.dev`,
+    favIconUrl: null,
+    customTitle: null,
+    note: null,
+    description: null,
+    heading: null,
+    pageInfoAt: null,
+    starred: false,
+    tagIds,
+    hashtagIds,
+    position: 0,
+    createdAt: 0,
+    updatedAt: 0,
+  });
+  const byCollection = new Map([
+    ['a', [card('1', 'a', ['work', 'read']), card('2', 'a', ['read'])]],
+    ['b', [card('3', 'b', ['fun'])]],
+  ]);
+
+  it('keeps links that carry all selected tags and hides collections without them', () => {
+    const f = { ...NO_FILTER, cardTagIds: ['work', 'read'] };
+    expect(filterCards(byCollection.get('a') ?? [], f).map((c) => c.id)).toEqual(['1']);
+    expect(filterCollections(sample, f, byCollection).map((c) => c.id)).toEqual(['a']);
+    expect(filterCollections(sample, { ...NO_FILTER, cardTagIds: ['read'] }, byCollection).map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('combines with hashtags: both lists must match', () => {
+    const tagged = new Map([['a', [card('1', 'a', ['work'], ['rust']), card('2', 'a', ['work'], ['other'])]]]);
+    const f = { ...NO_FILTER, cardTagIds: ['work'], hashtagIds: ['rust'] };
+    expect(filterCards(tagged.get('a') ?? [], f).map((c) => c.id)).toEqual(['1']);
   });
 });
 

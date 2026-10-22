@@ -10,6 +10,9 @@ interface Labels {
 
 const LabelsContext = createContext<Labels>({ tags: new Map(), hashtags: new Map() });
 
+/** Reads the id→label maps; lives under LabelsProvider, which wraps the whole app tree. */
+export const useLabels = () => useContext(LabelsContext);
+
 /** Lets any card row resolve its tag and hashtag ids to names without passing them down through every layer. */
 export function LabelsProvider({ tags, hashtags, children }: { tags: readonly Tag[]; hashtags: readonly Hashtag[]; children: React.ReactNode }) {
   const value = useMemo(() => ({ tags: new Map(tags.map((t) => [t.id, t])), hashtags: new Map(hashtags.map((h) => [h.id, h])) }), [tags, hashtags]);
@@ -25,10 +28,12 @@ interface CardLabelsProps {
   limitTags?: number;
   limitHashtags?: number;
   className?: string;
+  /** Makes the visible text chips clickable, e.g. to filter the board. Absent chips stay plain text. */
+  onChipClick?: (kind: 'tag' | 'hashtag', id: string) => void;
 }
 
 /** The labels of a card on one line that never wraps: a few of them, then "+N" for the rest. */
-export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitHashtags = 2, className = '' }: CardLabelsProps) {
+export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitHashtags = 2, className = '', onChipClick }: CardLabelsProps) {
   const { tags, hashtags } = useContext(LabelsContext);
   const cardTags = card.tagIds.flatMap((id) => tags.get(id) ?? []);
   const cardHashtags = card.hashtagIds.flatMap((id) => hashtags.get(id) ?? []);
@@ -50,22 +55,70 @@ export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitH
   return (
     <span className={`flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-xs ${className}`}>
       {lead !== undefined && <span className="min-w-0 shrink truncate text-muted">{lead}</span>}
-      {shownTags.map((t) => (
-        <span key={t.id} className="flex shrink-0 items-center gap-1 font-medium">
-          <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
-          {t.title}
-        </span>
-      ))}
-      {shownHashtags.map((h) => (
-        <span key={h.id} className="min-w-0 shrink truncate font-medium text-primary">
-          #{h.name}
-        </span>
-      ))}
+      {shownTags.map((t) =>
+        onChipClick ? (
+          <ChipButton key={t.id} kind="tag" id={t.id} name={t.title} onClick={onChipClick} className="flex shrink-0 items-center gap-1 font-medium">
+            <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
+            {t.title}
+          </ChipButton>
+        ) : (
+          <span key={t.id} className="flex shrink-0 items-center gap-1 font-medium">
+            <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
+            {t.title}
+          </span>
+        ),
+      )}
+      {shownHashtags.map((h) =>
+        onChipClick ? (
+          <ChipButton key={h.id} kind="hashtag" id={h.id} name={`#${h.name}`} onClick={onChipClick} className="min-w-0 shrink truncate font-medium text-primary">
+            #{h.name}
+          </ChipButton>
+        ) : (
+          <span key={h.id} className="min-w-0 shrink truncate font-medium text-primary">
+            #{h.name}
+          </span>
+        ),
+      )}
       {rest > 0 && (
         <span aria-label={`${rest} more labels`} className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-muted">
           +{rest}
         </span>
       )}
+    </span>
+  );
+}
+
+interface ChipButtonProps {
+  kind: 'tag' | 'hashtag';
+  id: string;
+  name: string;
+  onClick: (kind: 'tag' | 'hashtag', id: string) => void;
+  className: string;
+  children: React.ReactNode;
+}
+
+/** A label chip that filters. It sits inside the card's <a>, so the click must not navigate: preventDefault cancels it. */
+function ChipButton({ kind, id, name, onClick, className, children }: ChipButtonProps) {
+  const activate = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick(kind, id);
+  };
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={`Filter by ${kind} ${name}`}
+      title={`Filter by ${name}`}
+      // Pressing must not focus the chip: focus would raise the row's action bar between mousedown and mouseup.
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={activate}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') activate(e);
+      }}
+      className={`cursor-pointer hover:underline ${className}`}
+    >
+      {children}
     </span>
   );
 }

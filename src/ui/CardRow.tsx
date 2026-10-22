@@ -43,6 +43,8 @@ export interface CardRowActions {
   onMove: () => void;
   /** Moves the link to the Inbox. Absent for links that already are there. */
   onInbox?: () => void;
+  /** Clicking a tag or hashtag chip on the row, e.g. to filter the board. Absent chips stay plain text. */
+  onFilterLabel?: (kind: 'tag' | 'hashtag', id: string) => void;
 }
 
 /** How a tab is drawn: normal row, dense one-liner, wide row with the host on the right, or a tile. */
@@ -115,16 +117,21 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
           />
         </label>
       )}
-      <a href={card.url} draggable={false} className={`${LINK[density]} transition-colors duration-150 hover:bg-surface-2`}>
+      {/* Rows with filter chips keep their labels clear of the hover action bar (~11rem wide on the right). */}
+      <a
+        href={card.url}
+        draggable={false}
+        className={`${LINK[density]} ${actions.onFilterLabel && (density === 'default' || density === 'wide') ? 'pe-44' : ''} transition-colors duration-150 hover:bg-surface-2`}
+      >
         <Favicon card={card} size={tile ? 24 : density === 'compact' ? 16 : 20} />
         <span className={`min-w-0 ${tile ? 'w-full' : 'flex-1'}`}>
           <span className={`block text-sm font-medium ${tile ? 'line-clamp-2' : 'truncate'}`}>{title}</span>
           {(density === 'default' || density === 'tile') && (
-            <CardLabels card={card} lead={`${hostOf(card.url)}${meta ? ` · ${meta}` : ''}`} limitHashtags={density === 'tile' ? 1 : 2} />
+            <CardLabels card={card} lead={`${hostOf(card.url)}${meta ? ` · ${meta}` : ''}`} limitHashtags={density === 'tile' ? 1 : 2} onChipClick={actions.onFilterLabel} />
           )}
         </span>
         {density === 'compact' && <CardLabels card={card} variant="dots" />}
-        {density === 'wide' && <CardLabels card={card} limitHashtags={2} className="hidden w-56 shrink-0 justify-end sm:flex" />}
+        {density === 'wide' && <CardLabels card={card} limitHashtags={2} className="hidden w-56 shrink-0 justify-end sm:flex" onChipClick={actions.onFilterLabel} />}
         {density === 'wide' && <span className="hidden max-w-[30%] shrink-0 truncate text-xs text-muted sm:block">{hostOf(card.url)}</span>}
         {card.note && !tile && <NotebookText size={14} aria-label="Has a note" className="shrink-0 text-muted" />}
         {card.starred && !tile && <Star size={14} aria-label="Starred" className="shrink-0 text-accent" fill="currentColor" />}

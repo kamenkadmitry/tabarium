@@ -10,19 +10,21 @@ export interface BoardFilter {
   tagId: string | null;
   /** Links must carry all of these hashtags. */
   hashtagIds: readonly string[];
+  /** Links must carry all of these tags (the link's own labels, not the collection's). */
+  cardTagIds: readonly string[];
 }
 
-export const NO_FILTER: BoardFilter = { color: null, tagId: null, hashtagIds: [] };
+export const NO_FILTER: BoardFilter = { color: null, tagId: null, hashtagIds: [], cardTagIds: [] };
 
-export const isFiltering = (f: BoardFilter): boolean => f.color !== null || f.tagId !== null || f.hashtagIds.length > 0;
+export const isFiltering = (f: BoardFilter): boolean => f.color !== null || f.tagId !== null || f.hashtagIds.length > 0 || f.cardTagIds.length > 0;
 
-/** The links that pass the hashtag filter (all of them when no hashtag is selected). */
+/** The links that pass the hashtag and link-tag filters (all of them when none are selected). */
 export function filterCards(cards: readonly Card[], filter: BoardFilter): Card[] {
-  if (filter.hashtagIds.length === 0) return [...cards];
-  return cards.filter((c) => filter.hashtagIds.every((id) => c.hashtagIds.includes(id)));
+  if (filter.hashtagIds.length === 0 && filter.cardTagIds.length === 0) return [...cards];
+  return cards.filter((c) => filter.hashtagIds.every((id) => c.hashtagIds.includes(id)) && filter.cardTagIds.every((id) => c.tagIds.includes(id)));
 }
 
-/** Collections that pass the colour and tag filters and, with hashtags selected, hold at least one matching link. */
+/** Collections that pass the colour and tag filters and, with link labels selected, hold at least one matching link. */
 export function filterCollections(
   collections: readonly Collection[],
   filter: BoardFilter,
@@ -31,7 +33,7 @@ export function filterCollections(
   return collections.filter((c) => {
     if (filter.color !== null && (filter.color === 'none' ? c.color !== null : c.color !== filter.color)) return false;
     if (filter.tagId !== null && !c.tagIds.includes(filter.tagId)) return false;
-    if (filter.hashtagIds.length > 0 && filterCards(cardsByCollection.get(c.id) ?? [], filter).length === 0) return false;
+    if ((filter.hashtagIds.length > 0 || filter.cardTagIds.length > 0) && filterCards(cardsByCollection.get(c.id) ?? [], filter).length === 0) return false;
     return true;
   });
 }

@@ -4,6 +4,7 @@ import { type BoardFilter, isFiltering, NO_FILTER } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import type { Tag as TagType } from '../core/types';
 import { SWATCHES } from './colors';
+import { useLabels } from './labels';
 import { Menu, MenuItem } from './Menu';
 
 const SORTS: { value: BoardSort; label: string }[] = [
@@ -162,6 +163,8 @@ function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Pr
 export function BoardToolbar(props: Props) {
   const activeView = VIEWS.find((v) => v.value === props.view) ?? VIEWS[3];
   const activeSort = SORTS.find((s) => s.value === props.sort) ?? SORTS[0];
+  // Link-tag chips come from card clicks, so they may name tags that no collection uses — resolve all, not just props.tags.
+  const { tags: allTags } = useLabels();
   const filterChips: { key: string; label: string; clear: () => void }[] = [];
   if (props.filter.color !== null) {
     filterChips.push({
@@ -183,6 +186,13 @@ export function BoardToolbar(props: Props) {
       key: `hashtag-${id}`,
       label: `#${props.hashtags.find((h) => h.id === id)?.name ?? 'hashtag'}`,
       clear: () => props.onFilter({ ...props.filter, hashtagIds: props.filter.hashtagIds.filter((x) => x !== id) }),
+    });
+  }
+  for (const id of props.filter.cardTagIds) {
+    filterChips.push({
+      key: `cardtag-${id}`,
+      label: allTags.get(id)?.title ?? 'Tag',
+      clear: () => props.onFilter({ ...props.filter, cardTagIds: props.filter.cardTagIds.filter((x) => x !== id) }),
     });
   }
 
