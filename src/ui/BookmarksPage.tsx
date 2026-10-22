@@ -1,11 +1,13 @@
 import { ChevronRight, Folder, Search, Star } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type BookmarkImportMode, type BookmarkNode, BOOKMARKS_COLLECTION, BOOKMARKS_SPACE, countBookmarks, planBookmarkImport } from '../core/bookmarks';
-import { repo } from '../core/instance';
+import { db, repo } from '../core/instance';
+import { saveToInbox } from '../core/quicksave';
 import type { Card } from '../core/types';
 import { normalizeUrl } from '../core/url';
 import { usePlatform } from '../platform/context';
 import { hostOf, PageFavicon } from './CardRow';
+import { useDuplicateGuard } from './DuplicateGuard';
 import { inputClass, PrimaryButton, SecondaryButton } from './Dialog';
 
 const box = 'rounded-2xl border border-line bg-surface';
@@ -15,10 +17,26 @@ const MODES: { value: BookmarkImportMode; title: string; hint: string }[] = [
   { value: 'folders', title: 'Keep the folders', hint: 'One collection per bookmark folder, named by its path.' },
 ];
 
-function BookmarkRow({ node, saved }: { node: BookmarkNode; saved: boolean }) {
+interface Selection {
+  has: (id: string) => boolean;
+  /** Ticks or unticks every bookmark of the given ids. */
+  set: (ids: readonly string[], on: boolean) => void;
+}
+
+const checkbox = 'size-4 shrink-0 accent-[var(--primary)]';
+const webIds = (nodes: readonly BookmarkNode[]) => flatten(nodes).filter((n) => /^https?:\/\//i.test(n.url ?? '')).map((n) => n.id);
+
+function BookmarkRow({ node, saved, sel }: { node: BookmarkNode; saved: boolean; sel: Selection }) {
   const url = node.url ?? '';
   return (
     <li className="flex min-h-10 items-center gap-3 rounded-lg px-2 py-1 hover:bg-surface-2">
+      <input
+        type="checkbox"
+        aria-label={`Select ${node.title || url}`}
+        checked={sel.has(node.id)}
+        onChange={(e) => sel.set([node.id], e.target.checked)}
+        className={checkbox}
+      />
       <PageFavicon url={url} favIconUrl={null} size={18} />
       <a href={url} target="_blank" rel="noreferrer" className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{node.title || url}</span>
@@ -29,35 +47,50 @@ function BookmarkRow({ node, saved }: { node: BookmarkNode; saved: boolean }) {
   );
 }
 
-function FolderNode({ node, known, depth }: { node: BookmarkNode; known: ReadonlySet<string>; depth: number }) {
+function FolderNode({ node, known, depth, sel }: { node: BookmarkNode; known: ReadonlySet<string>; depth: number; sel: Selection }) {
   const [open, setOpen] = useState(depth === 0);
   const count = countBookmarks(node.children ?? []);
+  const ids = webIds(node.children ?? []);
+  const ticked = ids.filter((id) => sel.has(id)).length;
   return (
     <li>
+      <div className="flex items-center gap-2 rounded-lg pl-2 hover:bg-surface-2">
+        <input
+          type="checkbox"
+          aria-label={`Select all in ${node.title || 'Untitled'}`}
+          checked={ids.length > 0 && ticked === ids.length}
+          ref={(el) => {
+            if (el) el.indeterminate = ticked > 0 && ticked < ids.length;
+          }}
+          disabled={ids.length === 0}
+          onChange={(e) => sel.set(ids, e.target.checked)}
+          className={checkbox}
+        />
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 py-1 text-left hover:bg-surface-2"
+        className="flex min-h-10 min-w-0 flex-1 items-center gap-2 py-1 pr-2 text-left"
       >
         <ChevronRight size={16} aria-hidden className={`shrink-0 text-muted transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
         <Folder size={16} aria-hidden className="shrink-0 text-muted" />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{node.title || 'Untitled'}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted">{count}</span>
       </button>
-      {open && <Nodes nodes={node.children ?? []} known={known} depth={depth + 1} />}
+      </div>
+      {open && <Nodes nodes={node.children ?? []} known={known} depth={depth + 1} sel={sel} />}
     </li>
   );
 }
 
-function Nodes({ nodes, known, depth }: { nodes: readonly BookmarkNode[]; known: ReadonlySet<string>; depth: number }) {
+function Nodes({ nodes, known, depth, sel }: { nodes: readonly BookmarkNode[]; known: ReadonlySet<string>; depth: number; sel: Selection }) {
   return (
     <ul className={depth > 0 ? 'ml-4 border-l border-line pl-2' : ''}>
       {nodes.map((n) =>
         n.url === undefined ? (
-          <FolderNode key={n.id} node={n} known={known} depth={depth} />
+          <FolderNode key={n.id} node={n} known={known} depth={depth} sel={sel} />
         ) : (
-          <BookmarkRow key={n.id} node={n} saved={known.has(normalizeUrl(n.url))} />
+          <BookmarkRow key={n.id} node={n} saved={known.has(normalizeUrl(n.url))} sel={sel} />
         ),
       )}
     </ul>
@@ -77,6 +110,8 @@ interface Props {
 /** The bookmarks of the browser, read live. They can be copied into Tabarium and then removed from the bookmarks bar. */
 export function BookmarksPage({ cards, run }: Props) {
   const platform = usePlatform();
+  const guard = useDuplicateGuard();
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [tree, setTree] = useState<BookmarkNode[] | null>(null);
   const [query, setQuery] = useState('');
@@ -100,6 +135,32 @@ export function BookmarksPage({ cards, run }: Props) {
     if (!tree || q === '') return null;
     return flatten(tree).filter((n) => `${n.title} ${n.url}`.toLowerCase().includes(q));
   }, [tree, query]);
+
+  const sel: Selection = {
+    has: (id) => picked.has(id),
+    set: (ids, on) =>
+      setPicked((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) {
+          if (on) next.add(id);
+          else next.delete(id);
+        }
+        return next;
+      }),
+  };
+  const visibleIds = useMemo(() => (tree ? (matches ? webIds(matches) : webIds(tree)) : []), [tree, matches]);
+  const allTicked = visibleIds.length > 0 && visibleIds.every((id) => picked.has(id));
+  const pickedNodes = useMemo(() => (tree ? flatten(tree).filter((n) => picked.has(n.id)) : []), [tree, picked]);
+
+  const sendToInbox = () =>
+    void run('Sending the bookmarks to the Inbox', async () => {
+      const links = pickedNodes.map((n) => ({ title: n.title || (n.url ?? ''), url: n.url ?? '' }));
+      const approved = await guard(links);
+      if (!approved) return;
+      const added = await saveToInbox(db, approved);
+      setPicked(new Set());
+      setNote(`Sent ${added} bookmark${added === 1 ? '' : 's'} to the Inbox.`);
+    });
 
   const allow = () =>
     void run('Asking for the bookmarks permission', async () => {
@@ -197,18 +258,27 @@ export function BookmarksPage({ cards, run }: Props) {
           </label>
           <SecondaryButton onClick={() => void load()}>Refresh</SecondaryButton>
         </div>
+        <div className="flex flex-wrap items-center gap-3 px-1">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={allTicked} disabled={visibleIds.length === 0} onChange={(e) => sel.set(visibleIds, e.target.checked)} className={checkbox} />
+            {matches ? 'Select all found' : 'Select all'}
+          </label>
+          <PrimaryButton disabled={pickedNodes.length === 0} onClick={sendToInbox}>
+            Send {pickedNodes.length} to Inbox
+          </PrimaryButton>
+        </div>
         {tree === null ? null : matches ? (
           matches.length === 0 ? (
             <p className="p-4 text-center text-sm text-muted">No bookmark matches.</p>
           ) : (
             <ul>
               {matches.map((n) => (
-                <BookmarkRow key={n.id} node={n} saved={n.url !== undefined && known.has(normalizeUrl(n.url))} />
+                <BookmarkRow key={n.id} node={n} saved={n.url !== undefined && known.has(normalizeUrl(n.url))} sel={sel} />
               ))}
             </ul>
           )
         ) : (
-          <Nodes nodes={tree.flatMap((r) => (r.url === undefined && r.title === '' ? (r.children ?? []) : [r]))} known={known} depth={0} />
+          <Nodes nodes={tree.flatMap((r) => (r.url === undefined && r.title === '' ? (r.children ?? []) : [r]))} known={known} depth={0} sel={sel} />
         )}
       </section>
     </div>

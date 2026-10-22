@@ -789,6 +789,16 @@ test('bookmarks: browser bookmarks are listed, copied into a collection and remo
   await expect(list.getByText('First mark')).toHaveCount(0);
   await list.getByRole('textbox', { name: 'Search the bookmarks' }).fill('');
 
+  // Pick one bookmark by hand and send it to the Inbox (a link that is not saved yet, so no duplicate warning).
+  await list.getByRole('checkbox', { name: 'Select First mark' }).check();
+  await p.getByRole('button', { name: 'Send 1 to Inbox' }).click();
+  await expect(p.getByRole('status')).toContainText('Sent 1 bookmark to the Inbox.');
+  await expect(list.getByRole('checkbox', { name: 'Select First mark' })).not.toBeChecked();
+  await list.getByRole('checkbox', { name: 'Select all in E2E folder' }).check();
+  await expect(p.getByRole('button', { name: 'Send 2 to Inbox' })).toBeEnabled();
+  await list.getByRole('checkbox', { name: 'Select all in E2E folder' }).uncheck();
+  await expect(p.getByRole('button', { name: 'Send 0 to Inbox' })).toBeDisabled();
+
   await p.getByRole('button', { name: /^Copy \d+ new links?$/ }).click();
   await expect(p.getByRole('status')).toContainText(/Imported \d+ links? into/);
   await list.getByRole('button', { name: /^E2E folder/ }).click().catch(() => undefined);
