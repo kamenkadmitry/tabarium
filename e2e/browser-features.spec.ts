@@ -789,6 +789,7 @@ test('bookmarks: browser bookmarks are listed, copied into a collection and remo
   await expect(list.getByText('First mark')).toHaveCount(0);
   await list.getByRole('textbox', { name: 'Search the bookmarks' }).fill('');
 
+  await list.getByRole('button', { name: /^E2E folder/ }).click(); // clearing the search folded the tree
   // Pick one bookmark by hand and send it to the Inbox (a link that is not saved yet, so no duplicate warning).
   await list.getByRole('checkbox', { name: 'Select First mark' }).check();
   await p.getByRole('button', { name: 'Send 1 to Inbox' }).click();
