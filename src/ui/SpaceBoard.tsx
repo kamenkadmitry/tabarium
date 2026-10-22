@@ -1,9 +1,10 @@
-import { Layers } from 'lucide-react';
+import { Funnel, Layers } from 'lucide-react';
 import { useState } from 'react';
 import type { BoardView } from '../core/boardTypes';
 import type { Card, Collection, Tag } from '../core/types';
 import { CollectionCard, type CollectionActions } from './CollectionCard';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
+import { EmptyState } from './EmptyState';
 import type { CardSelection } from './useCardSelection';
 
 interface Props {
@@ -93,13 +94,9 @@ export function SpaceBoard(props: Props) {
         } ${over ? 'border-primary bg-surface-2' : 'border-line'}`}
       >
         {empty && props.filtered ? (
-          <p className="text-sm text-muted">No collection matches the current filter.</p>
+          <EmptyState icon={<Funnel />} title="No collection matches the current filter" hint="Clear a filter chip above to see everything again." />
         ) : empty ? (
-          <div>
-            <Layers size={34} aria-hidden className="mx-auto text-muted" />
-            <p className="mt-3 font-bold">No collections yet</p>
-            <p className="mt-1 text-sm text-muted">Drag a tab here, or save tabs, to create your first collection.</p>
-          </div>
+          <EmptyState icon={<Layers />} title="No collections yet" hint="Drag a tab here, or save tabs, to create your first collection." />
         ) : (
           <p className="text-sm text-muted">Drop tabs here to create a new collection</p>
         )}

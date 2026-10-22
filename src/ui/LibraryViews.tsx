@@ -1,6 +1,8 @@
+import { Copy, SearchX } from 'lucide-react';
 import type { Card, Collection, Space } from '../core/types';
 import type { OpenTab } from '../platform/ports';
 import { CardRow, type CardRowActions, hostOf } from './CardRow';
+import { EmptyState } from './EmptyState';
 
 interface ResultGroup {
   collection: Collection;
@@ -18,7 +20,7 @@ export function SearchResults(props: {
   onAddOpenTab: (tabId: number) => void;
 }) {
   if (props.groups.length === 0 && props.openTabs.length === 0) {
-    return <p className="mt-16 text-center text-muted">No tabs match “{props.query}”.</p>;
+    return <EmptyState className="mt-16" icon={<SearchX />} title={`No tabs match “${props.query}”`} hint="Try another word, or search by #hashtag." />;
   }
   return (
     <div className="flex max-w-2xl flex-col gap-4">
@@ -66,7 +68,7 @@ export function DuplicatesView(props: {
   groups: readonly { url: string; cards: Card[]; collections: Map<string, Collection> }[];
   cardActions: (card: Card) => CardRowActions;
 }) {
-  if (props.groups.length === 0) return <p className="mt-16 text-center text-muted">No duplicate tabs. Tidy library!</p>;
+  if (props.groups.length === 0) return <EmptyState className="mt-16" icon={<Copy />} title="No duplicate tabs" hint="Every link is saved once — nothing to tidy." />;
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       {props.groups.map((g) => (

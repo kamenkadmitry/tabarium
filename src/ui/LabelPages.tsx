@@ -1,14 +1,16 @@
-import { Search, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { Hash, Search, Tag as TagIcon, Trash2, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { Card, Hashtag, Tag } from '../core/types';
 import { hostOf, PageFavicon } from './CardRow';
 import { SWATCHES } from './colors';
 import { inputClass } from './Dialog';
+import { EmptyState } from './EmptyState';
 
 const box = 'rounded-2xl border border-line bg-surface';
 const addButton =
   'flex h-11 shrink-0 items-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
 const trash = 'grid size-9 shrink-0 place-items-center rounded-md text-muted transition-colors duration-150 hover:text-danger';
+const emptyAction = 'h-9 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2';
 
 function Segmented<T extends string>(props: { label: string; value: T; options: readonly { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
@@ -84,6 +86,7 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
   const [title, setTitle] = useState('');
   const [color, setColor] = useState<string>(SWATCHES[0].value);
   const [colorFor, setColorFor] = useState<string | null>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<TagSort>('az');
   const [filter, setFilter] = useState<TagFilter>('all');
@@ -108,7 +111,7 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
       >
         <p className="mb-2 text-sm font-semibold">New tag</p>
         <div className="flex gap-2">
-          <input aria-label="Tag name" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tag name" className={inputClass} />
+          <input ref={nameInput} aria-label="Tag name" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tag name" className={inputClass} />
           <button className={addButton} disabled={title.trim() === ''}>
             Add
           </button>
@@ -219,7 +222,23 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
             </li>
           );
         })}
-        {shown.length === 0 && <li className="p-6 text-center text-sm text-muted">{tags.length === 0 ? 'No tags yet.' : 'No tag matches.'}</li>}
+        {shown.length === 0 &&
+          (tags.length === 0 ? (
+            <li>
+              <EmptyState
+                icon={<TagIcon />}
+                title="No tags yet"
+                hint="Tags are coloured labels you can put on collections and on links."
+                action={
+                  <button type="button" className={emptyAction} onClick={() => nameInput.current?.focus()}>
+                    New tag
+                  </button>
+                }
+              />
+            </li>
+          ) : (
+            <li className="p-6 text-center text-sm text-muted">No tag matches.</li>
+          ))}
       </ul>
     </div>
   );
@@ -248,6 +267,7 @@ const PREVIEW = 8;
 /** Free-form #hashtags for links. Built for hundreds of them: letter groups, counts, search, a side panel per hashtag. */
 export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDelete, onMerge, onRemoveFrom, onDeleteUnused }: HashtagsPageProps) {
   const [name, setName] = useState('');
+  const nameInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<HashtagSort>('az');
   const [filter, setFilter] = useState<HashtagFilter>('all');
@@ -296,7 +316,7 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
           setName('');
         }}
       >
-        <input aria-label="Hashtag name" value={name} onChange={(e) => setName(e.target.value)} placeholder="New hashtag, e.g. #to-read" className={inputClass} />
+        <input ref={nameInput} aria-label="Hashtag name" value={name} onChange={(e) => setName(e.target.value)} placeholder="New hashtag, e.g. #to-read" className={inputClass} />
         <button className={addButton} disabled={name.trim() === ''}>
           Add
         </button>
@@ -359,7 +379,21 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
               </ul>
             </div>
           ))}
-          {shown.length === 0 && <p className="py-6 text-sm text-muted">{hashtags.length === 0 ? 'No hashtags yet.' : 'No hashtag matches.'}</p>}
+          {shown.length === 0 &&
+            (hashtags.length === 0 ? (
+              <EmptyState
+                icon={<Hash />}
+                title="No hashtags yet"
+                hint="Hashtags are quick topic labels for links, like #rust or #to-read."
+                action={
+                  <button type="button" className={emptyAction} onClick={() => nameInput.current?.focus()}>
+                    New hashtag
+                  </button>
+                }
+              />
+            ) : (
+              <p className="py-6 text-sm text-muted">No hashtag matches.</p>
+            ))}
         </div>
 
         {selected && (

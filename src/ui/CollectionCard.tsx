@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ExternalLink, GripVertical, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, GripVertical, Link2, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Tag } from '../core/types';
 import type { BoardView } from '../core/boardTypes';
@@ -289,9 +289,10 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
           {indicator === null && <li aria-hidden className="mx-1 h-0.5 rounded bg-primary" />}
         </ul>
       ) : (
-        <p className={`px-4 py-5 text-center text-sm text-muted ${indicator === null ? 'text-primary' : ''}`}>
-          Empty. Add a link, drop a tab here, or save your open tabs.
-        </p>
+        <div className={`px-4 py-5 text-center text-sm ${indicator === null ? 'text-primary' : 'text-muted'}`} data-empty-state>
+          <Link2 size={20} aria-hidden className="mx-auto" />
+          <p className="mt-1.5">Empty. Add a link below, drop a tab here, or save your open tabs.</p>
+        </div>
       )}
       {expanded && (
         <footer className="border-t border-line p-2">

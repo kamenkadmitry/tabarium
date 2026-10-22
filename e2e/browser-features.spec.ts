@@ -195,6 +195,51 @@ test('profile: the sidebar shows a Local badge and the name set in Settings', as
   await p.close();
 });
 
+test('empty states: icon, one sentence and the primary action', async () => {
+  const p = await openLibraryWithSpace('Empty');
+  p.setDefaultTimeout(10_000);
+
+  // A space board without collections explains itself.
+  const board = p.locator('[data-empty-state]', { hasText: 'No collections yet' });
+  await expect(board).toBeVisible();
+  await expect(board.locator('svg')).toHaveCount(1);
+
+  // An empty collection explains itself; "Add link" sits right under it.
+  await addCollectionWithLinks(p, 'Pile', []);
+  const pile = p.locator('section[aria-label="Pile"]');
+  await expect(pile.locator('[data-empty-state]')).toContainText('Empty. Add a link');
+  await expect(pile.getByRole('button', { name: 'Add link' })).toBeVisible();
+
+  // Starred: the primary action takes you back to the board.
+  await p.getByRole('button', { name: 'Starred', exact: true }).click();
+  const starred = p.locator('[data-empty-state]', { hasText: 'Nothing starred yet' });
+  await expect(starred).toBeVisible();
+  await expect(starred.locator('svg')).toHaveCount(1);
+  await starred.getByRole('button', { name: 'Open a space' }).click();
+  await expect(p.getByRole('button', { name: 'New collection' })).toBeVisible();
+
+  // Tags: the primary action focuses the new-tag input. Runs before the labels test, so no tags exist yet.
+  await p.getByRole('button', { name: 'Tags', exact: true }).click();
+  const noTags = p.locator('[data-empty-state]', { hasText: 'No tags yet' });
+  await expect(noTags).toBeVisible();
+  await noTags.getByRole('button', { name: 'New tag' }).click();
+  await expect(p.getByLabel('Tag name')).toBeFocused();
+
+  // Hashtags: same.
+  await p.getByRole('button', { name: 'Hashtags', exact: true }).click();
+  const noHashtags = p.locator('[data-empty-state]', { hasText: 'No hashtags yet' });
+  await expect(noHashtags).toBeVisible();
+  await noHashtags.getByRole('button', { name: 'New hashtag' }).click();
+  await expect(p.getByLabel('Hashtag name')).toBeFocused();
+
+  // Duplicates: a good kind of empty.
+  await p.getByRole('button', { name: 'Duplicates', exact: true }).click();
+  const noDups = p.locator('[data-empty-state]', { hasText: 'No duplicate tabs' });
+  await expect(noDups).toBeVisible();
+  await expect(noDups.locator('svg')).toHaveCount(1);
+  await p.close();
+});
+
 test('tags and hashtags: own pages, picked or created while adding and editing a link', async () => {
   const p = await openLibraryWithSpace('Labels');
   await addCollectionWithLinks(p, 'Reading', []);

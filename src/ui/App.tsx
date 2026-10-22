@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { PanelRightOpen, Plus, Search, X } from 'lucide-react';
+import { PanelRightOpen, Plus, Search, Star, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
@@ -31,6 +31,7 @@ import { SpaceDialog } from './dialogs/SpaceDialog';
 import { TagsDialog } from './dialogs/TagsDialog';
 import { UndoToast } from './UndoToast';
 import { HashtagsPage, TagsPage } from './LabelPages';
+import { EmptyState } from './EmptyState';
 import { LabelsProvider } from './labels';
 import { DuplicatesView, SearchResults } from './LibraryViews';
 import { OpenTabsPanel } from './OpenTabsPanel';
@@ -387,7 +388,26 @@ export function App() {
                 .map((c) => (
                   <CardRow key={c.id} card={c} draggable={false} {...cardActions(c)} />
                 ))}
-              {!cards.some((c) => c.starred) && <li className="p-6 text-center text-sm text-muted">Star a tab to find it here.</li>}
+              {!cards.some((c) => c.starred) && (
+                <li>
+                  <EmptyState
+                    icon={<Star />}
+                    title="Nothing starred yet"
+                    hint="Star a link to keep it here — the star is in the row's action bar."
+                    action={
+                      firstSpaceId !== undefined ? (
+                        <button
+                          type="button"
+                          className="h-9 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
+                          onClick={() => setView({ kind: 'space', spaceId: firstSpaceId })}
+                        >
+                          Open a space
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                </li>
+              )}
             </ul>
           )}
 
