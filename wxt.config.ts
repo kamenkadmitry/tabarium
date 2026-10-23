@@ -20,6 +20,12 @@ export default defineConfig({
       optional_host_permissions: e2e ? [] : ['https://*/*', 'http://*/*'],
       host_permissions: e2e ? ['https://*/*', 'http://*/*'] : [],
       optional_permissions: e2e ? [] : [...OPTIONAL],
+      commands: {
+        'save-current-tab': {
+          suggested_key: { default: 'Alt+Shift+S' },
+          description: 'Save the current tab to Tabarium',
+        },
+      },
     };
   },
 });

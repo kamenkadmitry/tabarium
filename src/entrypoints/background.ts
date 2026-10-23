@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { attachAlarmHandler, syncBackupAlarm } from '../background/backupAlarm';
+import { attachCommandHandler, saveActiveTab } from '../background/commands';
 import { attachContextMenuHandler, handleClick, syncContextMenu } from '../background/contextMenu';
 import { applyToolbarBehavior } from '../background/toolbar';
 import { db } from '../core/instance';
@@ -9,6 +10,7 @@ import { saveToInbox } from '../core/quicksave';
 async function syncAll(): Promise<void> {
   attachAlarmHandler();
   attachContextMenuHandler();
+  attachCommandHandler();
   await Promise.all([syncBackupAlarm(), syncContextMenu(), applyToolbarBehavior()]);
 }
 
@@ -16,6 +18,7 @@ export default defineBackground(() => {
   // Listeners must be registered synchronously on every worker start so the browser can wake the worker.
   attachAlarmHandler();
   attachContextMenuHandler();
+  attachCommandHandler();
   // The popup override is not persisted by the browser, so it is re-applied every time the worker starts.
   applyToolbarBehavior().catch((e: unknown) => console.error('Tabarium: applying the toolbar behaviour failed', e));
   browser.runtime.onInstalled.addListener(() => void syncAll());
@@ -32,6 +35,7 @@ export default defineBackground(() => {
         items?: Parameters<typeof saveToInbox>[1];
       };
       if (m.type === 'e2e-save-to-inbox' && m.items) return saveToInbox(db, m.items); // puts links into the Inbox on purpose
+      if (m.type === 'e2e-save-current-tab') return saveActiveTab(); // real key presses can't reach the commands API from tests
       return m.type === 'e2e-context-click' && m.info ? handleClick(m.info, m.tab) : undefined;
     });
   }

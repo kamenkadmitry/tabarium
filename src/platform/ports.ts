@@ -110,9 +110,24 @@ export interface BackupSchedulePort {
   resync(): Promise<void>;
 }
 
+export interface ShortcutInfo {
+  /** Command id from the manifest (e.g. "save-current-tab"). */
+  name: string;
+  /** Human-readable label declared alongside the command. */
+  description: string;
+  /** The bound keys, e.g. "Alt+Shift+S"; empty when the user has not assigned one. */
+  shortcut: string;
+}
+
+export interface ShortcutsPort {
+  /** The commands declared in the manifest with their currently bound keys. */
+  list(): Promise<ShortcutInfo[]>;
+}
+
 export interface Platform {
   permissions: PermissionsPort;
   tabs: TabsPort;
   backupSchedule: BackupSchedulePort;
   bookmarks: BookmarksPort;
+  shortcuts: ShortcutsPort;
 }

@@ -2,15 +2,11 @@ import { browser } from 'wxt/browser';
 import { db } from '../core/instance';
 import { quickSave } from '../core/quicksave';
 import { loadSettings } from '../core/settings';
+import { flashBadge } from './badge';
 
 const PAGE = 'tabarium-save-page';
 const LINK = 'tabarium-save-link';
 const ALL = 'tabarium-save-all';
-
-async function flashBadge(text: string): Promise<void> {
-  await browser.action.setBadgeText({ text });
-  setTimeout(() => void browser.action.setBadgeText({ text: '' }), 2500);
-}
 
 async function hasTabsPermission(): Promise<boolean> {
   return browser.permissions.contains({ permissions: ['tabs'] });

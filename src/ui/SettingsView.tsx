@@ -8,6 +8,7 @@ import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
+import type { ShortcutInfo } from '../platform/ports';
 import { detectProviderFromKey } from '../core/ai/client';
 import { testConnection } from '../core/ai/tasks';
 import { isAiConfigured, withProviderAccess } from './ai';
@@ -80,6 +81,10 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const [status, setStatus] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
+  const [shortcuts, setShortcuts] = useState<ShortcutInfo[]>([]);
+  useEffect(() => {
+    void platform.shortcuts.list().then(setShortcuts);
+  }, [platform]);
 
   // Palette swatches preview the theme that is actually on screen, so "system" resolves to light or dark.
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -427,6 +432,20 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             </button>
           ))}
         </div>
+      </Section>
+
+      <Section title="Keyboard shortcuts" description="Rebind a key in your browser's extension shortcut settings.">
+        <ul className="space-y-1.5">
+          {shortcuts.map((s) => (
+            <li key={s.name} className="flex items-center justify-between gap-3 text-sm">
+              <span>{s.description}</span>
+              <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-xs">{s.shortcut || 'Not set'}</kbd>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted">
+          Edit at <span className="font-mono">chrome://extensions/shortcuts</span>
+        </p>
       </Section>
 
       <Section

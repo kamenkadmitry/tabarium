@@ -37,6 +37,9 @@ export function createDemoPlatform(): Platform {
       remove: async () => undefined,
     },
     backupSchedule: { resync: async () => undefined },
+    shortcuts: {
+      list: async () => [{ name: 'save-current-tab', description: 'Save the current tab to Tabarium', shortcut: 'Alt+Shift+S' }],
+    },
     tabs: {
       listWindowTabs: async () => [...tabs],
       closeTabs: async (ids) => {

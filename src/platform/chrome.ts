@@ -76,6 +76,13 @@ export function createChromePlatform(): Platform {
         await requireExtension().runtime.sendMessage({ type: 'sync-settings' });
       },
     },
+    shortcuts: {
+      async list() {
+        return (await requireExtension().commands.getAll()).flatMap((c) =>
+          c.name === undefined ? [] : [{ name: c.name, description: c.description ?? '', shortcut: c.shortcut ?? '' }],
+        );
+      },
+    },
     tabs: {
       async listWindowTabs() {
         const tabs = await requireExtension().tabs.query({ currentWindow: true });

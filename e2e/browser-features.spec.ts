@@ -1206,6 +1206,33 @@ test('colour palette: settings swatch re-skins the app and survives a reload', a
   await p.close();
 });
 
+test('keyboard shortcut: the command saves the focused web tab and flashes the badge', async () => {
+  // The manifest declares the command with the suggested key, listed in Settings for rebinding.
+  const commands = await app.worker.evaluate(async () =>
+    (await chrome.commands.getAll()).map((c) => ({ name: c.name, shortcut: c.shortcut })),
+  );
+  expect(commands).toContainEqual({ name: 'save-current-tab', shortcut: 'Alt+Shift+S' });
+
+  // The library page sends the trigger (a service worker cannot message itself); a web tab stays focused.
+  const p = await openLibraryWithSpace('Keys');
+  const target = await app.context.newPage();
+  await target.goto(web('key-save'));
+  await target.bringToFront();
+
+  // Real key presses can't reach the commands API in tests, so the e2e hook runs the same handler.
+  await p.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-save-current-tab' }));
+  await expect.poll(() => app.worker.evaluate(() => chrome.action.getBadgeText({}))).toBe('+1');
+
+  // The link landed in whatever collection is the current quick-save target — search finds it anywhere.
+  await p.getByPlaceholder('Search all tabs').fill('key-save');
+  await expect(p.locator('main').getByText('Page key-save')).toBeVisible();
+
+  await p.getByRole('button', { name: 'Settings' }).click();
+  await expect(p.getByText('Save the current tab to Tabarium')).toBeVisible();
+  await expect(p.getByText('Alt+Shift+S')).toBeVisible();
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });
