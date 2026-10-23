@@ -1042,6 +1042,51 @@ test('deleting a link offers Undo that puts it back where it was', async () => {
   await p.close();
 });
 
+test('navigation: Back/Forward move through views and a stale space falls back to default', async () => {
+  const p = await openLibraryWithSpace('Navig');
+  const back = p.getByRole('button', { name: 'Go back' });
+  const fwd = p.getByRole('button', { name: 'Go forward' });
+
+  // The entry written when the space was created is already one deep.
+  await p.getByRole('button', { name: 'Tags', exact: true }).click();
+  await expect(p.getByRole('heading', { name: 'Tags' })).toBeVisible();
+  await p.getByRole('button', { name: 'Starred', exact: true }).click();
+  await expect(p.getByRole('heading', { name: 'Starred' })).toBeVisible();
+
+  // The browser's own Back/Forward walk the in-app history.
+  await p.goBack();
+  await expect(p.getByRole('heading', { name: 'Tags' })).toBeVisible();
+  await p.goForward();
+  await expect(p.getByRole('heading', { name: 'Starred' })).toBeVisible();
+
+  // The header chevrons do the same and know the edges of the stack.
+  await back.click();
+  await expect(p.getByRole('heading', { name: 'Tags' })).toBeVisible();
+  await back.click();
+  await expect(p.getByRole('heading', { name: 'Navig' })).toBeVisible();
+  await expect(fwd).toBeEnabled();
+  await fwd.click();
+  await fwd.click();
+  await expect(p.getByRole('heading', { name: 'Starred' })).toBeVisible();
+  await expect(fwd).toBeDisabled();
+
+  // A history entry that points at a deleted space falls back to the default view.
+  await p.getByRole('button', { name: 'Create space' }).click();
+  await p.getByLabel('Space name').fill('Doomed');
+  await p.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(p.getByRole('heading', { name: 'Doomed' })).toBeVisible();
+  await p.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(p.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  p.once('dialog', (d) => void d.accept());
+  const del = p.getByRole('button', { name: 'Delete space Doomed' });
+  await del.focus();
+  await del.click();
+  await p.goBack();
+  await expect(p.getByRole('heading', { name: 'Doomed' })).toHaveCount(0);
+  await expect(p.getByPlaceholder('Search all tabs, notes and links')).toBeVisible();
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

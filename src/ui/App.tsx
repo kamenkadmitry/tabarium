@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { PanelRightOpen, Plus, Search, Star, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, PanelRightOpen, Plus, Search, Star, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
@@ -71,6 +71,15 @@ type DialogState =
 
 const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', bookmarks: 'Browser bookmarks', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
 
+/** One entry in the tab's history stack; pos orders entries so the chevrons know where the edges are. */
+interface NavEntry {
+  pos: number;
+  view: View | null;
+}
+
+const sameView = (a: View | null, b: View | null): boolean =>
+  a === b || (a?.kind === b?.kind && (a?.kind !== 'space' || (b?.kind === 'space' && a.spaceId === b.spaceId)));
+
 export function App() {
   const platform = usePlatform();
   const data = useLibraryData();
@@ -103,7 +112,12 @@ export function App() {
   // Until the user picks something, show the first space.
   // The Inbox is always there; the welcome screen is for the first space of your own.
   const firstSpaceId = data?.spaces.find((s) => s.kind !== 'inbox')?.id;
-  const view: View | null = selectedView ?? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null);
+  const requested: View | null = selectedView ?? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null);
+  // A view naming a space that no longer exists (e.g. a history entry to a deleted space) falls back to default.
+  const view: View | null =
+    requested?.kind === 'space' && data && !data.spaces.some((s) => s.id === requested.spaceId)
+      ? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null)
+      : requested;
 
   const reportError = useCallback((what: string, e: unknown) => {
     console.error(`Tabarium: ${what} failed`, e);
@@ -133,6 +147,47 @@ export function App() {
   const inboxViewActive = view?.kind === 'space' && data?.spaces.find((sp) => sp.id === view.spaceId)?.kind === 'inbox';
   const reading = useInboxReading({ enabled: settings?.fetchDescriptions === true, active: inboxViewActive, cards: inboxCardList, reportError });
   const clearPicked = picked.clear;
+
+  /** Applies a view with the resets a navigation always carries: selection, search and board filter. */
+  const applyView = (v: View | null) => {
+    setView(v);
+    clearPicked();
+    setQuery('');
+    setFilter(NO_FILTER);
+  };
+  /** pos is where the cursor sits in our history slice; seq is its forward edge (the highest pos written). */
+  const [nav, setNav] = useState(() => {
+    const entry = history.state as NavEntry | null;
+    const pos = entry && typeof entry.pos === 'number' ? entry.pos : 0;
+    return { pos, seq: pos };
+  });
+  /** Latest applyView for the popstate listener bound once below; a stale space falls back where `view` is derived. */
+  const popRef = useRef<(v: View | null) => void>(() => {});
+  useEffect(() => {
+    popRef.current = applyView;
+  });
+  /** Moves to a view and records it in the tab's history unless it is where we already are. */
+  const navigate = (v: View | null) => {
+    if (!sameView(v, view)) {
+      const pos = nav.seq + 1;
+      history.pushState({ pos, view: v } satisfies NavEntry, '');
+      setNav({ pos, seq: pos });
+    }
+    applyView(v);
+  };
+  useEffect(() => {
+    if (!(history.state as NavEntry | null)) history.replaceState({ pos: 0, view: null } satisfies NavEntry, '');
+    const onPop = (e: PopStateEvent) => {
+      const st = e.state as NavEntry | null;
+      if (st && typeof st.pos === 'number' && 'view' in st) {
+        setNav((s) => ({ pos: st.pos, seq: Math.max(s.seq, st.pos) }));
+        popRef.current(st.view ?? null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   // Esc drops the selection, unless it is used by something that is open (a field, the editor, a dialog).
   const hasPicked = picked.selected.size > 0;
   useEffect(() => {
@@ -295,12 +350,7 @@ export function App() {
         view={view}
         inboxCount={inboxCards(spaces, collections, cards).length}
         duplicateCount={data.duplicates.length}
-        onSelect={(v) => {
-          setView(v);
-          clearPicked();
-          setQuery('');
-          setFilter(NO_FILTER);
-        }}
+        onSelect={navigate}
         onCreateSpace={() => setDialog({ kind: 'space' })}
         onRenameSpace={(space) => setDialog({ kind: 'rename-space', space })}
         onDeleteSpace={(space) => {
@@ -308,7 +358,7 @@ export function App() {
           if (confirm(`Delete the space “${space.name}” with its ${n} collections and all their tabs?`)) {
             void run('Deleting space', async () => {
               undoable(await repo.deleteSpace(space.id));
-              if (view?.kind === 'space' && view.spaceId === space.id) setView(null);
+              if (view?.kind === 'space' && view.spaceId === space.id) navigate(null);
             });
           }
         }}
@@ -320,6 +370,26 @@ export function App() {
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-surface px-6 py-3">
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label="Go back"
+              disabled={nav.pos <= 0}
+              onClick={() => history.back()}
+              className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:opacity-40"
+            >
+              <ArrowLeft size={17} aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label="Go forward"
+              disabled={nav.pos >= nav.seq}
+              onClick={() => history.forward()}
+              className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:opacity-40"
+            >
+              <ArrowRight size={17} aria-hidden />
+            </button>
+          </div>
           {view?.kind === 'space' && activeSpace ? (
             <SpaceHeading name={activeSpace.name} icon={activeSpace.icon} collections={spaceCollections.length} tabs={spaceTabCount} />
           ) : (
@@ -399,7 +469,7 @@ export function App() {
                         <button
                           type="button"
                           className="h-9 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
-                          onClick={() => setView({ kind: 'space', spaceId: firstSpaceId })}
+                          onClick={() => navigate({ kind: 'space', spaceId: firstSpaceId })}
                         >
                           Open a space
                         </button>
@@ -597,7 +667,7 @@ export function App() {
           onSubmit={({ name, icon }) =>
             run('Creating space', async () => {
               const space = await repo.createSpace(name, icon);
-              setView({ kind: 'space', spaceId: space.id });
+              navigate({ kind: 'space', spaceId: space.id });
             })
           }
         />
