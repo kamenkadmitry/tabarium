@@ -3,7 +3,7 @@ import { attachAlarmHandler, syncBackupAlarm } from '../background/backupAlarm';
 import { attachCommandHandler, saveActiveTab } from '../background/commands';
 import { attachContextMenuHandler, handleClick, syncContextMenu } from '../background/contextMenu';
 import { applyToolbarBehavior } from '../background/toolbar';
-import { db } from '../core/instance';
+import { db, repo } from '../core/instance';
 import { saveToInbox } from '../core/quicksave';
 
 /** Re-applies everything that depends on optional permissions or settings. Safe to call repeatedly. */
@@ -33,9 +33,11 @@ export default defineBackground(() => {
         info?: Parameters<typeof handleClick>[0];
         tab?: Parameters<typeof handleClick>[1];
         items?: Parameters<typeof saveToInbox>[1];
+        name?: string;
       };
       if (m.type === 'e2e-save-to-inbox' && m.items) return saveToInbox(db, m.items); // puts links into the Inbox on purpose
       if (m.type === 'e2e-save-current-tab') return saveActiveTab(); // real key presses can't reach the commands API from tests
+      if (m.type === 'e2e-ensure-hashtag' && typeof m.name === 'string') return repo.ensureHashtag(m.name); // seeds a label the UI can't create headlessly
       return m.type === 'e2e-context-click' && m.info ? handleClick(m.info, m.tab) : undefined;
     });
   }

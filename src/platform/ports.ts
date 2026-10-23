@@ -65,6 +65,8 @@ export interface TabsPort {
   closeTabs(ids: readonly number[]): Promise<void>;
   /** Opens the URLs in background tabs; with `groupTitle` they are put in a tab group (needs `tabGroups`). */
   openUrls(urls: readonly string[], options?: OpenOptions): Promise<void>;
+  /** Opens a URL in a new foreground tab. */
+  openUrl(url: string): Promise<void>;
   /** Opens the URLs, then closes every other tab of the current window except the Tabarium page itself. Needs `tabs`. */
   replaceWindowTabs(urls: readonly string[], options?: OpenOptions): Promise<void>;
   /** The focused tab of the current window, or null if it is not a web page. Works via `activeTab` when the popup opens. */

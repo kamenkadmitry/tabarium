@@ -226,6 +226,9 @@ export function createChromePlatform(): Platform {
       async openUrls(urls, options) {
         await openInBackground(urls, options);
       },
+      async openUrl(url) {
+        await requireExtension().tabs.create({ url, active: true });
+      },
       async replaceWindowTabs(urls, options) {
         const api = requireExtension();
         const self = await api.tabs.getCurrent();

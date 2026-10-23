@@ -46,6 +46,7 @@ export function createDemoPlatform(): Platform {
         tabs = tabs.filter((t) => !ids.includes(t.id));
       },
       openUrls: async () => undefined,
+      openUrl: async () => undefined,
       listWindows: async () => [
         {
           id: 1,

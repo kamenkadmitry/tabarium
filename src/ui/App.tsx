@@ -9,6 +9,7 @@ import type { InboxGroup, InboxSort } from '../core/inbox';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../core/organise';
 import { ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
+import { cardSearchText } from './searchModel';
 import type { Card, Space } from '../core/types';
 import type { Deletion } from '../core/undo';
 import { usePlatform } from '../platform/context';
@@ -19,6 +20,7 @@ import type { CardRowActions } from './CardRow';
 import { BoardToolbar } from './BoardToolbar';
 import { BulkBar } from './BulkBar';
 import { CardRow } from './CardRow';
+import { CommandPalette } from './CommandPalette';
 import { AddToCollectionDialog } from './dialogs/AddToCollectionDialog';
 import { AiNamesDialog } from './dialogs/AiNamesDialog';
 import { AiDetailsDialog, type ProposedDetails } from './dialogs/AiDetailsDialog';
@@ -91,6 +93,7 @@ export function App() {
   /** Width while (and after) the panel edge is dragged; falls back to the saved width. */
   const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** The last delete's snapshot, held while the undo toast is up. A new delete replaces (and finalizes) it. */
   const [undo, setUndo] = useState<Deletion | null>(null);
@@ -228,6 +231,19 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [organizerOpen]);
 
+  // Ctrl/Cmd+K toggles the command palette from anywhere — including inside inputs and on views
+  // where the header search isn't rendered. A different open dialog keeps the shortcut for itself.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return;
+      if (document.querySelector('dialog[open]:not([data-command-palette])')) return;
+      e.preventDefault();
+      setPaletteOpen((open) => !open);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const plainPage =
     organizerOpen || view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
@@ -326,12 +342,7 @@ export function App() {
       setDialog({ kind: 'session', tabs: await platform.tabs.listWindowTabs() });
     });
 
-  const labelText = (c: Card) =>
-    [
-      ...c.tagIds.flatMap((id) => tags.find((t) => t.id === id)?.title ?? []),
-      ...c.hashtagIds.flatMap((id) => hashtags.find((h) => h.id === id)?.name ?? []).map((n) => `#${n}`),
-    ].join(' ');
-  const matching = (c: Card) => `${c.title} ${c.customTitle ?? ''} ${c.url} ${c.note ?? ''} ${labelText(c)}`.toLowerCase().includes(q);
+  const matching = (c: Card) => cardSearchText(c, tags, hashtags).includes(q);
 
   const labelsApi = buildLabelsApi(tags, hashtags, cards);
   const inboxSlot = editor.slot(labelsApi, 'stack', suggestForLink);
@@ -881,6 +892,37 @@ export function App() {
               if (closeTabs) await platform.tabs.closeTabs(approved.map((t) => t.id));
             })
           }
+        />
+      )}
+      {paletteOpen && (
+        <CommandPalette
+          spaces={spaces}
+          collections={collections}
+          cards={cards}
+          tags={tags}
+          hashtags={hashtags}
+          onClose={() => setPaletteOpen(false)}
+          onOpenLink={(c) => {
+            setPaletteOpen(false);
+            void run('Opening link', () => platform.tabs.openUrl(c.url));
+          }}
+          onGoCollection={(col) => {
+            setPaletteOpen(false);
+            navigate({ kind: 'space', spaceId: col.spaceId });
+            void run('Opening collection', () => repo.updateCollection(col.id, { expanded: true }));
+            // The section mounts after navigation (and after the expand lands); poll the next frames for it.
+            let tries = 0;
+            const reveal = () => {
+              const el = document.querySelector(`[data-collection-id="${col.id}"]`);
+              if (el) el.scrollIntoView({ block: 'center' });
+              else if (++tries < 30) requestAnimationFrame(reveal);
+            };
+            requestAnimationFrame(reveal);
+          }}
+          onNavigate={(v) => {
+            setPaletteOpen(false);
+            navigate(v);
+          }}
         />
       )}
       <UndoToast

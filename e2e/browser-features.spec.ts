@@ -1233,6 +1233,65 @@ test('keyboard shortcut: the command saves the focused web tab and flashes the b
   await p.close();
 });
 
+test('command palette: Ctrl+K searches everything and jumps by keyboard', async () => {
+  const p = await openLibraryWithSpace('Jump');
+  // A link to find, plus a hashtag for the '#' mode (the library page sends the seeds; a worker cannot message itself).
+  await p.evaluate(() =>
+    chrome.runtime.sendMessage({ type: 'e2e-save-to-inbox', items: [{ title: 'Palette needle link', url: 'https://example.test/pal-needle', favIconUrl: null }] }),
+  );
+  await p.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-ensure-hashtag', name: 'palcheck' }));
+
+  // A second space whose collection the palette jumps to.
+  await p.getByRole('button', { name: 'Create space' }).click();
+  await p.getByLabel('Space name').fill('Far');
+  await p.getByRole('button', { name: 'Create', exact: true }).click();
+  await addCollectionWithLinks(p, 'Remote spot', []);
+  // The create-collection dialog unmounts asynchronously after its run() lands; while any dialog is
+  // open the palette guard keeps Ctrl+K for it, so wait for a clean slate before opening ours.
+  await expect(p.locator('dialog[open]')).toHaveCount(0);
+
+  // Ctrl+K opens the palette; the status region announces the result count to screen readers.
+  // The browser reserves Ctrl+K before the page sees it, so tests dispatch the same event the listener watches.
+  const ctrlK = () => p.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
+  await ctrlK();
+  const palette = p.getByRole('dialog', { name: 'Command palette' });
+  await expect(palette).toBeVisible();
+  const box = palette.getByRole('combobox');
+  const options = palette.getByRole('option');
+  await expect(options.first()).toBeVisible();
+
+  // A link result opens its page in a new tab on Enter.
+  await box.fill('needle');
+  await expect(options).toHaveCount(1);
+  await expect(palette.getByRole('status')).toHaveText('1 result');
+  const [opened] = await Promise.all([app.context.waitForEvent('page'), p.keyboard.press('Enter')]);
+  await expect(opened).toHaveURL('https://example.test/pal-needle');
+  await opened.close();
+
+  // A collection result lands on its space board with the section revealed.
+  await ctrlK();
+  await box.fill('remote');
+  await expect(options).toHaveCount(1);
+  await expect(options.first()).toContainText('Remote spot');
+  await p.keyboard.press('Enter');
+  await expect(p.locator('section[aria-label="Remote spot"]')).toBeVisible();
+
+  // '#' restricts results to hashtags; Enter goes to the Hashtags page.
+  await ctrlK();
+  await box.fill('#palch');
+  await expect(options).toHaveCount(1);
+  await expect(options.first()).toContainText('#palcheck');
+  await p.keyboard.press('Enter');
+  await expect(p.getByRole('heading', { name: 'Hashtags' })).toBeVisible();
+
+  // Escape closes the palette.
+  await ctrlK();
+  await expect(palette).toBeVisible();
+  await p.keyboard.press('Escape');
+  await expect(palette).toHaveCount(0);
+  await p.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

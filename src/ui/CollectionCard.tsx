@@ -195,6 +195,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
   return (
     <section
       aria-label={collection.title}
+      data-collection-id={collection.id}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) clear();
