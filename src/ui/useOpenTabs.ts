@@ -45,12 +45,14 @@ export function useOpenTabs(enabled: boolean) {
     if (!enabled || access !== 'granted') return;
     // Scheduled instead of called inline: the first read must not set state synchronously inside the effect.
     const first = setTimeout(() => void refresh(), 0);
+    // `groupsAccess` re-subscribes after a mid-session grant: the tabGroups events only exist once the
+    // optional permission is granted, and the watcher picks its event list at subscribe time.
     const unwatch = platform.tabs.watch(() => void refresh());
     return () => {
       clearTimeout(first);
       unwatch();
     };
-  }, [enabled, access, platform, refresh]);
+  }, [enabled, access, groupsAccess, platform, refresh]);
 
   /** Must run from a click: the browser shows the permission prompt only for a user gesture. */
   const grant = useCallback(async () => {

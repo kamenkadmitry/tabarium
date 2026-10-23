@@ -41,6 +41,7 @@ import { Sidebar, type View } from './Sidebar';
 import { parseDraggedLinks } from './dnd';
 import { SpaceBoard } from './SpaceBoard';
 import { SpaceHeading } from './SpaceHeading';
+import { TabOrganizer } from './TabOrganizer';
 import { useLibraryData } from './useLibraryData';
 import { useDuplicateGuard } from './DuplicateGuard';
 import { buildLabelsApi } from './labelsApi';
@@ -69,7 +70,7 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', bookmarks: 'Browser bookmarks', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings' } as const;
+const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', bookmarks: 'Browser bookmarks', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings', organizer: 'Tab organizer' } as const;
 
 /** One entry in the tab's history stack; pos orders entries so the chevrons know where the edges are. */
 interface NavEntry {
@@ -118,6 +119,7 @@ export function App() {
     requested?.kind === 'space' && data && !data.spaces.some((s) => s.id === requested.spaceId)
       ? (firstSpaceId ? { kind: 'space', spaceId: firstSpaceId } : null)
       : requested;
+  const organizerOpen = view?.kind === 'organizer';
 
   const reportError = useCallback((what: string, e: unknown) => {
     console.error(`Tabarium: ${what} failed`, e);
@@ -202,12 +204,33 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [hasPicked, clearPicked]);
 
-  const plainPage = view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
+  // Esc leaves the tab organizer the same way the Back button does. Text-entry controls keep Esc for
+  // themselves (the rename input cancels with it); checkboxes and buttons don't swallow it.
+  const leavingOrganizer = useRef(false);
+  useEffect(() => {
+    if (!organizerOpen) {
+      leavingOrganizer.current = false;
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      // One pop per press, and never again once leaving: popstate is async, a second Escape must not overshoot.
+      if (e.key !== 'Escape' || e.defaultPrevented || leavingOrganizer.current) return;
+      const el = e.target as HTMLElement;
+      if (el.closest('input:not([type=checkbox]):not([type=radio]), textarea, select, form, dialog, [role=menu]')) return;
+      leavingOrganizer.current = true;
+      history.back();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [organizerOpen]);
+
+  const plainPage =
+    organizerOpen || view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
   const tabsCtl = useOpenTabsController({
-    enabled: panelEnabled,
+    enabled: panelEnabled || organizerOpen,
     settings,
-    spaceId: view?.kind === 'space' ? view.spaceId : undefined,
+    spaceId: view?.kind === 'space' ? view.spaceId : organizerOpen ? firstSpaceId : undefined,
     run,
     guard,
   });
@@ -496,6 +519,26 @@ export function App() {
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 
+          {view?.kind === 'organizer' && (
+            <TabOrganizer
+              access={tabsCtl.access}
+              groupsAccess={tabsCtl.groupsAccess}
+              windows={tabsCtl.windows}
+              error={tabsCtl.error}
+              selected={tabsCtl.selected}
+              onToggle={tabsCtl.toggle}
+              onFocus={tabsCtl.focus}
+              onCloseTab={tabsCtl.closeTab}
+              onSaveGroup={tabsCtl.saveGroup}
+              onMoveToGroup={tabsCtl.moveToGroup}
+              onMoveToUngrouped={tabsCtl.moveToUngrouped}
+              onCreateGroup={tabsCtl.createGroup}
+              onUpdateGroup={tabsCtl.updateGroup}
+              onGrant={tabsCtl.grant}
+              onGrantGroups={tabsCtl.grantGroups}
+            />
+          )}
+
           {view?.kind === 'tags' && (
             <TagsPage
               tags={tags}
@@ -645,6 +688,7 @@ export function App() {
           aiReady={aiReady}
           onGrant={() => void tabsCtl.grant()}
           onHide={() => saveSetting('Hiding open tabs', { openTabsPanel: false })}
+          onExpand={() => navigate({ kind: 'organizer' })}
           onMerge={tabsCtl.merge}
           onFocus={tabsCtl.focus}
           onCloseTab={tabsCtl.closeTab}

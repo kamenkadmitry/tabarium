@@ -13,6 +13,8 @@ interface Props {
   onClose?: () => void;
   /** "roomy" is the larger two-line chip used in the side panel and popup. */
   size?: 'compact' | 'roomy';
+  /** Draws the drop-position bar above the row while something is dragged over it. */
+  dropAbove?: boolean;
   /** Extra props for the <li>, e.g. drag handlers. */
   itemProps?: HTMLAttributes<HTMLLIElement>;
 }
@@ -21,7 +23,7 @@ interface Props {
  * A browser tab as a rounded chip: the site's icon and the page title. The focused tab of a window is
  * highlighted, hovering reveals a selection checkbox (in place of the icon) and a close button.
  */
-export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, size = 'compact', itemProps }: Props) {
+export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, size = 'compact', itemProps, dropAbove }: Props) {
   const roomy = size === 'roomy';
   const selectable = selected !== undefined && onToggleSelect !== undefined;
   const title = tab.title || tab.url;
@@ -31,6 +33,8 @@ export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, si
       data-open-tab-id={tab.id}
       aria-current={tab.active ? 'true' : undefined}
       className={`group flex items-center gap-3 rounded-xl border font-medium transition-colors duration-150 ${
+        dropAbove ? 'relative before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary ' : ''
+      }${
         roomy ? 'min-h-12 px-3 py-1.5 text-sm' : 'h-9 gap-2 px-2.5 text-xs'
       } ${
         selected ? 'border-primary bg-surface-2' : tab.active ? 'border-line bg-surface-2' : 'border-transparent bg-bg hover:bg-surface-2'

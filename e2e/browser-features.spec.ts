@@ -407,6 +407,78 @@ test('open tabs panel: shows browser tab groups, groups a selection, finds open 
   await p.close();
 });
 
+test('tab organizer: kanban of real tab groups, drags change browser groups, inline rename, Esc leaves', async () => {
+  // Two tabs in a real browser group, one loose tab.
+  const a = await app.context.newPage();
+  await a.goto(web('org-a'));
+  const b = await app.context.newPage();
+  await b.goto(web('org-b'));
+  const loose = await app.context.newPage();
+  await loose.goto(web('org-loose'));
+  const groupId = await app.worker.evaluate(async () => {
+    const tabs = await chrome.tabs.query({ url: ['https://example.test/org-a', 'https://example.test/org-b'] });
+    const ids = tabs.flatMap((t) => (t.id === undefined ? [] : [t.id]));
+    const id = await chrome.tabs.group({ tabIds: ids as [number, ...number[]] });
+    await chrome.tabGroups.update(id, { title: 'Frontend', color: 'blue' });
+    return id;
+  });
+
+  const p = await openLibraryWithSpace('Org');
+  const panel = p.getByRole('complementary', { name: 'Open tabs' });
+  await expect(panel.locator('[data-open-tab-id]', { hasText: 'Page org-loose' })).toBeVisible();
+
+  // The expand button opens the full-surface board: one column per real group plus Ungrouped.
+  await panel.getByRole('button', { name: 'Expand open tabs' }).click();
+  const board = p.getByRole('region', { name: 'Tab organizer' });
+  await expect(board).toBeVisible();
+  const column = board.getByRole('region', { name: 'Tab group Frontend' });
+  await expect(column.locator('[data-open-tab-id]', { hasText: 'Page org-a' })).toBeVisible();
+  const looseColumn = board.getByRole('region', { name: /Ungrouped tabs/ });
+  await expect(looseColumn.locator('[data-open-tab-id]', { hasText: 'Page org-loose' })).toBeVisible();
+
+  // Clicking the column title renames the real browser group inline.
+  await column.getByRole('button', { name: 'Rename group Frontend' }).click();
+  await column.getByLabel('Group name').fill('Renamed');
+  await column.getByLabel('Group name').press('Enter');
+  const renamed = board.getByRole('region', { name: 'Tab group Renamed' });
+  await expect(renamed).toBeVisible();
+  await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabGroups.get(id)).title, groupId)).toBe('Renamed');
+
+  // Dragging the loose tab onto the group column joins the real browser group.
+  const looseId = await app.worker.evaluate(async () => (await chrome.tabs.query({ url: 'https://example.test/org-loose' }))[0].id);
+  const bId = await app.worker.evaluate(async () => (await chrome.tabs.query({ url: 'https://example.test/org-b' }))[0].id);
+  await board.locator('[data-open-tab-id]', { hasText: 'Page org-loose' }).dragTo(renamed);
+  await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabs.get(id ?? -1)).groupId, looseId)).toBe(groupId);
+  await expect(renamed.locator('[data-open-tab-id]', { hasText: 'Page org-loose' })).toBeVisible();
+
+  // A positioned drop lands before the targeted card on the real strip. The index is resolved against all
+  // the window's tabs, so a hidden tab (this library page is not a web tab and is not listed) moved to the
+  // strip's front must not shift the landing — a pre-fix bug dropped one slot early.
+  await app.worker.evaluate(async () => {
+    const lib = (await chrome.tabs.query({})).find((t) => (t.url ?? '').includes('newtab.html'));
+    if (lib?.id !== undefined) await chrome.tabs.move(lib.id, { index: 0 });
+  });
+  await renamed
+    .locator('[data-open-tab-id]', { hasText: 'Page org-loose' })
+    .dragTo(renamed.locator('[data-open-tab-id]', { hasText: 'Page org-b' }), { targetPosition: { x: 40, y: 2 } });
+  await expect
+    .poll(async () => {
+      const [loose, before] = await app.worker.evaluate(async ([l, b]) => [(await chrome.tabs.get(l ?? -1)).index, (await chrome.tabs.get(b ?? -1)).index], [looseId, bId] as const);
+      return loose === before - 1;
+    })
+    .toBe(true);
+  await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabs.get(id ?? -1)).groupId, looseId)).toBe(groupId);
+
+  // Dragging it onto the Ungrouped column takes it back out of the group.
+  await renamed.locator('[data-open-tab-id]', { hasText: 'Page org-loose' }).dragTo(looseColumn);
+  await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabs.get(id ?? -1)).groupId, looseId)).toBe(-1);
+
+  // Escape leaves the organizer, back on the library board.
+  await p.keyboard.press('Escape');
+  await expect(p.getByRole('button', { name: 'New collection' })).toBeVisible();
+  await p.close();
+});
+
 test('board toolbar: view, sort, colour filter and collapse all', async () => {
   const p = await openLibraryWithSpace('Board');
   await addCollectionWithLinks(p, 'Bravo', []);

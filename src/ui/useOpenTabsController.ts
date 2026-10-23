@@ -4,7 +4,7 @@ import { db, repo } from '../core/instance';
 import { applyGroups, loadLibraryContext } from '../core/organise';
 import type { Settings } from '../core/settings';
 import { usePlatform } from '../platform/context';
-import type { OpenTab, OpenWindow } from '../platform/ports';
+import type { OpenTab, OpenWindow, TabGroupColor } from '../platform/ports';
 import { withProviderAccess } from './ai';
 import type { DuplicateGuard } from './DuplicateGuard';
 import { useOpenTabs } from './useOpenTabs';
@@ -46,6 +46,17 @@ export function useOpenTabsController({ enabled, settings, spaceId, run, guard }
     });
   const clear = () => setPicked(new Set());
 
+  /** Wraps a group operation with the `tabGroups` permission request and a panel refresh afterwards. */
+  const withGroupAccess = (what: string, action: () => Promise<void>) =>
+    void run(what, async () => {
+      // `has` first: already-granted drops/blur commits carry no user activation, and only a real prompt needs it.
+      if (!(await platform.permissions.has('tabGroups')) && !(await platform.permissions.request('tabGroups'))) {
+        throw new Error('Tabarium needs the "tabGroups" permission to manage browser tab groups.');
+      }
+      await action();
+      await tabs.refresh();
+    });
+
   /** Adds the given open tabs to a collection (existing or new) and, if enabled, closes them. */
   const addTabs = (tabIds: readonly number[], target: TabTarget) =>
     run('Adding tabs', async () => {
@@ -76,10 +87,13 @@ export function useOpenTabsController({ enabled, settings, spaceId, run, guard }
     closeWindow: (id: number) => void run('Closing window', () => platform.tabs.closeWindow(id)),
     merge: () => void run('Merging windows', () => platform.tabs.mergeWindows()),
     saveGroup: (groupTabsList: readonly OpenTab[], title: string) =>
-      void addTabs(
-        groupTabsList.map((t) => t.id),
-        { kind: 'new', spaceId: needSpaceOrThrow(spaceId), title },
-      ),
+      void run('Saving group as a collection', async () => {
+        const target = needSpaceOrThrow(spaceId);
+        await addTabs(
+          groupTabsList.map((t) => t.id),
+          { kind: 'new', spaceId: target, title },
+        );
+      }),
     /** Turns the selected tabs into a browser tab group (one per window). Needs the `tabGroups` permission. */
     groupSelected: () =>
       void run('Grouping tabs', async () => {
@@ -91,11 +105,38 @@ export function useOpenTabsController({ enabled, settings, spaceId, run, guard }
         setPicked(new Set());
         await tabs.refresh();
       }),
+    /** Drops on a group column: the tabs join that browser group (moving into its window first when needed). */
+    moveToGroup: (tabIds: readonly number[], groupId: number, beforeTabId?: number) =>
+      withGroupAccess('Moving tabs to a group', () => platform.tabs.moveToGroup(tabIds, groupId, beforeTabId)),
+    /** Drops on an ungrouped column: grouped tabs come loose first, then land at the position. */
+    moveToUngrouped: (tabIds: readonly number[], windowId: number, beforeTabId?: number) =>
+      // Reordering loose tabs needs no permission; only ungrouping actually grouped ones does.
+      tabIds.some((id) => byId.get(id)?.groupId !== undefined)
+        ? withGroupAccess('Ungrouping tabs', async () => {
+            await platform.tabs.ungroupTabs(tabIds);
+            await platform.tabs.moveTabs(tabIds, windowId, beforeTabId);
+          })
+        : void run('Moving tabs', async () => {
+            await platform.tabs.moveTabs(tabIds, windowId, beforeTabId);
+            await tabs.refresh();
+          }),
+    /** Renames or recolours a browser tab group. */
+    updateGroup: (groupId: number, patch: { title?: string; color?: TabGroupColor }) =>
+      withGroupAccess('Renaming group', () => platform.tabs.updateGroup(groupId, patch)),
+    /** Drops on a window's "new group" endcap: the tabs move there and become a new, unnamed group. */
+    createGroup: (tabIds: readonly number[], windowId: number) =>
+      withGroupAccess('Creating a tab group', async () => {
+        await platform.tabs.moveTabs(tabIds, windowId, undefined);
+        await platform.tabs.groupTabs(tabIds, '');
+      }),
     saveWindow: (w: OpenWindow, name: string) =>
-      void addTabs(
-        w.tabs.map((t) => t.id),
-        { kind: 'new', spaceId: needSpaceOrThrow(spaceId), title: `${w.current ? 'Saved' : name} ${stamp()}` },
-      ),
+      void run('Saving window as a collection', async () => {
+        const target = needSpaceOrThrow(spaceId);
+        await addTabs(
+          w.tabs.map((t) => t.id),
+          { kind: 'new', spaceId: target, title: `${w.current ? 'Saved' : name} ${stamp()}` },
+        );
+      }),
     organiseWindow: (w: OpenWindow) =>
       void run('Organising with AI', async () => {
         if (!settings) throw new Error('Settings are not loaded yet.');

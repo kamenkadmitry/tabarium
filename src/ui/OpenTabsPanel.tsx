@@ -1,4 +1,4 @@
-import { Group, PanelRightClose, Shrink } from 'lucide-react';
+import { Group, Maximize2, PanelRightClose, Shrink } from 'lucide-react';
 import { useRef } from 'react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import { TabsByWindow } from './TabsByWindow';
@@ -22,6 +22,8 @@ interface Props {
   aiReady: boolean;
   onGrant: () => void;
   onHide: () => void;
+  /** Opens the full-surface tab organizer. */
+  onExpand: () => void;
   onMerge: () => void;
   onFocus: (tabId: number) => void;
   onCloseTab: (tabId: number) => void;
@@ -84,6 +86,9 @@ export function OpenTabsPanel(props: Props) {
           <PanelRightClose size={17} aria-hidden />
         </button>
         <h2 className="flex-1 text-sm font-bold">Open tabs</h2>
+        <button type="button" aria-label="Expand open tabs" onClick={props.onExpand} className={iconButton}>
+          <Maximize2 size={15} aria-hidden />
+        </button>
         <button type="button" aria-label="Merge windows" disabled={windows.length < 2} onClick={props.onMerge} className={iconButton}>
           <Shrink size={17} aria-hidden />
         </button>

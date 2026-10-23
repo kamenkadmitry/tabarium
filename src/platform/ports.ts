@@ -73,6 +73,18 @@ export interface TabsPort {
   listWindows(): Promise<OpenWindow[]>;
   /** Puts the tabs into a new browser tab group per window (needs `tabGroups`). */
   groupTabs(tabIds: readonly number[], title: string, color?: TabGroupColor): Promise<void>;
+  /** Adds the tabs to an existing group, moving them into its window first when needed. `beforeTabId` lands them just before that tab; without it they settle at the group's end. Needs `tabGroups`. */
+  moveToGroup(tabIds: readonly number[], groupId: number, beforeTabId?: number): Promise<void>;
+  /** Removes the tabs from whatever group they are in (needs `tabGroups`). */
+  ungroupTabs(tabIds: readonly number[]): Promise<void>;
+  /** Renames or recolours a browser tab group (needs `tabGroups`). */
+  updateGroup(groupId: number, patch: { title?: string; color?: TabGroupColor }): Promise<void>;
+  /**
+   * Moves tabs inside or into `windowId`, just before `beforeTabId` (or to the window's end without it).
+   * The position is resolved against the real tab strip, including tabs this app cannot see.
+   * Warning: moving a grouped tab outside its group's range ungroups it; landing inside one groups it.
+   */
+  moveTabs(tabIds: readonly number[], windowId: number, beforeTabId?: number): Promise<void>;
   /** Calls `listener` when the focused tab or its title/address changes; returns an unsubscribe function. */
   watchActiveTab(listener: () => void): () => void;
   /** Brings a tab (and its window) to the front. */

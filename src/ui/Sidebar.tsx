@@ -13,7 +13,8 @@ export type View =
   | { kind: 'bookmarks' }
   | { kind: 'tags' }
   | { kind: 'hashtags' }
-  | { kind: 'settings' };
+  | { kind: 'settings' }
+  | { kind: 'organizer' };
 
 interface Props {
   spaces: readonly Space[];

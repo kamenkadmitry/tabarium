@@ -28,6 +28,19 @@ async function openInBackground(urls: readonly string[], options?: OpenOptions):
 
 const isWebUrl = (url: string | undefined): url is string => url !== undefined && /^https?:\/\//.test(url);
 
+/**
+ * The `tabs.move` index that lands `moving` just before `beforeTabId`, resolved on the real tab strip
+ * (the app's window model only lists saveable web tabs). `tabs.move` indexes the post-removal strip, so
+ * every moved tab that currently sits before the target pulls the landing one slot earlier.
+ */
+async function stripIndexBefore(api: typeof browser, windowId: number, beforeTabId: number, moving: readonly number[]): Promise<number> {
+  const strip = await api.tabs.query({ windowId });
+  const at = strip.findIndex((t) => t.id === beforeTabId);
+  if (at < 0) throw new Error(`Tab ${beforeTabId} is no longer in window ${windowId}`);
+  const movingSet = new Set(moving);
+  return at - strip.slice(0, at).filter((t) => t.id !== undefined && movingSet.has(t.id)).length;
+}
+
 function toOpenTab(t: { id?: number; title?: string; url?: string; favIconUrl?: string; groupId?: number; active?: boolean }): OpenTab | null {
   if (t.id === undefined || !isWebUrl(t.url)) return null;
   // Chrome reports -1 for tabs that are not in a group.
@@ -115,6 +128,33 @@ export function createChromePlatform(): Platform {
           await api.tabGroups.update(groupId, color === undefined ? { title } : { title, color });
         }
       },
+      async moveToGroup(tabIds, groupId, beforeTabId) {
+        if (tabIds.length === 0) return;
+        const api = requireExtension();
+        const group = await api.tabGroups.get(groupId);
+        // A group lives in one window, so tabs from other windows move there first.
+        const tabs = await Promise.all(tabIds.map((id) => api.tabs.get(id)));
+        const foreign = tabs.flatMap((t) => (t.id !== undefined && t.windowId !== group.windowId ? [t.id] : []));
+        if (foreign.length > 0) await api.tabs.move(foreign, { windowId: group.windowId, index: -1 });
+        await api.tabs.group({ tabIds: [...tabIds] as [number, ...number[]], groupId });
+        if (beforeTabId !== undefined) {
+          const index = await stripIndexBefore(api, group.windowId, beforeTabId, tabIds);
+          await api.tabs.move([...tabIds], { windowId: group.windowId, index });
+        }
+      },
+      async ungroupTabs(tabIds) {
+        const api = requireExtension();
+        if (tabIds.length > 0) await api.tabs.ungroup([...tabIds] as [number, ...number[]]);
+      },
+      async updateGroup(groupId, patch) {
+        await requireExtension().tabGroups.update(groupId, patch);
+      },
+      async moveTabs(tabIds, windowId, beforeTabId) {
+        if (tabIds.length === 0) return;
+        const api = requireExtension();
+        const index = beforeTabId === undefined ? -1 : await stripIndexBefore(api, windowId, beforeTabId, tabIds);
+        await api.tabs.move([...tabIds], { windowId, index });
+      },
       watchActiveTab(listener) {
         const api = requireExtension();
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -164,6 +204,8 @@ export function createChromePlatform(): Platform {
           api.tabs.onAttached,
           api.tabs.onDetached,
           api.windows.onRemoved,
+          // `tabGroups` exists only once the user granted the optional permission.
+          ...(api.tabGroups ? [api.tabGroups.onCreated, api.tabGroups.onUpdated, api.tabGroups.onRemoved, api.tabGroups.onMoved] : []),
         ];
         for (const e of events) e.addListener(fire);
         return () => {
