@@ -1,15 +1,15 @@
 import { unbumpActivity } from './activity';
 import type { TabariumDB } from './db';
-import type { Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
+import type { Card, Collection, Hashtag, Space, Tag } from './types';
 
 /**
  * What a delete removed, kept in memory for the few seconds the undo toast is up.
  * Restoring writes the rows back verbatim: same ids, positions, labels and timestamps.
  */
 export type Deletion =
-  | { kind: 'cards'; cards: Card[]; nexts: NextItem[]; duplicates: boolean }
-  | { kind: 'collection'; collection: Collection; cards: Card[]; nexts: NextItem[] }
-  | { kind: 'space'; space: Space; collections: Collection[]; cards: Card[]; nexts: NextItem[] }
+  | { kind: 'cards'; cards: Card[]; duplicates: boolean }
+  | { kind: 'collection'; collection: Collection; cards: Card[] }
+  | { kind: 'space'; space: Space; collections: Collection[]; cards: Card[] }
   | { kind: 'tag'; tag: Tag; collections: { id: string; tagIds: string[] }[]; cards: { id: string; tagIds: string[] }[] }
   | { kind: 'hashtag'; hashtag: Hashtag; cards: { id: string; hashtagIds: string[] }[]; /** Set by mergeHashtag: the id the links were moved to; restoring drops it again. */ mergedInto?: string }
   | { kind: 'tags'; tags: Tag[] }
@@ -25,33 +25,30 @@ export type Deletion =
 export async function restoreDeletion(db: TabariumDB, d: Deletion): Promise<void> {
   switch (d.kind) {
     case 'cards':
-      await db.transaction('rw', [db.cards, db.collections, db.nexts, db.activity, db.tags, db.hashtags], async () => {
+      await db.transaction('rw', [db.cards, db.collections, db.activity, db.tags, db.hashtags], async () => {
         const parents = await db.collections.bulkGet([...new Set(d.cards.map((c) => c.collectionId))]);
         if (parents.some((c) => !c)) throw new Error('Cannot undo: the collection no longer exists.');
         const live = await liveLabelIds(db);
         await db.cards.bulkAdd(d.cards.map((c) => pruneLabels(c, live)));
-        await db.nexts.bulkAdd(d.nexts);
         await unbumpActivity(db, 'deleted', d.cards.length);
         if (d.duplicates) await unbumpActivity(db, 'duplicates-removed', d.cards.length);
       });
       return;
     case 'collection':
-      await db.transaction('rw', [db.collections, db.spaces, db.cards, db.nexts, db.activity, db.tags, db.hashtags], async () => {
+      await db.transaction('rw', [db.collections, db.spaces, db.cards, db.activity, db.tags, db.hashtags], async () => {
         if (!(await db.spaces.get(d.collection.spaceId))) throw new Error('Cannot undo: the space no longer exists.');
         const live = await liveLabelIds(db);
         await db.collections.add({ ...d.collection, tagIds: d.collection.tagIds.filter((t) => live.tags.has(t)) });
         await db.cards.bulkAdd(d.cards.map((c) => pruneLabels(c, live)));
-        await db.nexts.bulkAdd(d.nexts);
         await unbumpActivity(db, 'deleted', d.cards.length);
       });
       return;
     case 'space':
-      await db.transaction('rw', [db.spaces, db.collections, db.cards, db.nexts, db.activity, db.tags, db.hashtags], async () => {
+      await db.transaction('rw', [db.spaces, db.collections, db.cards, db.activity, db.tags, db.hashtags], async () => {
         const live = await liveLabelIds(db);
         await db.spaces.add(d.space);
         await db.collections.bulkAdd(d.collections.map((c) => ({ ...c, tagIds: c.tagIds.filter((t) => live.tags.has(t)) })));
         await db.cards.bulkAdd(d.cards.map((c) => pruneLabels(c, live)));
-        await db.nexts.bulkAdd(d.nexts);
         await unbumpActivity(db, 'deleted', d.cards.length);
       });
       return;

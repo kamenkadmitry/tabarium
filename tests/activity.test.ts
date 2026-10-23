@@ -86,6 +86,11 @@ describe('activity history', () => {
       { id: '2026-10-01|added', day: '2026-10-01', type: 'added', count: 2 },
       { id: '2026-10-03|added', day: '2026-10-03', type: 'added', count: 1 },
     ]);
+    // v6 drops the retired nexts table physically, not just from the schema.
+    const raw = new Dexie(name);
+    await raw.open();
+    expect(raw.tables.map((t) => t.name)).not.toContain('nexts');
+    raw.close();
   });
 });
 

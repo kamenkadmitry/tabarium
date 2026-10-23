@@ -205,10 +205,7 @@ describe('bulk actions on links', () => {
 
     await repo.setStarred([a.id, b.id], true);
     expect((await db.cards.toArray()).filter((x) => x.starred).map((x) => x.id).sort()).toEqual([a.id, b.id].sort());
-    // Rows of the retired Next queue are still cleaned up with their link.
-    await db.nexts.add({ id: 'legacy-next', cardId: a.id, state: 'todo', position: 100 });
     await repo.deleteCards([a.id, b.id]);
     expect((await db.cards.toArray()).map((x) => x.id)).toEqual([c.id]);
-    expect(await db.nexts.count()).toBe(0);
   });
 });

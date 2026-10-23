@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { dayKey } from './activity';
-import type { Activity, Card, Collection, Hashtag, NextItem, Space, Tag } from './types';
+import type { Activity, Card, Collection, Hashtag, Space, Tag } from './types';
 
 export interface SettingRow {
   key: string;
@@ -14,7 +14,6 @@ export class TabariumDB extends Dexie {
   tags!: EntityTable<Tag, 'id'>;
   hashtags!: EntityTable<Hashtag, 'id'>;
   activity!: EntityTable<Activity, 'id'>;
-  nexts!: EntityTable<NextItem, 'id'>;
   settings!: EntityTable<SettingRow, 'key'>;
 
   constructor(name = 'tabarium') {
@@ -24,7 +23,6 @@ export class TabariumDB extends Dexie {
       collections: 'id, spaceId, position',
       cards: 'id, collectionId, url, starred, position',
       tags: 'id, position',
-      nexts: 'id, cardId, position',
       settings: 'key',
     });
     // v2: multi-entry index so collections can be looked up by tag.
@@ -67,5 +65,7 @@ export class TabariumDB extends Dexie {
         const rows: Activity[] = [...perDay].map(([day, count]) => ({ id: `${day}|added`, day, type: 'added', count }));
         if (rows.length > 0) await tx.table('activity').bulkAdd(rows);
       });
+    // v6: the retired Next queue is dropped for good. Null means "delete this table".
+    this.version(6).stores({ nexts: null });
   }
 }

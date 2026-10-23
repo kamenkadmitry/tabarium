@@ -5,7 +5,6 @@ import {
   CardSchema,
   CollectionSchema,
   HashtagSchema,
-  NextItemSchema,
   SCHEMA_VERSION,
   SpaceSchema,
   TagSchema,
@@ -21,20 +20,18 @@ export const BackupSchema = z.object({
   tags: z.array(TagSchema),
   hashtags: z.array(HashtagSchema).default([]),
   activity: z.array(ActivitySchema).default([]),
-  nexts: z.array(NextItemSchema),
 });
 
 export type Backup = z.infer<typeof BackupSchema>;
 
 export async function exportBackup(db: TabariumDB): Promise<Backup> {
-  const [spaces, collections, cards, tags, hashtags, activity, nexts] = await Promise.all([
+  const [spaces, collections, cards, tags, hashtags, activity] = await Promise.all([
     db.spaces.toArray(),
     db.collections.toArray(),
     db.cards.toArray(),
     db.tags.toArray(),
     db.hashtags.toArray(),
     db.activity.toArray(),
-    db.nexts.toArray(),
   ]);
   return {
     app: 'tabarium',
@@ -46,7 +43,6 @@ export async function exportBackup(db: TabariumDB): Promise<Backup> {
     tags,
     hashtags,
     activity,
-    nexts,
   };
 }
 
@@ -65,7 +61,6 @@ export function parseBackup(json: string): Backup {
 function assertReferentialIntegrity(b: Backup): void {
   const spaces = new Set(b.spaces.map((s) => s.id));
   const collections = new Set(b.collections.map((c) => c.id));
-  const cards = new Set(b.cards.map((c) => c.id));
   const tags = new Set(b.tags.map((t) => t.id));
   const hashtags = new Set(b.hashtags.map((h) => h.id));
   for (const c of b.collections) {
@@ -81,14 +76,11 @@ function assertReferentialIntegrity(b: Backup): void {
     for (const t of c.tagIds) if (!tags.has(t)) throw new Error(`Card ${c.id} references missing tag ${t}`);
     for (const h of c.hashtagIds) if (!hashtags.has(h)) throw new Error(`Card ${c.id} references missing hashtag ${h}`);
   }
-  for (const n of b.nexts) {
-    if (!cards.has(n.cardId)) throw new Error(`Next item ${n.id} references missing card ${n.cardId}`);
-  }
 }
 
 /** Replaces ALL data with the backup contents in a single transaction (all-or-nothing). */
 export async function restoreBackup(db: TabariumDB, backup: Backup): Promise<void> {
-  await db.transaction('rw', [db.spaces, db.collections, db.cards, db.tags, db.hashtags, db.activity, db.nexts], async () => {
+  await db.transaction('rw', [db.spaces, db.collections, db.cards, db.tags, db.hashtags, db.activity], async () => {
     await Promise.all([
       db.spaces.clear(),
       db.collections.clear(),
@@ -96,7 +88,6 @@ export async function restoreBackup(db: TabariumDB, backup: Backup): Promise<voi
       db.tags.clear(),
       db.hashtags.clear(),
       db.activity.clear(),
-      db.nexts.clear(),
     ]);
     await db.spaces.bulkAdd(backup.spaces);
     await db.collections.bulkAdd(backup.collections);
@@ -104,6 +95,5 @@ export async function restoreBackup(db: TabariumDB, backup: Backup): Promise<voi
     await db.tags.bulkAdd(backup.tags);
     await db.hashtags.bulkAdd(backup.hashtags);
     await db.activity.bulkAdd(backup.activity);
-    await db.nexts.bulkAdd(backup.nexts);
   });
 }

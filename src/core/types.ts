@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const id = z.string().min(1);
 const timestamp = z.number().int().nonnegative();
@@ -78,13 +78,6 @@ export const ActivitySchema = z.object({
   count: z.number().int().positive(),
 });
 
-export const NextItemSchema = z.object({
-  id,
-  cardId: id,
-  state: z.enum(['todo', 'done']),
-  position: z.number(),
-});
-
 export type Space = z.infer<typeof SpaceSchema>;
 export type Collection = z.infer<typeof CollectionSchema>;
 export type Card = z.infer<typeof CardSchema>;
@@ -92,4 +85,3 @@ export type Tag = z.infer<typeof TagSchema>;
 export type Hashtag = z.infer<typeof HashtagSchema>;
 export type Activity = z.infer<typeof ActivitySchema>;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
-export type NextItem = z.infer<typeof NextItemSchema>;

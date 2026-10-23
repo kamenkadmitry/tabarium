@@ -118,23 +118,21 @@ export class Repository {
     if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(`Space ${spaceId} does not exist`);
   }
 
-  /** Deletes a space with all its collections, links and Next entries in one transaction. */
+  /** Deletes a space with all its collections and links in one transaction. */
   async deleteSpace(spaceId: string): Promise<Deletion> {
     await this.assertUserSpace(spaceId, 'deleted');
-    return this.db.transaction('rw', this.db.spaces, this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
+    return this.db.transaction('rw', this.db.spaces, this.db.collections, this.db.cards, this.db.activity, async () => {
       const space = await this.db.spaces.get(spaceId);
       if (!space) throw new Error(`Space ${spaceId} does not exist`);
       const collections = await this.db.collections.where('spaceId').equals(spaceId).toArray();
       const collectionIds = collections.map((c) => c.id);
       const cards = await this.db.cards.where('collectionId').anyOf(collectionIds).toArray();
       const cardIds = cards.map((c) => c.id);
-      const nexts = await this.db.nexts.where('cardId').anyOf(cardIds).toArray();
       await bumpActivity(this.db, 'deleted', cardIds.length);
-      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
       await this.db.cards.bulkDelete(cardIds);
       await this.db.collections.bulkDelete(collectionIds);
       await this.db.spaces.delete(spaceId);
-      return { kind: 'space', space, collections, cards, nexts };
+      return { kind: 'space', space, collections, cards };
     });
   }
 
@@ -212,16 +210,14 @@ export class Repository {
     await this.db.cards.where('id').anyOf([...cardIds]).modify({ starred, updatedAt: Date.now() });
   }
 
-  /** Deletes links together with their Next entries. A deleted duplicate is counted as such on the dashboard. */
+  /** Deletes links. A deleted duplicate is counted as such on the dashboard. */
   async deleteCards(cardIds: readonly string[], reason?: DeleteReason): Promise<Deletion> {
-    return this.db.transaction('rw', this.db.cards, this.db.nexts, this.db.activity, async () => {
+    return this.db.transaction('rw', this.db.cards, this.db.activity, async () => {
       const cards = (await this.db.cards.bulkGet([...cardIds])).flatMap((c) => c ?? []);
-      const nexts = await this.db.nexts.where('cardId').anyOf([...cardIds]).toArray();
-      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
       await this.db.cards.bulkDelete([...cardIds]);
       await bumpActivity(this.db, 'deleted', cards.length);
       if (reason === 'duplicate') await bumpActivity(this.db, 'duplicates-removed', cards.length);
-      return { kind: 'cards', cards, nexts, duplicates: reason === 'duplicate' };
+      return { kind: 'cards', cards, duplicates: reason === 'duplicate' };
     });
   }
 
@@ -476,17 +472,15 @@ export class Repository {
   }
 
   async deleteCollection(collectionId: string): Promise<Deletion> {
-    return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.nexts, this.db.activity, async () => {
+    return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.activity, async () => {
       const collection = await this.db.collections.get(collectionId);
       if (!collection) throw new Error(`Collection ${collectionId} does not exist`);
       const cards = await this.db.cards.where('collectionId').equals(collectionId).toArray();
       const cardIds = cards.map((c) => c.id);
-      const nexts = await this.db.nexts.where('cardId').anyOf(cardIds).toArray();
       await bumpActivity(this.db, 'deleted', cardIds.length);
-      await this.db.nexts.bulkDelete(nexts.map((n) => n.id));
       await this.db.cards.bulkDelete(cardIds);
       await this.db.collections.delete(collectionId);
-      return { kind: 'collection', collection, cards, nexts };
+      return { kind: 'collection', collection, cards };
     });
   }
 }

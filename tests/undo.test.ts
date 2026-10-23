@@ -24,24 +24,21 @@ async function seed() {
 const counts = async () => Object.fromEntries((await db.activity.toArray()).map((a) => [a.type, a.count]));
 
 describe('undo: links', () => {
-  it('restores a deleted link with its position, labels and Next entry', async () => {
+  it('restores a deleted link with its position and labels', async () => {
     const { col, cards } = await seed();
     const [a, b, c] = cards;
     if (!a || !b || !c) throw new Error('cards were not added');
     const tag = await repo.createTag('Keep', '#0d9488');
     const hashtag = await repo.ensureHashtag('read');
     await repo.setCardLabels(b.id, { tagIds: [tag.id], hashtagIds: [hashtag.id] });
-    await db.nexts.add({ id: 'n1', cardId: b.id, state: 'todo', position: 100 });
 
     const deletion = await repo.deleteCard(b.id);
     expect(await db.cards.get(b.id)).toBeUndefined();
-    expect(await db.nexts.count()).toBe(0);
     expect((await counts()).deleted).toBe(1);
 
     await repo.restoreDeletion(deletion);
     const restored = await db.cards.get(b.id);
     expect(restored).toMatchObject({ collectionId: col.id, position: b.position, tagIds: [tag.id], hashtagIds: [hashtag.id], createdAt: b.createdAt });
-    expect(await db.nexts.get('n1')).toMatchObject({ cardId: b.id, state: 'todo' });
     // It lands back between its old neighbours.
     const ordered = await db.cards.where('collectionId').equals(col.id).sortBy('position');
     expect(ordered.map((x) => x.id)).toEqual([a.id, b.id, c.id]);
