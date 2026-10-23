@@ -115,7 +115,7 @@ export interface ShortcutInfo {
   name: string;
   /** Human-readable label declared alongside the command. */
   description: string;
-  /** The bound keys, e.g. "Alt+Shift+S"; empty when the user has not assigned one. */
+  /** The bound keys, e.g. "Ctrl+Shift+S"; empty when the user has not assigned one. */
   shortcut: string;
 }
 

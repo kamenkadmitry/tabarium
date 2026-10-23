@@ -1211,7 +1211,7 @@ test('keyboard shortcut: the command saves the focused web tab and flashes the b
   const commands = await app.worker.evaluate(async () =>
     (await chrome.commands.getAll()).map((c) => ({ name: c.name, shortcut: c.shortcut })),
   );
-  expect(commands).toContainEqual({ name: 'save-current-tab', shortcut: 'Alt+Shift+S' });
+  expect(commands).toContainEqual({ name: 'save-current-tab', shortcut: 'Ctrl+Shift+S' });
 
   // The library page sends the trigger (a service worker cannot message itself); a web tab stays focused.
   const p = await openLibraryWithSpace('Keys');
@@ -1229,7 +1229,7 @@ test('keyboard shortcut: the command saves the focused web tab and flashes the b
 
   await p.getByRole('button', { name: 'Settings' }).click();
   await expect(p.getByText('Save the current tab to Tabarium')).toBeVisible();
-  await expect(p.getByText('Alt+Shift+S')).toBeVisible();
+  await expect(p.getByText('Ctrl+Shift+S')).toBeVisible();
   await p.close();
 });
 

@@ -22,7 +22,7 @@ export default defineConfig({
       optional_permissions: e2e ? [] : [...OPTIONAL],
       commands: {
         'save-current-tab': {
-          suggested_key: { default: 'Alt+Shift+S' },
+          suggested_key: { default: 'Ctrl+Shift+S' },
           description: 'Save the current tab to Tabarium',
         },
       },
