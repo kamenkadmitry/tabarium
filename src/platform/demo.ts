@@ -38,7 +38,10 @@ export function createDemoPlatform(): Platform {
     },
     backupSchedule: { resync: async () => undefined },
     shortcuts: {
-      list: async () => [{ name: 'save-current-tab', description: 'Save the current tab to Tabarium', shortcut: 'Ctrl+Shift+S' }],
+      list: async () => [
+        { name: 'save-current-tab', description: 'Save the current tab to Tabarium', shortcut: 'Ctrl+Shift+S' },
+        { name: 'toggle-command-palette', description: 'Open the Tabarium command palette', shortcut: 'Ctrl+Shift+K' },
+      ],
     },
     tabs: {
       listWindowTabs: async () => [...tabs],

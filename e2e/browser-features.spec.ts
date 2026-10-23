@@ -1212,6 +1212,7 @@ test('keyboard shortcut: the command saves the focused web tab and flashes the b
     (await chrome.commands.getAll()).map((c) => ({ name: c.name, shortcut: c.shortcut })),
   );
   expect(commands).toContainEqual({ name: 'save-current-tab', shortcut: 'Ctrl+Shift+S' });
+  expect(commands).toContainEqual({ name: 'toggle-command-palette', shortcut: 'Ctrl+Shift+K' });
 
   // The library page sends the trigger (a service worker cannot message itself); a web tab stays focused.
   const p = await openLibraryWithSpace('Keys');
