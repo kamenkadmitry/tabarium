@@ -1,6 +1,6 @@
 import { FolderInput, Plus, Ungroup } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import type { OpenTab, OpenWindow, TabGroupColor, TabGroupInfo } from '../platform/ports';
+import { TAB_GROUP_COLORS, type OpenTab, type OpenWindow, type TabGroupColor, type TabGroupInfo } from '../platform/ports';
 import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
 import { TabPill } from './TabPill';
@@ -114,6 +114,61 @@ function useColumnDrop(tabs: readonly OpenTab[], onDrop: (payload: { type: 'tabs
   };
 }
 
+/** The group's colour dot: opens the nine native browser group colours to recolour the real group. */
+function GroupColorDot({ group, onUpdateGroup }: { group: TabGroupInfo; onUpdateGroup: Props['onUpdateGroup'] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <span ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={`Group colour, currently ${group.color}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Change colour"
+        onClick={() => setOpen((v) => !v)}
+        className="grid size-5 place-items-center rounded-md transition-colors duration-150 hover:bg-surface-2"
+      >
+        <span aria-hidden className="size-2.5 rounded-full" style={{ background: GROUP_COLORS[group.color] ?? GROUP_COLORS.grey }} />
+      </button>
+      {open && (
+        <div role="menu" aria-label="Group colour" className="absolute left-0 top-7 z-20 grid w-32 grid-cols-3 gap-0.5 rounded-xl border border-line bg-surface p-1">
+          {TAB_GROUP_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="menuitemradio"
+              aria-checked={group.color === c}
+              aria-label={c}
+              title={c}
+              onClick={() => {
+                if (c !== group.color) onUpdateGroup(group.id, { color: c });
+                setOpen(false);
+              }}
+              className={`grid size-9 place-items-center rounded-lg hover:bg-surface-2 ${group.color === c ? 'bg-surface-2' : ''}`}
+            >
+              <span className="size-4 rounded-full" style={{ background: GROUP_COLORS[c] }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
 /** One group of browser tabs as a kanban column: colored top edge, inline-renamed title, tab cards. */
 function GroupColumn({
   group,
@@ -136,7 +191,7 @@ function GroupColumn({
       {...drop.props}
     >
       <header className="flex items-center gap-2 border-b border-line px-3 py-2">
-        <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
+        <GroupColorDot group={group} onUpdateGroup={p.onUpdateGroup} />
         {draft !== null ? (
           <input
             autoFocus

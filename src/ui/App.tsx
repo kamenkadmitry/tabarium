@@ -217,6 +217,8 @@ export function App() {
       if (e.key !== 'Escape' || e.defaultPrevented || leavingOrganizer.current) return;
       const el = e.target as HTMLElement;
       if (el.closest('input:not([type=checkbox]):not([type=radio]), textarea, select, form, dialog, [role=menu]')) return;
+      // An open menu or dialog consumes Escape itself.
+      if (document.querySelector('[role=menu], dialog[open]')) return;
       leavingOrganizer.current = true;
       history.back();
     };

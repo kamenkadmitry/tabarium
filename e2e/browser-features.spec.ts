@@ -444,6 +444,12 @@ test('tab organizer: kanban of real tab groups, drags change browser groups, inl
   await expect(renamed).toBeVisible();
   await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabGroups.get(id)).title, groupId)).toBe('Renamed');
 
+  // The colour dot opens the native palette; picking a swatch recolours the real browser group.
+  await renamed.getByRole('button', { name: 'Group colour, currently blue' }).click();
+  await renamed.getByRole('menuitemradio', { name: 'pink' }).click();
+  await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabGroups.get(id)).color, groupId)).toBe('pink');
+  await expect(renamed.getByRole('button', { name: 'Group colour, currently pink' })).toBeVisible();
+
   // Dragging the loose tab onto the group column joins the real browser group.
   const looseId = await app.worker.evaluate(async () => (await chrome.tabs.query({ url: 'https://example.test/org-loose' }))[0].id);
   const bId = await app.worker.evaluate(async () => (await chrome.tabs.query({ url: 'https://example.test/org-b' }))[0].id);
