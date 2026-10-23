@@ -1,4 +1,4 @@
-import { Group, Maximize2, PanelRightClose, Shrink } from 'lucide-react';
+import { Group, Kanban, PanelRightClose, Shrink } from 'lucide-react';
 import { useRef } from 'react';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import { TabsByWindow } from './TabsByWindow';
@@ -86,8 +86,12 @@ export function OpenTabsPanel(props: Props) {
           <PanelRightClose size={17} aria-hidden />
         </button>
         <h2 className="flex-1 text-sm font-bold">Open tabs</h2>
-        <button type="button" aria-label="Expand open tabs" onClick={props.onExpand} className={iconButton}>
-          <Maximize2 size={15} aria-hidden />
+        <button
+          type="button"
+          onClick={props.onExpand}
+          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+        >
+          <Kanban size={14} aria-hidden /> Groups Organizer
         </button>
         <button type="button" aria-label="Merge windows" disabled={windows.length < 2} onClick={props.onMerge} className={iconButton}>
           <Shrink size={17} aria-hidden />

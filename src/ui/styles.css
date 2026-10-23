@@ -96,6 +96,14 @@ a {
   }
 }
 
+/* Scrollbars hidden while wheel and drag scrolling stay available (the organizer kanban). */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* The "New collection" button anchors the undo toast, which hangs 50px to its left (UndoToast.tsx). */
 .anchor-undo {
   anchor-name: --undo-anchor;

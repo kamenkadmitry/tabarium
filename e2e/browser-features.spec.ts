@@ -428,7 +428,7 @@ test('tab organizer: kanban of real tab groups, drags change browser groups, inl
   await expect(panel.locator('[data-open-tab-id]', { hasText: 'Page org-loose' })).toBeVisible();
 
   // The expand button opens the full-surface board: one column per real group plus Ungrouped.
-  await panel.getByRole('button', { name: 'Expand open tabs' }).click();
+  await panel.getByRole('button', { name: 'Groups Organizer' }).click();
   const board = p.getByRole('region', { name: 'Tab organizer' });
   await expect(board).toBeVisible();
   const column = board.getByRole('region', { name: 'Tab group Frontend' });

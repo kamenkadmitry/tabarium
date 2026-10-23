@@ -1,4 +1,4 @@
-import { Bookmark, Copy, Hash, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Bookmark, Copy, Hash, Kanban, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
@@ -137,6 +137,9 @@ export function Sidebar(props: Props) {
         </NavButton>
         <NavButton active={view?.kind === 'hashtags'} onClick={() => props.onSelect({ kind: 'hashtags' })} icon={<Hash size={18} aria-hidden />}>
           Hashtags
+        </NavButton>
+        <NavButton active={view?.kind === 'organizer'} onClick={() => props.onSelect({ kind: 'organizer' })} icon={<Kanban size={18} aria-hidden />}>
+          Groups Organizer
         </NavButton>
       </nav>
 

@@ -1,5 +1,5 @@
 import { FolderInput, Plus } from 'lucide-react';
-import { useEffect, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { OpenTab, OpenWindow, TabGroupColor, TabGroupInfo } from '../platform/ports';
 import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
@@ -31,9 +31,34 @@ interface Props {
  */
 type Indicator = number | null | undefined;
 
-const column = 'flex max-h-[60vh] w-64 shrink-0 flex-col rounded-xl border border-line bg-surface';
+const column = 'flex w-64 shrink-0 flex-col rounded-xl border border-line bg-surface';
 const iconButton =
   'grid size-7 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg';
+
+/**
+ * A window's strip of columns. Scrollbars are hidden; the mouse wheel scrolls it sideways, except over a
+ * column's own scrollable list which keeps the wheel for itself.
+ */
+function WindowRow({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const vertical = (e.target as HTMLElement).closest('[data-scroll-y]') as HTMLElement | null;
+      if (vertical && vertical.scrollHeight > vertical.clientHeight) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+  return (
+    <div ref={ref} className="no-scrollbar flex min-h-0 flex-1 items-stretch gap-3 overflow-x-auto pb-1">
+      {children}
+    </div>
+  );
+}
 
 /** Reads the drop position under the pointer: the tab row hit and whether it is in its upper half. */
 function useColumnDrop(tabs: readonly OpenTab[], onDrop: (payload: { type: 'tabs'; tabIds: number[] }, beforeTabId?: number) => void) {
@@ -145,7 +170,7 @@ function GroupColumn({
           <FolderInput size={14} aria-hidden />
         </button>
       </header>
-      <ul className="flex min-h-8 flex-col gap-1 overflow-y-auto p-2">
+      <ul data-scroll-y className="no-scrollbar flex min-h-8 flex-1 flex-col gap-1 overflow-y-auto p-2">
         {tabs.map((t) => (
           <TabPill
             key={t.id}
@@ -178,7 +203,7 @@ function UngroupedColumn({ w, tabs, windowName, ...p }: Props & { w: OpenWindow;
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-muted">Ungrouped</span>
         <span className="text-xs text-muted">{tabs.length}</span>
       </header>
-      <ul className="flex min-h-8 flex-col gap-1 overflow-y-auto p-2">
+      <ul data-scroll-y className="no-scrollbar flex min-h-8 flex-1 flex-col gap-1 overflow-y-auto p-2">
         {tabs.map((t) => (
           <TabPill
             key={t.id}
@@ -240,7 +265,7 @@ function NewGroupZone({ w, onCreateGroup }: { w: OpenWindow } & Pick<Props, 'onC
  */
 export function TabOrganizer(p: Props) {
   return (
-    <section aria-label="Tab organizer" className="flex h-full flex-col gap-5 overflow-y-auto">
+    <section aria-label="Tab organizer" className="no-scrollbar flex h-full flex-col gap-5 overflow-y-auto">
       {p.access === 'needed' && (
         <div className="px-2 py-6 text-center">
           <p className="text-sm text-muted">Allow Tabarium to see your open tabs so you can organise them into groups.</p>
@@ -280,17 +305,17 @@ export function TabOrganizer(p: Props) {
           const groupRuns = segmentTabs(w).filter((r): r is { group: TabGroupInfo; tabs: OpenTab[] } => r.group !== null);
           const ungrouped = w.tabs.filter((t) => t.groupId === undefined);
           return (
-            <div key={w.id}>
+            <div key={w.id} className="flex min-h-56 flex-1 flex-col">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
                 {w.current ? 'This window' : `Window ${i + 1}`} · {w.tabs.length} tabs
               </h3>
-              <div className="flex items-start gap-3 overflow-x-auto pb-2">
+              <WindowRow>
                 {groupRuns.map((run) => (
                   <GroupColumn key={run.group.id} {...p} group={run.group} tabs={run.tabs} />
                 ))}
                 <UngroupedColumn {...p} w={w} tabs={ungrouped} windowName={windowName} />
                 <NewGroupZone w={w} onCreateGroup={p.onCreateGroup} />
-              </div>
+              </WindowRow>
             </div>
           );
         })}
