@@ -7,8 +7,13 @@ export const BOARD_SORTS = ['custom', 'name-asc', 'name-desc', 'newest', 'oldest
 
 export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'openrouter', 'custom'] as const;
 
+/** The curated whole-app palettes selectable in Settings → Appearance; 'teal' is the shipping look. */
+export const PALETTE_IDS = ['teal', 'ocean', 'forest', 'violet', 'rose', 'amber', 'slate', 'mocha', 'graphite', 'sunset'] as const;
+
 export const SettingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
+  /** Colour palette applied via the `data-palette` attribute; defaults to the original teal/orange. */
+  palette: z.enum(PALETTE_IDS).default('teal'),
   autoBackup: z.object({
     enabled: z.boolean(),
     intervalHours: z.number().int().min(1).max(24 * 30),
@@ -54,6 +59,7 @@ export type Settings = z.infer<typeof SettingsSchema>;
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
+  palette: 'teal',
   autoBackup: { enabled: false, intervalHours: 24 },
   lastBackupAt: null,
   quickSaveCollectionId: null,

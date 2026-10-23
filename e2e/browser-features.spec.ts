@@ -485,7 +485,7 @@ test('tab organizer: kanban of real tab groups, drags change browser groups, inl
     .poll(() => app.worker.evaluate(async (id) => (await chrome.tabGroups.query({})).some((g) => g.id === id), groupId))
     .toBe(false);
   await expect(looseColumn.locator('[data-open-tab-id]', { hasText: 'Page org-a' })).toBeVisible();
-  await expect(board.getByRole('region', { name: /^Tab group/ })).toHaveCount(0);
+  await expect(renamed).toHaveCount(0);
 
   // Escape leaves the organizer, back on the library board.
   await p.keyboard.press('Escape');
@@ -1170,6 +1170,39 @@ test('navigation: Back/Forward move through views and a stale space falls back t
   await p.goBack();
   await expect(p.getByRole('heading', { name: 'Doomed' })).toHaveCount(0);
   await expect(p.getByPlaceholder('Search all tabs, notes and links')).toBeVisible();
+  await p.close();
+});
+
+test('colour palette: settings swatch re-skins the app and survives a reload', async () => {
+  const p = await openLibraryWithSpace('Palette');
+  await p.getByRole('button', { name: 'Settings' }).click();
+
+  const swatches = p.getByRole('radiogroup', { name: 'Colour palette' });
+  await expect(swatches.getByRole('radio', { name: 'Teal (default)' })).toHaveAttribute('aria-checked', 'true');
+  const tokens = () =>
+    p.evaluate(() => {
+      const s = getComputedStyle(document.documentElement);
+      return { palette: document.documentElement.dataset.palette, bg: s.getPropertyValue('--bg').trim(), primary: s.getPropertyValue('--primary').trim() };
+    });
+  expect((await tokens()).palette).toBe('teal');
+
+  // The whole app re-tokens on pick: the background and primary vars take Ocean's light values.
+  await swatches.getByRole('radio', { name: 'Ocean' }).click();
+  await expect.poll(() => p.evaluate(() => document.documentElement.dataset.palette)).toBe('ocean');
+  await expect.poll(async () => (await tokens()).bg).toBe('#eff6ff');
+  await expect.poll(async () => (await tokens()).primary).toBe('#2563eb');
+  await expect(swatches.getByRole('radio', { name: 'Ocean' })).toHaveAttribute('aria-checked', 'true');
+
+  // The choice is stored in settings, so a reload comes back in Ocean.
+  await p.reload();
+  await expect.poll(() => p.evaluate(() => document.documentElement.dataset.palette)).toBe('ocean');
+  await expect.poll(async () => (await tokens()).primary).toBe('#2563eb');
+
+  // An explicit dark theme layers the palette's dark token set over it.
+  await p.getByRole('button', { name: 'Settings' }).click();
+  await p.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name: 'dark' }).click();
+  await expect.poll(async () => (await tokens()).bg).toBe('#0a1524');
+  await expect.poll(async () => (await tokens()).primary).toBe('#60a5fa');
   await p.close();
 });
 

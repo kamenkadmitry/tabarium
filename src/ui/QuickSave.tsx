@@ -33,6 +33,16 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   const [status, setStatus] = useState<Status>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
+  // Re-applies theme and palette live when they change in Settings on another surface.
+  const theme = settings?.theme;
+  const palette = settings?.palette;
+  useEffect(() => {
+    if (theme === undefined || palette === undefined) return;
+    if (theme === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.palette = palette;
+  }, [theme, palette]);
+
   // Makes sure the Inbox exists (and adopts an older one) so its tab has something to show.
   useEffect(() => {
     ensureInbox(db).catch((e: unknown) => {

@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Download, Eye, EyeOff, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
 import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
 import { parseTobyFile, toTobyJson } from '../core/toby';
@@ -13,6 +13,7 @@ import { testConnection } from '../core/ai/tasks';
 import { isAiConfigured, withProviderAccess } from './ai';
 import { avatarFromFile } from './avatar';
 import { inputClass } from './Dialog';
+import { PALETTES } from './palettes';
 
 const PROVIDER_LABELS: Record<(typeof AI_PROVIDERS)[number], string> = {
   anthropic: 'Anthropic (Claude)',
@@ -80,7 +81,17 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
 
+  // Palette swatches preview the theme that is actually on screen, so "system" resolves to light or dark.
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   if (!settings) return null;
+  const effectiveTheme = settings.theme === 'system' ? (systemDark ? 'dark' : 'light') : settings.theme;
   const ai = aiDraft ?? settings.ai;
   const keyBelongsTo = detectProviderFromKey(ai.apiKey);
   const keyMismatch = ai.provider !== null && ai.provider !== 'custom' && keyBelongsTo !== null && keyBelongsTo !== ai.provider;
@@ -388,6 +399,31 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
               }`}
             >
               {t}
+            </button>
+          ))}
+        </div>
+        <div role="radiogroup" aria-label="Colour palette" className="mt-4 flex flex-wrap gap-3">
+          {PALETTES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={settings.palette === p.id}
+              aria-label={p.name}
+              title={p.name}
+              onClick={guard('Colour palette', async () => void (await updateSettings(db, { palette: p.id })))}
+              className={`grid size-11 place-items-center rounded-full transition-shadow duration-150 ${
+                settings.palette === p.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface' : 'hover:ring-2 hover:ring-line hover:ring-offset-2 hover:ring-offset-surface'
+              }`}
+            >
+              {/* The swatch carries the palette+theme attrs itself, so the quadrant disc previews real tokens. */}
+              <span
+                aria-hidden
+                data-palette={p.id}
+                data-theme={effectiveTheme}
+                className="size-9 rounded-full border border-line"
+                style={{ background: 'conic-gradient(var(--bg) 0 25%, var(--surface) 0 50%, var(--accent) 0 75%, var(--primary) 0)' }}
+              />
             </button>
           ))}
         </div>

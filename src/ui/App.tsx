@@ -104,11 +104,13 @@ export function App() {
   };
 
   const theme = settings?.theme;
+  const palette = settings?.palette;
   useEffect(() => {
-    if (theme === undefined) return;
+    if (theme === undefined || palette === undefined) return;
     if (theme === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = theme;
-  }, [theme]);
+    document.documentElement.dataset.palette = palette;
+  }, [theme, palette]);
 
   // Until the user picks something, show the first space.
   // The Inbox is always there; the welcome screen is for the first space of your own.

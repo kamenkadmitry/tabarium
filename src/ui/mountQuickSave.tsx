@@ -15,8 +15,9 @@ export async function mountQuickSave(surface: 'popup' | 'sidepanel'): Promise<vo
   if (!root) throw new Error('#root not found');
   const demo = new URLSearchParams(location.search).has('demo');
   if (demo) await seedDemo(db);
-  const { theme } = await loadSettings(db);
+  const { theme, palette } = await loadSettings(db);
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.palette = palette;
   createRoot(root).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
       <DuplicateGuardProvider>
