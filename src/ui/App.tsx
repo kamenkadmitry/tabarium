@@ -532,6 +532,7 @@ export function App() {
               onSaveGroup={tabsCtl.saveGroup}
               onMoveToGroup={tabsCtl.moveToGroup}
               onMoveToUngrouped={tabsCtl.moveToUngrouped}
+              onUngroup={tabsCtl.ungroup}
               onCreateGroup={tabsCtl.createGroup}
               onUpdateGroup={tabsCtl.updateGroup}
               onGrant={tabsCtl.grant}

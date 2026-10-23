@@ -105,6 +105,9 @@ export function useOpenTabsController({ enabled, settings, spaceId, run, guard }
         setPicked(new Set());
         await tabs.refresh();
       }),
+    /** Dissolves a whole browser group: its tabs stay open in place, only the grouping goes away. */
+    ungroup: (tabIds: readonly number[]) =>
+      withGroupAccess('Ungrouping group', () => platform.tabs.ungroupTabs(tabIds)),
     /** Drops on a group column: the tabs join that browser group (moving into its window first when needed). */
     moveToGroup: (tabIds: readonly number[], groupId: number, beforeTabId?: number) =>
       withGroupAccess('Moving tabs to a group', () => platform.tabs.moveToGroup(tabIds, groupId, beforeTabId)),

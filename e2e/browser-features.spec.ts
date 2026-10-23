@@ -473,6 +473,14 @@ test('tab organizer: kanban of real tab groups, drags change browser groups, inl
   await renamed.locator('[data-open-tab-id]', { hasText: 'Page org-loose' }).dragTo(looseColumn);
   await expect.poll(() => app.worker.evaluate(async (id) => (await chrome.tabs.get(id ?? -1)).groupId, looseId)).toBe(-1);
 
+  // Ungrouping a column dissolves the real browser group; its tabs stay open and join Ungrouped.
+  await renamed.getByRole('button', { name: 'Ungroup Renamed' }).click();
+  await expect
+    .poll(() => app.worker.evaluate(async (id) => (await chrome.tabGroups.query({})).some((g) => g.id === id), groupId))
+    .toBe(false);
+  await expect(looseColumn.locator('[data-open-tab-id]', { hasText: 'Page org-a' })).toBeVisible();
+  await expect(board.getByRole('region', { name: /^Tab group/ })).toHaveCount(0);
+
   // Escape leaves the organizer, back on the library board.
   await p.keyboard.press('Escape');
   await expect(p.getByRole('button', { name: 'New collection' })).toBeVisible();

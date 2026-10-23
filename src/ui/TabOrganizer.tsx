@@ -1,4 +1,4 @@
-import { FolderInput, Plus } from 'lucide-react';
+import { FolderInput, Plus, Ungroup } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { OpenTab, OpenWindow, TabGroupColor, TabGroupInfo } from '../platform/ports';
 import { dragSourceProps, endDrag, getDragPayload } from './dnd';
@@ -19,6 +19,8 @@ interface Props {
   onSaveGroup: (tabs: OpenTab[], title: string) => void;
   onMoveToGroup: (tabIds: readonly number[], groupId: number, beforeTabId?: number) => void;
   onMoveToUngrouped: (tabIds: readonly number[], windowId: number, beforeTabId?: number) => void;
+  /** Dissolves a browser group while keeping its tabs open. */
+  onUngroup: (tabIds: readonly number[]) => void;
   onCreateGroup: (tabIds: readonly number[], windowId: number) => void;
   onUpdateGroup: (groupId: number, patch: { title?: string; color?: TabGroupColor }) => void;
   onGrant: () => void;
@@ -168,6 +170,15 @@ function GroupColumn({
           className={iconButton}
         >
           <FolderInput size={14} aria-hidden />
+        </button>
+        <button
+          type="button"
+          aria-label={`Ungroup ${group.title || 'untitled'}`}
+          title="Ungroup"
+          onClick={() => p.onUngroup(tabs.map((t) => t.id))}
+          className={iconButton}
+        >
+          <Ungroup size={14} aria-hidden />
         </button>
       </header>
       <ul data-scroll-y className="no-scrollbar flex min-h-8 flex-1 flex-col gap-1 overflow-y-auto p-2">
