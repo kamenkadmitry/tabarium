@@ -93,7 +93,8 @@ export function App() {
   /** Width while (and after) the panel edge is dragged; falls back to the saved width. */
   const [liveWidth, setLiveWidth] = useState<number | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  // `newtab.html?palette` is how the manifest Ctrl+K command opens the palette on a fresh page.
+  const [paletteOpen, setPaletteOpen] = useState(() => new URLSearchParams(location.search).has('palette'));
   const [error, setError] = useState<string | null>(null);
   /** The last delete's snapshot, held while the undo toast is up. A new delete replaces (and finalizes) it. */
   const [undo, setUndo] = useState<Deletion | null>(null);
@@ -233,15 +234,22 @@ export function App() {
 
   // Ctrl/Cmd+K toggles the command palette from anywhere — including inside inputs and on views
   // where the header search isn't rendered. A different open dialog keeps the shortcut for itself.
+  // The custom event is the same toggle relayed from the manifest command by the service worker —
+  // Chrome reserves Ctrl+K for the omnibox before any page listener can see it.
   useEffect(() => {
+    const toggle = () => setPaletteOpen((open) => !open);
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return;
       if (document.querySelector('dialog[open]:not([data-command-palette])')) return;
       e.preventDefault();
-      setPaletteOpen((open) => !open);
+      toggle();
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('tabarium:toggle-palette', toggle);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('tabarium:toggle-palette', toggle);
+    };
   }, []);
 
   const plainPage =

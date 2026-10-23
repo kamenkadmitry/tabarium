@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { browser } from 'wxt/browser';
 import { db } from '../../core/instance';
 import { loadSettings } from '../../core/settings';
 import { createChromePlatform } from '../../platform/chrome';
@@ -20,6 +21,13 @@ async function start(container: HTMLElement): Promise<void> {
   const { theme, palette } = await loadSettings(db);
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.palette = palette;
+  if (!demo) {
+    // The manifest Ctrl+K command can't reach page key listeners (the browser keeps it), so the
+    // worker relays it here and the page forwards it to the palette as a DOM event.
+    browser.runtime.onMessage.addListener((m: unknown) => {
+      if ((m as { type?: string }).type === 'tabarium-toggle-palette') document.dispatchEvent(new CustomEvent('tabarium:toggle-palette'));
+    });
+  }
   createRoot(container).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
       <DuplicateGuardProvider>

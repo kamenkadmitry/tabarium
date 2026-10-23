@@ -1292,6 +1292,30 @@ test('command palette: Ctrl+K searches everything and jumps by keyboard', async 
   await p.close();
 });
 
+test('command palette: the Ctrl+K command focuses or opens the library', async () => {
+  const p = await openLibraryWithSpace('Cmd');
+  // Real key presses can't reach the commands API from tests, so the command is invoked through the
+  // worker's e2e hook — the same path chrome.commands.onCommand takes.
+  await p.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-invoke-command', name: 'toggle-command-palette' }));
+  await expect(p.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
+
+  // With no library page running, the command opens a fresh one with the palette already up.
+  // Earlier tests may leave their library tabs in the shared context — close every one of them.
+  await p.close();
+  for (const page of app.context.pages()) {
+    if (page.url().startsWith(`chrome-extension://${app.extensionId}/newtab.html`)) await page.close();
+  }
+  const popup = await app.context.newPage();
+  await popup.goto(`chrome-extension://${app.extensionId}/popup.html`);
+  const [created] = await Promise.all([
+    app.context.waitForEvent('page'),
+    popup.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-invoke-command', name: 'toggle-command-palette' })),
+  ]);
+  await expect(created.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
+  await created.close();
+  await popup.close();
+});
+
 test('the service worker raised no errors', () => {
   expect(app.workerErrors).toEqual([]);
 });

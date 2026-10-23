@@ -25,6 +25,12 @@ export default defineConfig({
           suggested_key: { default: 'Ctrl+Shift+S' },
           description: 'Save the current tab to Tabarium',
         },
+        'toggle-command-palette': {
+          // Bound through the commands API on purpose: Chrome keeps Ctrl+K for the omnibox before
+          // any page listener can see it, while a manifest command takes precedence over it.
+          suggested_key: { default: 'Ctrl+K' },
+          description: 'Open the Tabarium command palette',
+        },
       },
     };
   },
