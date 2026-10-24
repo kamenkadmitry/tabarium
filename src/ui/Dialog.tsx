@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useT } from '../i18n/I18nProvider';
 
 interface Props {
   title: string;
@@ -9,6 +10,7 @@ interface Props {
 
 /** Modal built on the native <dialog> element: focus trap, Esc to close and backdrop come from the browser. */
 export function Dialog({ title, onClose, children }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function Dialog({ title, onClose, children }: Props) {
         </h2>
         <button
           type="button"
-          aria-label="Close"
+          aria-label={t('common.close')}
           onClick={onClose}
           className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
         >

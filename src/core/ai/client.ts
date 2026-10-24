@@ -1,4 +1,5 @@
 import type { Settings } from '../settings';
+import { tr } from '../../i18n/runtime';
 
 export type AiConfig = Settings['ai'];
 
@@ -44,11 +45,11 @@ export function detectProviderFromKey(key: string): Exclude<AiConfig['provider']
 
 /** A config is usable only when every field the chosen provider needs is filled in. */
 export function assertConfigured(config: AiConfig): asserts config is AiConfig & { provider: NonNullable<AiConfig['provider']> } {
-  if (config.provider === null) throw new AiError('AI is turned off. Choose a provider in Settings.');
-  if (config.apiKey.trim() === '') throw new AiError('Add your API key in Settings.');
-  if (config.model.trim() === '') throw new AiError('Enter a model name in Settings.');
+  if (config.provider === null) throw new AiError(tr()('err.aiNoProvider'));
+  if (config.apiKey.trim() === '') throw new AiError(tr()('err.aiNoKey'));
+  if (config.model.trim() === '') throw new AiError(tr()('err.aiNoModel'));
   if (config.provider === 'custom') {
-    if (config.baseUrl.trim() === '') throw new AiError('Enter the base URL of your provider in Settings.');
+    if (config.baseUrl.trim() === '') throw new AiError(tr()('err.aiNoBaseUrl'));
     new URL(config.baseUrl);
   }
 }
@@ -164,14 +165,12 @@ export async function complete(
   const response = await fetchImpl(url, { method: 'POST', headers, body: JSON.stringify(body) });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
-    throw new AiError(`${config.provider} responded with ${response.status}${detail ? `: ${detail}` : ''}`, response.status);
+    throw new AiError(tr()('err.aiHttp', { provider: config.provider, status: response.status, detail: detail ? `: ${detail}` : '' }), response.status);
   }
   const { text, finishReason } = extractText(config.provider, await response.json());
   if (text.trim() === '' && !options.allowEmpty) {
-    const why = finishReason ? ` (finish reason: ${finishReason})` : '';
-    throw new AiError(
-      `The model returned no text${why}. Reasoning models can spend their whole token budget thinking; try a non-reasoning model.`,
-    );
+    const reason = finishReason ? tr()('err.aiNoTextReason', { reason: finishReason }) : '';
+    throw new AiError(tr()('err.aiNoText', { reason }));
   }
   return text;
 }

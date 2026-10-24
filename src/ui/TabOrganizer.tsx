@@ -1,5 +1,7 @@
 import { FolderInput, Plus, Ungroup } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useT } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/messages';
 import { TAB_GROUP_COLORS, type OpenTab, type OpenWindow, type TabGroupColor, type TabGroupInfo } from '../platform/ports';
 import { dragSourceProps, endDrag, getDragPayload } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
@@ -36,6 +38,20 @@ type Indicator = number | null | undefined;
 const column = 'flex w-64 shrink-0 flex-col rounded-xl border border-line bg-surface';
 const iconButton =
   'grid size-7 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg';
+
+/** Message keys for Chrome's fixed group-colour enum; an unknown colour falls back to grey like GROUP_COLORS does. */
+const COLOR_KEYS: Record<string, StringKey> = {
+  grey: 'groupColor.grey',
+  blue: 'groupColor.blue',
+  red: 'groupColor.red',
+  yellow: 'groupColor.yellow',
+  green: 'groupColor.green',
+  pink: 'groupColor.pink',
+  purple: 'groupColor.purple',
+  cyan: 'groupColor.cyan',
+  orange: 'groupColor.orange',
+};
+const groupColorKey = (color: string): StringKey => COLOR_KEYS[color] ?? 'groupColor.grey';
 
 /**
  * A window's strip of columns. Scrollbars are hidden; the mouse wheel scrolls it sideways, except over a
@@ -116,6 +132,7 @@ function useColumnDrop(tabs: readonly OpenTab[], onDrop: (payload: { type: 'tabs
 
 /** The group's colour dot: opens the nine native browser group colours to recolour the real group. */
 function GroupColorDot({ group, onUpdateGroup }: { group: TabGroupInfo; onUpdateGroup: Props['onUpdateGroup'] }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -135,25 +152,25 @@ function GroupColorDot({ group, onUpdateGroup }: { group: TabGroupInfo; onUpdate
     <span ref={ref} className="relative shrink-0">
       <button
         type="button"
-        aria-label={`Group colour, currently ${group.color}`}
+        aria-label={t('org.groupColour', { colour: t(groupColorKey(group.color)) })}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Change colour"
+        title={t('org.changeColour')}
         onClick={() => setOpen((v) => !v)}
         className="grid size-5 place-items-center rounded-md transition-colors duration-150 hover:bg-surface-2"
       >
         <span aria-hidden className="size-2.5 rounded-full" style={{ background: GROUP_COLORS[group.color] ?? GROUP_COLORS.grey }} />
       </button>
       {open && (
-        <div role="menu" aria-label="Group colour" className="absolute left-0 top-7 z-20 grid w-32 grid-cols-3 gap-0.5 rounded-xl border border-line bg-surface p-1">
+        <div role="menu" aria-label={t('org.groupColourMenu')} className="absolute left-0 top-7 z-20 grid w-32 grid-cols-3 gap-0.5 rounded-xl border border-line bg-surface p-1">
           {TAB_GROUP_COLORS.map((c) => (
             <button
               key={c}
               type="button"
               role="menuitemradio"
               aria-checked={group.color === c}
-              aria-label={c}
-              title={c}
+              aria-label={t(groupColorKey(c))}
+              title={t(groupColorKey(c))}
               onClick={() => {
                 if (c !== group.color) onUpdateGroup(group.id, { color: c });
                 setOpen(false);
@@ -175,6 +192,7 @@ function GroupColumn({
   tabs,
   ...p
 }: Props & { group: TabGroupInfo; tabs: OpenTab[] }) {
+  const t = useT();
   const color = GROUP_COLORS[group.color] ?? GROUP_COLORS.grey;
   const [draft, setDraft] = useState<string | null>(null);
   const drop = useColumnDrop(tabs, (payload, beforeTabId) => p.onMoveToGroup(payload.tabIds, group.id, beforeTabId));
@@ -185,7 +203,7 @@ function GroupColumn({
   };
   return (
     <section
-      aria-label={`Tab group ${group.title || 'untitled'}`}
+      aria-label={t('otp.groupAria', { title: group.title || t('org.untitled') })}
       className={`${column} border-t-4 ${drop.over ? 'ring-2 ring-primary' : ''}`}
       style={{ borderTopColor: color }}
       {...drop.props}
@@ -195,7 +213,7 @@ function GroupColumn({
         {draft !== null ? (
           <input
             autoFocus
-            aria-label="Group name"
+            aria-label={t('org.groupName')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -208,28 +226,28 @@ function GroupColumn({
         ) : (
           <button
             type="button"
-            aria-label={`Rename group ${group.title || 'untitled'}`}
-            title="Rename group"
+            aria-label={t('org.rename', { title: group.title || t('org.untitled') })}
+            title={t('org.renameHint')}
             onClick={() => setDraft(group.title)}
             className="min-w-0 flex-1 truncate text-left text-sm font-semibold"
           >
-            {group.title || 'Group'}
+            {group.title || t('org.group')}
           </button>
         )}
         <span className="text-xs text-muted">{tabs.length}</span>
         <button
           type="button"
-          aria-label={`Save group ${group.title || 'untitled'} as a collection`}
-          title="Save as a collection"
-          onClick={() => p.onSaveGroup(tabs, group.title || 'Group')}
+          aria-label={t('org.saveAsCollection', { title: group.title || t('org.untitled') })}
+          title={t('org.saveHint')}
+          onClick={() => p.onSaveGroup(tabs, group.title || t('org.group'))}
           className={iconButton}
         >
           <FolderInput size={14} aria-hidden />
         </button>
         <button
           type="button"
-          aria-label={`Ungroup ${group.title || 'untitled'}`}
-          title="Ungroup"
+          aria-label={t('org.ungroup', { title: group.title || t('org.untitled') })}
+          title={t('org.ungroupHint')}
           onClick={() => p.onUngroup(tabs.map((t) => t.id))}
           className={iconButton}
         >
@@ -258,15 +276,16 @@ function GroupColumn({
 
 /** The window's loose tabs: drops ungroup the payload and move it to the position. */
 function UngroupedColumn({ w, tabs, windowName, ...p }: Props & { w: OpenWindow; tabs: OpenTab[]; windowName: string }) {
+  const t = useT();
   const drop = useColumnDrop(tabs, (payload, beforeTabId) => p.onMoveToUngrouped(payload.tabIds, w.id, beforeTabId));
   return (
     <section
-      aria-label={`Ungrouped tabs of ${windowName}`}
+      aria-label={t('otp.ungroupedAria', { window: windowName })}
       className={`${column} ${drop.over ? 'ring-2 ring-primary' : ''}`}
       {...drop.props}
     >
       <header className="flex items-center gap-2 border-b border-line px-3 py-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-muted">Ungrouped</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-muted">{t('otp.ungrouped')}</span>
         <span className="text-xs text-muted">{tabs.length}</span>
       </header>
       <ul data-scroll-y className="no-scrollbar flex min-h-8 flex-1 flex-col gap-1 overflow-y-auto p-2">
@@ -291,6 +310,7 @@ function UngroupedColumn({ w, tabs, windowName, ...p }: Props & { w: OpenWindow;
 
 /** The endcap drop zone: tabs dropped here move into this window and form a brand-new, unnamed group. */
 function NewGroupZone({ w, onCreateGroup }: { w: OpenWindow } & Pick<Props, 'onCreateGroup'>) {
+  const t = useT();
   const [over, setOver] = useState(false);
   useEffect(() => {
     if (!over) return;
@@ -300,7 +320,7 @@ function NewGroupZone({ w, onCreateGroup }: { w: OpenWindow } & Pick<Props, 'onC
   }, [over]);
   return (
     <div
-      aria-label="New group drop zone"
+      aria-label={t('otp.newGroupZone')}
       className={`flex w-48 shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-8 text-sm font-semibold ${
         over ? 'border-primary bg-surface-2 text-fg' : 'border-line text-muted'
       }`}
@@ -320,7 +340,7 @@ function NewGroupZone({ w, onCreateGroup }: { w: OpenWindow } & Pick<Props, 'onC
         if (payload?.type === 'tabs') onCreateGroup(payload.tabIds, w.id);
       }}
     >
-      <Plus size={16} aria-hidden /> Drop tabs to group
+      <Plus size={16} aria-hidden /> {t('otp.dropToGroup')}
     </div>
   );
 }
@@ -330,21 +350,22 @@ function NewGroupZone({ w, onCreateGroup }: { w: OpenWindow } & Pick<Props, 'onC
  * tabs dragging between them for real — into, out of, and onto brand-new groups.
  */
 export function TabOrganizer(p: Props) {
+  const t = useT();
   return (
-    <section aria-label="Tab organizer" className="no-scrollbar flex h-full flex-col gap-5 overflow-y-auto">
+    <section aria-label={t('org.section')} className="no-scrollbar flex h-full flex-col gap-5 overflow-y-auto">
       {p.access === 'needed' && (
         <div className="px-2 py-6 text-center">
-          <p className="text-sm text-muted">Allow Tabarium to see your open tabs so you can organise them into groups.</p>
+          <p className="text-sm text-muted">{t('org.permission')}</p>
           <button
             type="button"
             onClick={p.onGrant}
             className="mt-4 h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
           >
-            Show open tabs
+            {t('org.show')}
           </button>
         </div>
       )}
-      {p.access === 'checking' && <p className="px-2 py-6 text-center text-sm text-muted">Checking access…</p>}
+      {p.access === 'checking' && <p className="px-2 py-6 text-center text-sm text-muted">{t('org.checking')}</p>}
       {p.error && (
         <p role="alert" className="mx-2 rounded-lg bg-surface-2 px-3 py-2 text-xs text-danger">
           {p.error}
@@ -352,28 +373,31 @@ export function TabOrganizer(p: Props) {
       )}
       {p.access === 'granted' && !p.groupsAccess && (
         <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
-          <p className="flex-1 text-sm text-muted">Grant the tab groups permission to see and manage your browser tab groups here.</p>
+          <p className="flex-1 text-sm text-muted">{t('org.groupsPermission')}</p>
           <button
             type="button"
             onClick={p.onGrantGroups}
             className="h-9 shrink-0 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
           >
-            Show tab groups
+            {t('org.showGroups')}
           </button>
         </div>
       )}
       {p.access === 'granted' && p.windows.length === 0 && (
-        <p className="px-2 py-6 text-center text-sm text-muted">No open tabs. Tabs you open will show up here.</p>
+        <p className="px-2 py-6 text-center text-sm text-muted">{t('org.empty')}</p>
       )}
       {p.access === 'granted' &&
         p.windows.map((w, i) => {
-          const windowName = w.current ? 'this window' : `window ${i + 1}`;
+          const windowName = w.current ? t('otp.window.thisWindow') : t('otp.window.n', { n: i + 1 });
           const groupRuns = segmentTabs(w).filter((r): r is { group: TabGroupInfo; tabs: OpenTab[] } => r.group !== null);
           const ungrouped = w.tabs.filter((t) => t.groupId === undefined);
           return (
             <div key={w.id} className="flex min-h-56 flex-1 flex-col">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-                {w.current ? 'This window' : `Window ${i + 1}`} · {w.tabs.length} tabs
+                {t('org.windowHeading', {
+                  window: w.current ? t('otp.windowName.thisWindow') : t('otp.windowName.n', { n: i + 1 }),
+                  tabs: t.plural('count.tabs', w.tabs.length),
+                })}
               </h3>
               <WindowRow>
                 {groupRuns.map((run) => (

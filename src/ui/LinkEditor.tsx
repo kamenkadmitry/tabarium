@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { CardDetails } from '../core/ai/tasks';
+import { useT } from '../i18n/I18nProvider';
 import { LabelFields, type LabelsApi } from './labels';
 import { type LinkValues, parseUserUrl } from './linkInput';
 
@@ -26,6 +27,7 @@ const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.l
 
 /** Edit or add a link in place. Ctrl+Enter saves, Esc cancels. */
 export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, onCancel, onDirtyChange }: Props) {
+  const t = useT();
   const [title, setTitle] = useState(initial.title);
   const [rawUrl, setRawUrl] = useState(initial.url);
   const [note, setNote] = useState(initial.note);
@@ -77,8 +79,12 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
       if (fillNote) setNote(details.note);
       setTagIds((prev) => [...new Set([...prev, ...addTags])]);
       setHashtagIds((prev) => [...new Set([...prev, ...addHashtags])]);
-      const parts = [fillNote ? 'a note' : '', addTags.length > 0 ? `${addTags.length} tag${addTags.length === 1 ? '' : 's'}` : '', addHashtags.length > 0 ? `${addHashtags.length} hashtag${addHashtags.length === 1 ? '' : 's'}` : ''].filter((x) => x !== '');
-      setSuggestNote({ tone: 'ok', text: parts.length > 0 ? `Added ${parts.join(', ')}. Review it and press Save.` : 'Nothing to suggest for this link.' });
+      const parts = [
+        fillNote ? t('le.part.note') : '',
+        addTags.length > 0 ? t.plural('le.part.tags', addTags.length) : '',
+        addHashtags.length > 0 ? t.plural('le.part.hashtags', addHashtags.length) : '',
+      ].filter((x) => x !== '');
+      setSuggestNote({ tone: 'ok', text: parts.length > 0 ? t('le.addedReview', { parts: t.list(parts) }) : t('le.nothingSuggested') });
     } catch (e) {
       console.error('Tabarium: the AI suggestion failed', e);
       setSuggestNote({ tone: 'error', text: e instanceof Error ? e.message : String(e) });
@@ -88,7 +94,7 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
   };
 
   const cancel = () => {
-    if (dirty && !confirm('Discard your changes?')) return;
+    if (dirty && !confirm(t('le.discard'))) return;
     onCancel();
   };
 
@@ -96,26 +102,26 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
   const textFields = (
     <>
       <label className="mb-3 block">
-        <span className="mb-1.5 block text-xs font-semibold text-muted">Title</span>
-        <input autoFocus={mode === 'edit'} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'add' ? 'Optional. Defaults to the site name' : undefined} className={field} />
+        <span className="mb-1.5 block text-xs font-semibold text-muted">{t('le.title')}</span>
+        <input autoFocus={mode === 'edit'} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'add' ? t('le.titlePlaceholder') : undefined} className={field} />
       </label>
       <label className="mb-3 block">
-        <span className="mb-1.5 block text-xs font-semibold text-muted">Address</span>
+        <span className="mb-1.5 block text-xs font-semibold text-muted">{t('le.address')}</span>
         <input
           autoFocus={mode === 'add'}
           value={rawUrl}
           onChange={(e) => setRawUrl(e.target.value)}
-          placeholder="example.com/article"
+          placeholder={t('le.addressPlaceholder')}
           aria-invalid={showUrlError}
           className={field}
         />
-        {showUrlError && <span className="mt-1 block text-xs text-danger">Enter a valid http(s) address.</span>}
+        {showUrlError && <span className="mt-1 block text-xs text-danger">{t('err.validHttpAddress')}</span>}
       </label>
     </>
   );
   const noteField = (
     <label className={`mb-3 block ${wide ? 'h-full' : ''}`}>
-      <span className="mb-1.5 block text-xs font-semibold text-muted">Note</span>
+      <span className="mb-1.5 block text-xs font-semibold text-muted">{t('le.note')}</span>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
@@ -134,7 +140,7 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
             onClick={() => void runSuggest()}
             className="flex h-8 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold transition-colors duration-150 hover:bg-bg disabled:opacity-50"
           >
-            <Sparkles size={13} aria-hidden className="text-accent" /> {suggesting ? 'Asking the AI…' : 'Suggest with AI'}
+            <Sparkles size={13} aria-hidden className="text-accent" /> {suggesting ? t('le.askingAI') : t('le.suggestAI')}
           </button>
           {suggestNote && (
             <span role="status" className={`text-xs ${suggestNote.tone === 'error' ? 'text-danger' : 'text-muted'}`}>
@@ -150,7 +156,7 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
   return (
     <form
       ref={form}
-      aria-label={mode === 'edit' ? 'Edit link' : 'Add link'}
+      aria-label={mode === 'edit' ? t('le.editForm') : t('le.addForm')}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -180,20 +186,20 @@ export function LinkEditor({ mode, initial, labels, layout, suggest, onSubmit, o
         </>
       )}
       <div className="flex items-center gap-2">
-        <span className="mr-auto text-xs text-muted">Ctrl+Enter to save · Esc to cancel</span>
+        <span className="mr-auto text-xs text-muted">{t('le.keysHint')}</span>
         <button
           type="button"
           onClick={cancel}
           className="h-9 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-bg"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           type="submit"
           disabled={url === null || busy}
           className="h-9 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {mode === 'edit' ? 'Save' : 'Add link'}
+          {mode === 'edit' ? t('common.save') : t('le.addLink')}
         </button>
       </div>
     </form>

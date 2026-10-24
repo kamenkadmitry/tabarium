@@ -1,5 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
+import { useT } from '../i18n/I18nProvider';
 
 export interface LabelItem {
   id: string;
@@ -14,6 +15,8 @@ interface Props {
   title: string;
   /** Singular name used in accessible labels, e.g. "hashtag". */
   noun: string;
+  /** Plural name for the empty list message, e.g. "hashtags". */
+  nounPlural: string;
   /** Shown before each label, e.g. "#". */
   prefix?: string;
   items: readonly LabelItem[];
@@ -35,7 +38,8 @@ const LIST_HEIGHT = 300;
  * A row of chips with a cross, ending in a dashed "+". Pressing "+" turns it into a small field with suggestions:
  * matches (or the most used labels when the field is empty) and a line to create a new label.
  */
-export function LabelChips({ title, noun, prefix = '', items, selected, onChange, onCreate, normalize = defaultNormalize, swatches }: Props) {
+export function LabelChips({ title, noun, nounPlural, prefix = '', items, selected, onChange, onCreate, normalize = defaultNormalize, swatches }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
   const [text, setText] = useState('');
@@ -119,7 +123,7 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
           if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) close();
         }}
       >
-        <ul className="flex flex-wrap items-center gap-1.5" aria-label={`Chosen ${title.toLowerCase()}`}>
+        <ul className="flex flex-wrap items-center gap-1.5" aria-label={t('label.chosen', { title })}>
           {selected.map((id) => {
             const item = byId.get(id);
             if (!item) return null;
@@ -132,7 +136,7 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
                 </span>
                 <button
                   type="button"
-                  aria-label={`Remove ${prefix}${item.label}`}
+                  aria-label={t('label.remove', { label: `${prefix}${item.label}` })}
                   onClick={() => onChange(selected.filter((s) => s !== id))}
                   className="grid size-5 place-items-center rounded-full text-muted hover:text-danger"
                 >
@@ -146,7 +150,7 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
               <input
                 autoFocus
                 role="combobox"
-                aria-label={`Add ${noun}`}
+                aria-label={t('label.add', { noun })}
                 aria-expanded
                 aria-controls={listId}
                 aria-activedescendant={rows > 0 ? `${listId}-${active}` : undefined}
@@ -163,7 +167,7 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
             ) : (
               <button
                 type="button"
-                aria-label={`Add ${noun}`}
+                aria-label={t('label.add', { noun })}
                 onClick={show}
                 className="grid h-7 w-8 place-items-center rounded-full border border-dashed border-muted text-muted transition-colors duration-150 hover:border-primary hover:text-primary"
               >
@@ -178,9 +182,9 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
             className={`absolute left-0 z-20 w-72 max-w-full overflow-hidden rounded-xl border border-line bg-surface shadow-lg ${openUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
           >
             {rows > 0 && (
-              <p className="px-3 pb-0.5 pt-2 text-[11px] font-bold uppercase tracking-wider text-muted">{key === '' ? `Often used` : 'Matches'}</p>
+              <p className="px-3 pb-0.5 pt-2 text-[11px] font-bold uppercase tracking-wider text-muted">{key === '' ? t('label.oftenUsed') : t('label.matches')}</p>
             )}
-            <ul id={listId} role="listbox" aria-label={`${title} suggestions`} className="max-h-64 overflow-y-auto py-1">
+            <ul id={listId} role="listbox" aria-label={t('label.suggestions', { title })} className="max-h-64 overflow-y-auto py-1">
               {suggestions.map((s, i) => (
                 <li
                   key={s.id}
@@ -208,15 +212,14 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
                   onClick={() => void create()}
                   className={`flex min-h-9 cursor-pointer items-center gap-2 border-t border-line px-3 text-sm font-bold text-primary ${active === suggestions.length ? 'bg-surface-2' : ''}`}
                 >
-                  <Plus size={14} aria-hidden /> Create {prefix}
-                  {key}
+                  <Plus size={14} aria-hidden /> {t('label.create', { label: `${prefix}${key}` })}
                   {swatches && (
-                    <span className="ml-auto flex gap-1" aria-label="Pick a colour">
+                    <span className="ml-auto flex gap-1" aria-label={t('label.pickColour')}>
                       {swatches.map((c) => (
                         <button
                           key={c}
                           type="button"
-                          aria-label={`Create with colour ${c}`}
+                          aria-label={t('label.createColour', { colour: c })}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -230,10 +233,10 @@ export function LabelChips({ title, noun, prefix = '', items, selected, onChange
                   )}
                 </li>
               )}
-              {rows === 0 && <li className="px-3 py-2 text-sm text-muted">{items.length === 0 ? `No ${noun}s yet. Type to create one.` : `Everything is already added.`}</li>}
+              {rows === 0 && <li className="px-3 py-2 text-sm text-muted">{items.length === 0 ? t('label.noneYet', { nounPlural }) : t('label.allAdded')}</li>}
             </ul>
             {error && <p className="border-t border-line px-3 py-2 text-xs text-danger">{error}</p>}
-            <p className="border-t border-line px-3 py-1.5 text-[11px] text-muted">Up and Down to choose, Enter to add, Esc to close</p>
+            <p className="border-t border-line px-3 py-1.5 text-[11px] text-muted">{t('label.keysHint')}</p>
           </div>
         )}
       </div>

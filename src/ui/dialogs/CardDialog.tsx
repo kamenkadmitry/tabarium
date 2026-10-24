@@ -4,6 +4,7 @@ import { Dialog } from '../Dialog';
 import type { LabelsApi } from '../labels';
 import { LinkEditor } from '../LinkEditor';
 import { type LinkValues } from '../linkInput';
+import { useT } from '../../i18n/I18nProvider';
 
 interface Props {
   card: Card;
@@ -15,8 +16,9 @@ interface Props {
 
 /** The link editor in a modal, for lists that have no board to open it in (Starred, Duplicates, search). */
 export function CardDialog({ card, labels, suggest, onSubmit, onClose }: Props) {
+  const t = useT();
   return (
-    <Dialog title="Edit tab" onClose={onClose}>
+    <Dialog title={t('dlg.editCard.title')} onClose={onClose}>
       <LinkEditor
         mode="edit"
         layout="stack"

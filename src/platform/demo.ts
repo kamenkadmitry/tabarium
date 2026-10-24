@@ -1,4 +1,5 @@
 import type { OpenTab, Platform } from './ports';
+import { tr } from '../i18n/runtime';
 
 const DEMO_TABS: OpenTab[] = [
   { id: 1, title: 'Hacker News', url: 'https://news.ycombinator.com/', favIconUrl: null },
@@ -39,8 +40,8 @@ export function createDemoPlatform(): Platform {
     backupSchedule: { resync: async () => undefined },
     shortcuts: {
       list: async () => [
-        { name: 'save-current-tab', description: 'Save the current tab to Tabarium', shortcut: 'Ctrl+Shift+S' },
-        { name: 'toggle-command-palette', description: 'Open the Tabarium command palette', shortcut: 'Ctrl+Shift+K' },
+        { name: 'save-current-tab', description: tr()('cmd.saveTabDesc'), shortcut: 'Ctrl+Shift+S' },
+        { name: 'toggle-command-palette', description: tr()('cmd.paletteDesc'), shortcut: 'Ctrl+Shift+K' },
       ],
     },
     tabs: {

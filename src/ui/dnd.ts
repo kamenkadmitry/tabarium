@@ -1,4 +1,5 @@
 import type { DragEvent } from 'react';
+import { tr } from '../i18n/runtime';
 
 export type DragPayload =
   | { type: 'card'; id: string }
@@ -78,10 +79,10 @@ export function readExternalLinks(e: DragEvent): DraggedLink[] {
 
 export function parseDraggedLinks(raw: string): DraggedLink[] {
   const data: unknown = JSON.parse(raw);
-  if (!Array.isArray(data) || data.length === 0) throw new Error('The dropped data holds no links');
+  if (!Array.isArray(data) || data.length === 0) throw new Error(tr()('err.noLinksDropped'));
   return data.map((item: unknown) => {
     const l = item as Partial<DraggedLink> | null;
-    if (!l || typeof l.url !== 'string' || !/^https?:\/\//.test(l.url)) throw new Error('A dropped link has no valid web address');
+    if (!l || typeof l.url !== 'string' || !/^https?:\/\//.test(l.url)) throw new Error(tr()('err.badLinkDropped'));
     return { title: typeof l.title === 'string' && l.title !== '' ? l.title : l.url, url: l.url, favIconUrl: typeof l.favIconUrl === 'string' ? l.favIconUrl : null };
   });
 }

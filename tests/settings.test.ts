@@ -30,4 +30,15 @@ describe('settings', () => {
     await db.settings.put({ key: 'settings', value: { theme: 'neon' } });
     await expect(loadSettings(db)).rejects.toThrow();
   });
+
+  it('defaults the language to system and persists an explicit choice', async () => {
+    expect((await loadSettings(db)).language).toBe('system');
+    await updateSettings(db, { language: 'ru' });
+    expect((await loadSettings(db)).language).toBe('ru');
+  });
+
+  it('rejects a language we do not ship', async () => {
+    await expect(updateSettings(db, { language: 'fr' as never })).rejects.toThrow();
+    expect((await loadSettings(db)).language).toBe('system');
+  });
 });

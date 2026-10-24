@@ -1,4 +1,5 @@
 import { AiError, assertConfigured, providerOrigin, type AiConfig } from '../core/ai/client';
+import { tr } from '../i18n/runtime';
 import type { Platform } from '../platform/ports';
 
 /**
@@ -9,7 +10,7 @@ export async function withProviderAccess<T>(platform: Platform, config: AiConfig
   assertConfigured(config);
   const origin = providerOrigin(config);
   if (!(await platform.permissions.requestOrigin(origin))) {
-    throw new AiError(`Tabarium needs permission to contact ${origin} to use AI features.`);
+    throw new AiError(tr()('err.aiNeedsOrigin', { origin }));
   }
   return action();
 }

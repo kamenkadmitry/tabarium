@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo } from 'react';
 import { normalizeHashtag } from '../core/hashtag';
 import type { Card, Hashtag, Tag } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import { LabelChips } from './LabelChips';
 
 interface Labels {
@@ -34,6 +35,7 @@ interface CardLabelsProps {
 
 /** The labels of a card on one line that never wraps: a few of them, then "+N" for the rest. */
 export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitHashtags = 2, className = '', onChipClick }: CardLabelsProps) {
+  const t = useT();
   const { tags, hashtags } = useContext(LabelsContext);
   const cardTags = card.tagIds.flatMap((id) => tags.get(id) ?? []);
   const cardHashtags = card.hashtagIds.flatMap((id) => hashtags.get(id) ?? []);
@@ -80,7 +82,7 @@ export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitH
         ),
       )}
       {rest > 0 && (
-        <span aria-label={`${rest} more labels`} className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-muted">
+        <span aria-label={t.plural('label.moreLabels', rest)} className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-muted">
           +{rest}
         </span>
       )}
@@ -99,6 +101,7 @@ interface ChipButtonProps {
 
 /** A label chip that filters. It sits inside the card's <a>, so the click must not navigate: preventDefault cancels it. */
 function ChipButton({ kind, id, name, onClick, className, children }: ChipButtonProps) {
+  const t = useT();
   const activate = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -108,8 +111,8 @@ function ChipButton({ kind, id, name, onClick, className, children }: ChipButton
     <span
       role="button"
       tabIndex={0}
-      aria-label={`Filter by ${kind} ${name}`}
-      title={`Filter by ${name}`}
+      aria-label={kind === 'tag' ? t('label.filterTag', { name }) : t('label.filterHashtag', { name })}
+      title={t('label.filterName', { name })}
       // Pressing must not focus the chip: focus would raise the row's action bar between mousedown and mouseup.
       onMouseDown={(e) => e.preventDefault()}
       onClick={activate}
@@ -145,20 +148,23 @@ interface FieldsProps {
 
 /** The two label rows used when a link is created or edited. */
 export function LabelFields({ api, tagIds, hashtagIds, onTags, onHashtags }: FieldsProps) {
+  const t = useT();
   return (
     <>
       <LabelChips
-        title="Tags"
-        noun="tag"
-        items={api.tags.map((t) => ({ id: t.id, label: t.title, color: t.color, count: api.tagUsage.get(t.id) ?? 0 }))}
+        title={t('label.tags')}
+        noun={t('label.tag')}
+        nounPlural={t('label.tagPlural')}
+        items={api.tags.map((tag) => ({ id: tag.id, label: tag.title, color: tag.color, count: api.tagUsage.get(tag.id) ?? 0 }))}
         selected={tagIds}
         onChange={onTags}
         onCreate={api.createTag}
         swatches={api.swatches}
       />
       <LabelChips
-        title="Hashtags"
-        noun="hashtag"
+        title={t('label.hashtags')}
+        noun={t('label.hashtag')}
+        nounPlural={t('label.hashtagPlural')}
         prefix="#"
         items={api.hashtags.map((h) => ({ id: h.id, label: h.name, count: api.hashtagUsage.get(h.id) ?? 0 }))}
         selected={hashtagIds}

@@ -1,5 +1,6 @@
 import { unbumpActivity } from './activity';
 import type { TabariumDB } from './db';
+import { tr } from '../i18n/runtime';
 import type { Card, Collection, Hashtag, Space, Tag } from './types';
 
 /**
@@ -27,7 +28,7 @@ export async function restoreDeletion(db: TabariumDB, d: Deletion): Promise<void
     case 'cards':
       await db.transaction('rw', [db.cards, db.collections, db.activity, db.tags, db.hashtags], async () => {
         const parents = await db.collections.bulkGet([...new Set(d.cards.map((c) => c.collectionId))]);
-        if (parents.some((c) => !c)) throw new Error('Cannot undo: the collection no longer exists.');
+        if (parents.some((c) => !c)) throw new Error(tr()('err.cannotUndoCollection'));
         const live = await liveLabelIds(db);
         await db.cards.bulkAdd(d.cards.map((c) => pruneLabels(c, live)));
         await unbumpActivity(db, 'deleted', d.cards.length);
@@ -36,7 +37,7 @@ export async function restoreDeletion(db: TabariumDB, d: Deletion): Promise<void
       return;
     case 'collection':
       await db.transaction('rw', [db.collections, db.spaces, db.cards, db.activity, db.tags, db.hashtags], async () => {
-        if (!(await db.spaces.get(d.collection.spaceId))) throw new Error('Cannot undo: the space no longer exists.');
+        if (!(await db.spaces.get(d.collection.spaceId))) throw new Error(tr()('err.cannotUndoSpace'));
         const live = await liveLabelIds(db);
         await db.collections.add({ ...d.collection, tagIds: d.collection.tagIds.filter((t) => live.tags.has(t)) });
         await db.cards.bulkAdd(d.cards.map((c) => pruneLabels(c, live)));

@@ -1,4 +1,5 @@
 import type { Backup } from './backup';
+import { tr } from '../i18n/runtime';
 import { normalizeUrl } from './url';
 
 const escapeHtml = (s: string) =>
@@ -116,7 +117,7 @@ function parseFolderTree(html: string): Folder {
       stack.pop();
     }
   }
-  if (!sawList) throw new Error('Not a bookmarks file: no <DL> list found');
+  if (!sawList) throw new Error(tr()('err.notBookmarksFile'));
   return root;
 }
 
@@ -138,14 +139,14 @@ export function parseBookmarksHtml(html: string): ImportedSpace[] {
     return created;
   };
 
-  if (root.links.length > 0) spaceNamed('Imported').collections.push({ title: 'Unsorted', links: root.links });
+  if (root.links.length > 0) spaceNamed(tr()('common.imported')).collections.push({ title: tr()('common.unsorted'), links: root.links });
   for (const top of root.children) {
     if (top.children.length === 0) {
-      if (top.links.length > 0) spaceNamed('Imported').collections.push({ title: top.title, links: top.links });
+      if (top.links.length > 0) spaceNamed(tr()('common.imported')).collections.push({ title: top.title, links: top.links });
       continue;
     }
-    const space = spaceNamed(top.title || 'Imported');
-    if (top.links.length > 0) space.collections.push({ title: 'Unsorted', links: top.links });
+    const space = spaceNamed(top.title || tr()('common.imported'));
+    if (top.links.length > 0) space.collections.push({ title: tr()('common.unsorted'), links: top.links });
     for (const sub of top.children) {
       const links = allLinks(sub);
       if (links.length > 0) space.collections.push({ title: sub.title, links });

@@ -7,7 +7,7 @@ import { db, repo } from '../core/instance';
 import { groupTabs, suggestCardDetails } from '../core/ai/tasks';
 import type { InboxGroup, InboxSort } from '../core/inbox';
 import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } from '../core/organise';
-import { ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
+import { displaySpaceName, ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import { cardSearchText } from './searchModel';
 import type { Card, Space } from '../core/types';
@@ -56,6 +56,7 @@ import { useInboxReading } from './useInboxReading';
 import { useCardSelection } from './useCardSelection';
 import { useInlineEditor } from './useInlineEditor';
 import { useOpenTabsController } from './useOpenTabsController';
+import { useT } from '../i18n/I18nProvider';
 
 type DialogState =
   | { kind: 'space' }
@@ -72,7 +73,17 @@ type DialogState =
   | { kind: 'add-tabs'; tabIds: number[] }
   | { kind: 'session'; tabs: OpenTab[] };
 
-const TITLES = { dashboard: 'Dashboard', starred: 'Starred', duplicates: 'Duplicates', bookmarks: 'Browser bookmarks', tags: 'Tags', hashtags: 'Hashtags', settings: 'Settings', organizer: 'Tab organizer' } as const;
+/** Header titles for the non-space views — the same nav.* keys the command palette's PAGES use. */
+const TITLE_KEYS = {
+  dashboard: 'nav.dashboard',
+  starred: 'nav.starred',
+  duplicates: 'nav.duplicates',
+  bookmarks: 'nav.bookmarksPage',
+  tags: 'nav.tags',
+  hashtags: 'nav.hashtags',
+  settings: 'nav.settings',
+  organizer: 'nav.organizerTitle',
+} as const;
 
 /** One entry in the tab's history stack; pos orders entries so the chevrons know where the edges are. */
 interface NavEntry {
@@ -85,6 +96,7 @@ const sameView = (a: View | null, b: View | null): boolean =>
 
 export function App() {
   const platform = usePlatform();
+  const t = useT();
   const data = useLibraryData();
   const settings = useLiveQuery(() => loadSettings(db), []);
   const [selectedView, setView] = useState<View | null>(null);
@@ -127,10 +139,13 @@ export function App() {
       : requested;
   const organizerOpen = view?.kind === 'organizer';
 
-  const reportError = useCallback((what: string, e: unknown) => {
-    console.error(`Tabarium: ${what} failed`, e);
-    setError(`${what} failed: ${e instanceof Error ? e.message : String(e)}`);
-  }, []);
+  const reportError = useCallback(
+    (what: string, e: unknown) => {
+      console.error(`Tabarium: ${what} failed`, e);
+      setError(t('error.failed', { what, error: e instanceof Error ? e.message : String(e) }));
+    },
+    [t],
+  );
   /** Runs a user-triggered action; failures are logged with context and shown to the user. */
   const run = useCallback(
     async (what: string, action: () => Promise<void>) => {
@@ -148,8 +163,8 @@ export function App() {
   const editor = useInlineEditor({ reportError, clearError: () => setError(null), guard });
   // Creates the Inbox on first use and adopts an older one, so it exists before anything is saved to it.
   useEffect(() => {
-    ensureInbox(db).catch((e: unknown) => reportError('Preparing the Inbox', e));
-  }, [reportError]);
+    ensureInbox(db).catch((e: unknown) => reportError(t('run.preparingInbox'), e));
+  }, [reportError, t]);
   const picked = useCardSelection();
   const inboxCardList = inboxCards(data?.spaces ?? [], data?.collections ?? [], data?.cards ?? []);
   const inboxViewActive = view?.kind === 'space' && data?.spaces.find((sp) => sp.id === view.spaceId)?.kind === 'inbox';
@@ -262,10 +277,10 @@ export function App() {
     run,
     guard,
   });
-  const newCollectionTitle = () => `Saved ${new Date().toLocaleDateString()}`;
+  const newCollectionTitle = () => t('common.savedDate', { date: t.date(new Date()) });
   /** Links dragged out of the side panel become a new collection in the given space. */
   const dropLinksAsCollection = (raw: string, targetSpaceId: string) =>
-    void run('Adding the dropped links', async () => {
+    void run(t('run.addingDroppedLinks'), async () => {
       const links = await guard(parseDraggedLinks(raw));
       if (!links || links.length === 0) return;
       const col = await repo.createCollection(targetSpaceId, newCollectionTitle());
@@ -288,12 +303,12 @@ export function App() {
   const inboxDefault = inboxCollections.find((c) => c.title === 'Saved tabs') ?? inboxCollections[0];
 
   const cardActions = (c: Card): CardRowActions => ({
-    onToggleStar: act('Updating tab', () => repo.updateCard(c.id, { starred: !c.starred })),
-    onDelete: act('Deleting tab', async () => undoable(await repo.deleteCard(c.id, view?.kind === 'duplicates' ? 'duplicate' : undefined))),
+    onToggleStar: act(t('run.updatingTab'), () => repo.updateCard(c.id, { starred: !c.starred })),
+    onDelete: act(t('run.deletingTab'), async () => undoable(await repo.deleteCard(c.id, view?.kind === 'duplicates' ? 'duplicate' : undefined))),
     // On the board the editor opens under the row; lists without a board (Starred, Duplicates, search) use a dialog.
     onEdit: () => (view?.kind === 'space' ? editor.openEdit(c) : setDialog({ kind: 'card', card: c })),
     onMove: () => setDialog({ kind: 'move', card: c }),
-    onInbox: inboxCollectionIds.has(c.collectionId) ? undefined : act('Moving to Inbox', () => moveToInbox(db, [c.id])),
+    onInbox: inboxCollectionIds.has(c.collectionId) ? undefined : act(t('run.movingToInbox'), () => moveToInbox(db, [c.id])),
     // Label chips filter only where a board toolbar exists; elsewhere they stay plain text.
     onFilterLabel:
       view?.kind === 'space' && !inboxViewActive && q === ''
@@ -319,7 +334,7 @@ export function App() {
       ? (input: { title: string; url: string }) =>
           withProviderAccess(platform, settings.ai, async () => {
             const [details] = await suggestCardDetails(settings.ai, [input], await loadLabelContext(db));
-            if (!details) throw new Error('The AI returned nothing for this link.');
+            if (!details) throw new Error(t('err.aiNothing'));
             return details;
           })
       : undefined;
@@ -332,7 +347,7 @@ export function App() {
     cardActions,
     setDialog: (d) => setDialog(d),
     openAddLink: (collectionId) =>
-      void run('Opening the editor', async () => {
+      void run(t('run.openingEditor'), async () => {
         const target = collectionById.get(collectionId);
         if (target && !target.expanded) await repo.updateCollection(collectionId, { expanded: true });
         editor.openAdd(collectionId);
@@ -343,9 +358,9 @@ export function App() {
   });
 
   const openSaveSession = () =>
-    run('Opening Save session', async () => {
+    run(t('run.openingSaveSession'), async () => {
       if (!(await platform.permissions.request('tabs'))) {
-        throw new Error('Tabarium needs the "tabs" permission to read your open tabs.');
+        throw new Error(t('err.needTabsPermission'));
       }
       setDialog({ kind: 'session', tabs: await platform.tabs.listWindowTabs() });
     });
@@ -355,7 +370,7 @@ export function App() {
   const labelsApi = buildLabelsApi(tags, hashtags, cards);
   const inboxSlot = editor.slot(labelsApi, 'stack', suggestForLink);
   const tagUsage = new Map(
-    tags.map((t) => [t.id, { collections: collections.filter((c) => c.tagIds.includes(t.id)).length, links: cards.filter((c) => c.tagIds.includes(t.id)).length }]),
+    tags.map((tag) => [tag.id, { collections: collections.filter((c) => c.tagIds.includes(tag.id)).length, links: cards.filter((c) => c.tagIds.includes(tag.id)).length }]),
   );
   const hashtagUsage = new Map(hashtags.map((h) => [h.id, cards.filter((c) => c.hashtagIds.includes(h.id)).length]));
   const searchGroups = collections
@@ -377,13 +392,13 @@ export function App() {
   const spaceHashtags = hashtags
     .map((h) => ({ id: h.id, name: h.name, count: spaceCollections.reduce((n, c) => n + (cardsByCollection.get(c.id) ?? []).filter((card) => card.hashtagIds.includes(h.id)).length, 0) }))
     .filter((h) => h.count > 0);
-  const spaceTags = tags.filter((t) => spaceCollections.some((c) => c.tagIds.includes(t.id)));
+  const spaceTags = tags.filter((tag) => spaceCollections.some((c) => c.tagIds.includes(tag.id)));
   const spaceColors = [...new Set(spaceCollections.flatMap((c) => (c.color === null ? [] : [c.color])))];
   const boardView: BoardView = (spaceId !== undefined ? settings?.boardView[spaceId] : undefined) ?? 'grid';
   const spaceTabCount = spaceCollections.reduce((n, c) => n + (tabCounts.get(c.id) ?? 0), 0);
 
 
-  const title = view && view.kind !== 'space' ? TITLES[view.kind] : (activeSpace?.name ?? 'Library');
+  const title = view && view.kind !== 'space' ? t(TITLE_KEYS[view.kind]) : (activeSpace ? displaySpaceName(activeSpace) : t('nav.library'));
   const searching = q !== '' && !plainPage;
   const tagsDialogCollection = dialog?.kind === 'tags' && dialog.collectionId ? collectionById.get(dialog.collectionId) : undefined;
 
@@ -401,14 +416,14 @@ export function App() {
         onRenameSpace={(space) => setDialog({ kind: 'rename-space', space })}
         onDeleteSpace={(space) => {
           const n = collections.filter((c) => c.spaceId === space.id).length;
-          if (confirm(`Delete the space “${space.name}” with its ${n} collections and all their tabs?`)) {
-            void run('Deleting space', async () => {
+          if (confirm(t.plural('space.deleteConfirm', n, { name: displaySpaceName(space) }))) {
+            void run(t('run.deletingSpace'), async () => {
               undoable(await repo.deleteSpace(space.id));
               if (view?.kind === 'space' && view.spaceId === space.id) navigate(null);
             });
           }
         }}
-        onDropCollection={(id, targetSpaceId) => void run('Moving collection', () => repo.moveCollection(id, targetSpaceId))}
+        onDropCollection={(id, targetSpaceId) => void run(t('run.movingCollection'), () => repo.moveCollection(id, targetSpaceId))}
         onDropLinks={dropLinksAsCollection}
         onDropTabs={(tabIds, targetSpaceId) =>
           void tabsCtl.addTabs(tabIds, { kind: 'new', spaceId: targetSpaceId, title: newCollectionTitle() })
@@ -419,7 +434,7 @@ export function App() {
           <div className="flex items-center">
             <button
               type="button"
-              aria-label="Go back"
+              aria-label={t('header.goBack')}
               disabled={nav.pos <= 0}
               onClick={() => history.back()}
               className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:opacity-40"
@@ -428,7 +443,7 @@ export function App() {
             </button>
             <button
               type="button"
-              aria-label="Go forward"
+              aria-label={t('header.goForward')}
               disabled={nav.pos >= nav.seq}
               onClick={() => history.forward()}
               className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 enabled:hover:bg-surface-2 enabled:hover:text-fg disabled:opacity-40"
@@ -437,18 +452,18 @@ export function App() {
             </button>
           </div>
           {view?.kind === 'space' && activeSpace ? (
-            <SpaceHeading name={activeSpace.name} icon={activeSpace.icon} collections={spaceCollections.length} tabs={spaceTabCount} />
+            <SpaceHeading name={displaySpaceName(activeSpace)} icon={activeSpace.icon} collections={spaceCollections.length} tabs={spaceTabCount} />
           ) : (
             <h1 className="text-xl font-bold tracking-tight">{title}</h1>
           )}
           {!plainPage && (
             <label className="relative ml-4 max-w-md flex-1">
-              <span className="sr-only">Search all tabs</span>
+              <span className="sr-only">{t('header.searchAria')}</span>
               <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search all tabs, notes and links"
+                placeholder={t('header.searchPlaceholder')}
                 className="h-10 w-full rounded-lg border border-line bg-bg pl-9 pr-3 text-sm placeholder:text-muted"
               />
             </label>
@@ -458,8 +473,8 @@ export function App() {
               {settings?.openTabsPanel === false && (
                 <button
                   type="button"
-                  aria-label="Show open tabs"
-                  onClick={() => saveSetting('Showing open tabs', { openTabsPanel: true })}
+                  aria-label={t('header.showOpenTabs')}
+                  onClick={() => saveSetting(t('run.showingOpenTabs'), { openTabsPanel: true })}
                   className="grid size-10 place-items-center rounded-lg border border-line text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
                 >
                   <PanelRightOpen size={17} aria-hidden />
@@ -470,7 +485,7 @@ export function App() {
                 onClick={() => void openSaveSession()}
                 className="flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90"
               >
-                <Plus size={16} aria-hidden /> Save session
+                <Plus size={16} aria-hidden /> {t('header.saveSession')}
               </button>
             </div>
           )}
@@ -479,7 +494,7 @@ export function App() {
         {error && (
           <div role="alert" className="flex items-center gap-3 border-b border-line bg-surface-2 px-6 py-2 text-sm text-danger">
             <span className="flex-1">{error}</span>
-            <button type="button" aria-label="Dismiss error" onClick={() => setError(null)}>
+            <button type="button" aria-label={t('header.dismissError')} onClick={() => setError(null)}>
               <X size={16} aria-hidden />
             </button>
           </div>
@@ -508,8 +523,8 @@ export function App() {
                 <li>
                   <EmptyState
                     icon={<Star />}
-                    title="Nothing starred yet"
-                    hint="Star a link to keep it here — the star is in the row's action bar."
+                    title={t('empty.starred.title')}
+                    hint={t('empty.starred.hint')}
                     action={
                       firstSpaceId !== undefined ? (
                         <button
@@ -517,7 +532,7 @@ export function App() {
                           className="h-9 rounded-lg border border-line px-4 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
                           onClick={() => navigate({ kind: 'space', spaceId: firstSpaceId })}
                         >
-                          Open a space
+                          {t('empty.openSpace')}
                         </button>
                       ) : undefined
                     }
@@ -567,10 +582,10 @@ export function App() {
             <TagsPage
               tags={tags}
               usage={tagUsage}
-              onCreate={(t, color) => void run('Creating tag', async () => void (await repo.createTag(t, color)))}
-              onUpdate={(id, patch) => void run('Updating tag', () => repo.updateTag(id, patch))}
-              onDelete={(id) => void run('Deleting tag', async () => undoable(await repo.deleteTag(id)))}
-              onDeleteUnused={() => void run('Deleting unused tags', async () => undoable(await repo.deleteUnusedTags()))}
+              onCreate={(tag, color) => void run(t('run.creatingTag'), async () => void (await repo.createTag(tag, color)))}
+              onUpdate={(id, patch) => void run(t('run.updatingTag'), () => repo.updateTag(id, patch))}
+              onDelete={(id) => void run(t('run.deletingTag'), async () => undoable(await repo.deleteTag(id)))}
+              onDeleteUnused={() => void run(t('run.deletingUnusedTags'), async () => undoable(await repo.deleteUnusedTags()))}
             />
           )}
 
@@ -579,16 +594,16 @@ export function App() {
               hashtags={hashtags}
               cards={cards}
               usage={hashtagUsage}
-              onCreate={(name) => void run('Creating hashtag', async () => void (await repo.ensureHashtag(name)))}
-              onRename={(id, name) => void run('Renaming hashtag', () => repo.renameHashtag(id, name))}
-              onDelete={(id) => void run('Deleting hashtag', async () => undoable(await repo.deleteHashtag(id)))}
-              onMerge={(from, into) => void run('Merging hashtags', async () => undoable(await repo.mergeHashtag(from, into)))}
+              onCreate={(name) => void run(t('run.creatingHashtag'), async () => void (await repo.ensureHashtag(name)))}
+              onRename={(id, name) => void run(t('run.renamingHashtag'), () => repo.renameHashtag(id, name))}
+              onDelete={(id) => void run(t('run.deletingHashtag'), async () => undoable(await repo.deleteHashtag(id)))}
+              onMerge={(from, into) => void run(t('run.mergingHashtags'), async () => undoable(await repo.mergeHashtag(from, into)))}
               onRemoveFrom={(card, hashtagId) =>
-                void run('Removing hashtag', () =>
+                void run(t('run.removingHashtag'), () =>
                   repo.setCardLabels(card.id, { tagIds: card.tagIds, hashtagIds: card.hashtagIds.filter((h) => h !== hashtagId) }),
                 )
               }
-              onDeleteUnused={() => void run('Deleting unused hashtags', async () => undoable(await repo.deleteUnusedHashtags()))}
+              onDeleteUnused={() => void run(t('run.deletingUnusedHashtags'), async () => undoable(await repo.deleteUnusedHashtags()))}
             />
           )}
 
@@ -598,8 +613,8 @@ export function App() {
               cards={inboxCards(spaces, collections, cards)}
               sort={settings.inboxSort}
               group={settings.inboxGroup}
-              onSort={(inboxSort: InboxSort) => saveSetting('Saving the Inbox view', { inboxSort })}
-              onGroup={(inboxGroup: InboxGroup) => saveSetting('Saving the Inbox view', { inboxGroup })}
+              onSort={(inboxSort: InboxSort) => saveSetting(t('run.savingInboxView'), { inboxSort })}
+              onGroup={(inboxGroup: InboxGroup) => saveSetting(t('run.savingInboxView'), { inboxGroup })}
               selection={selection}
               cardActions={cardActions}
               editor={{
@@ -611,9 +626,9 @@ export function App() {
               onSuggest={
                 aiReady && settings
                   ? (targets) =>
-                      void run('Suggesting labels', async () => {
+                      void run(t('run.suggestingLabels'), async () => {
                         const { items, skipped } = await proposeDetails(platform, settings.ai, targets);
-                        setDialog({ kind: 'ai-details', title: 'Suggested labels and collections', items, skipped });
+                        setDialog({ kind: 'ai-details', title: t('dlg.aiLabels.title'), items, skipped });
                       })
                   : undefined
               }
@@ -623,7 +638,7 @@ export function App() {
               pagesNote={reading.note}
               onDropTabs={(tabIds) => void tabsCtl.addTabs(tabIds, { kind: 'collection', collectionId: inboxDefault.id, before: null })}
               onDropLinks={(raw) =>
-                void run('Adding the dropped links', async () => {
+                void run(t('run.addingDroppedLinks'), async () => {
                   const links = await guard(parseDraggedLinks(raw));
                   if (links && links.length > 0) await repo.addCards(inboxDefault.id, links);
                 })
@@ -636,20 +651,21 @@ export function App() {
               <div className="mb-5">
                 <BoardToolbar
                   sort={settings?.boardSort ?? 'custom'}
-                  onSort={(boardSort: BoardSort) => saveSetting('Saving the sort order', { boardSort })}
+                  onSort={(boardSort: BoardSort) => saveSetting(t('run.savingSortOrder'), { boardSort })}
                   view={boardView}
-                  onView={(v) => saveSetting('Saving the view', { boardView: { ...(settings?.boardView ?? {}), [spaceId]: v } })}
+                  onView={(v) => saveSetting(t('run.savingView'), { boardView: { ...(settings?.boardView ?? {}), [spaceId]: v } })}
                   filter={filter}
                   onFilter={setFilter}
                   tags={spaceTags}
                   colors={spaceColors}
                   hashtags={spaceHashtags}
-                  onExpandAll={() => void run('Expanding collections', () => repo.setExpandedAll(spaceId, true))}
-                  onCollapseAll={() => void run('Collapsing collections', () => repo.setExpandedAll(spaceId, false))}
+                  onExpandAll={() => void run(t('run.expandingCollections'), () => repo.setExpandedAll(spaceId, true))}
+                  onCollapseAll={() => void run(t('run.collapsingCollections'), () => repo.setExpandedAll(spaceId, false))}
                   onNewCollection={() => setDialog({ kind: 'collection' })}
                 />
               </div>
               <SpaceBoard
+                space={activeSpace}
                 collections={visibleCollections}
                 cardsByCollection={boardCards}
                 tags={tags}
@@ -669,14 +685,14 @@ export function App() {
 
           {view === null && (
             <div className="mx-auto mt-24 max-w-sm text-center">
-              <h2 className="text-lg font-bold">Welcome to Tabarium</h2>
-              <p className="mt-2 text-muted">Everything stays in your browser. Start by creating a space for your collections.</p>
+              <h2 className="text-lg font-bold">{t('empty.welcome.title')}</h2>
+              <p className="mt-2 text-muted">{t('empty.welcome.text')}</p>
               <button
                 type="button"
                 onClick={() => setDialog({ kind: 'space' })}
                 className="mt-5 h-11 rounded-lg bg-primary px-5 text-sm font-bold text-primary-fg hover:opacity-90"
               >
-                Create your first space
+                {t('empty.welcome.action')}
               </button>
             </div>
           )}
@@ -688,10 +704,10 @@ export function App() {
             onClear={clearPicked}
             onMove={() => setDialog({ kind: 'move-many', ids: pickedIds })}
             onLabels={() => setDialog({ kind: 'bulk-labels', ids: pickedIds })}
-            onInbox={() => bulk('Moving to Inbox', () => moveToInbox(db, pickedIds))}
+            onInbox={() => bulk(t('run.movingToInbox'), () => moveToInbox(db, pickedIds))}
             hideInbox={inboxViewActive}
-            onStar={() => bulk('Updating tabs', () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
-            onDelete={() => bulk('Deleting tabs', async () => undoable(await repo.deleteCards(pickedIds)))}
+            onStar={() => bulk(t('run.updatingTabs'), () => repo.setStarred(pickedIds, !pickedCards.every((c) => c.starred)))}
+            onDelete={() => bulk(t('run.deletingTabs'), async () => undoable(await repo.deleteCards(pickedIds)))}
           />
         )}
       </main>
@@ -702,7 +718,7 @@ export function App() {
           onResize={setLiveWidth}
           onResizeEnd={(w) => {
             setLiveWidth(w);
-            saveSetting('Saving the panel width', { openTabsWidth: w });
+            saveSetting(t('run.savingPanelWidth'), { openTabsWidth: w });
           }}
           access={tabsCtl.access}
           windows={tabsCtl.windows}
@@ -711,7 +727,7 @@ export function App() {
           autoClose={settings?.autoCloseTabs ?? false}
           aiReady={aiReady}
           onGrant={() => void tabsCtl.grant()}
-          onHide={() => saveSetting('Hiding open tabs', { openTabsPanel: false })}
+          onHide={() => saveSetting(t('run.hidingOpenTabs'), { openTabsPanel: false })}
           onExpand={() => navigate({ kind: 'organizer' })}
           onMerge={tabsCtl.merge}
           onFocus={tabsCtl.focus}
@@ -724,7 +740,7 @@ export function App() {
           onOrganiseWindow={tabsCtl.organiseWindow}
           onAddSelected={() => setDialog({ kind: 'add-tabs', tabIds: [...tabsCtl.selected] })}
           onClearSelection={tabsCtl.clear}
-          onAutoClose={(v) => saveSetting('Saving setting', { autoCloseTabs: v })}
+          onAutoClose={(v) => saveSetting(t('run.savingSetting'), { autoCloseTabs: v })}
         />
       )}
 
@@ -733,7 +749,7 @@ export function App() {
           mode="create"
           onClose={() => setDialog(null)}
           onSubmit={({ name, icon }) =>
-            run('Creating space', async () => {
+            run(t('run.creatingSpace'), async () => {
               const space = await repo.createSpace(name, icon);
               navigate({ kind: 'space', spaceId: space.id });
             })
@@ -746,26 +762,26 @@ export function App() {
           initialName={dialog.space.name}
           initialIcon={dialog.space.icon}
           onClose={() => setDialog(null)}
-          onSubmit={(values) => run('Saving space', () => repo.updateSpace(dialog.space.id, values))}
+          onSubmit={(values) => run(t('run.savingSpace'), () => repo.updateSpace(dialog.space.id, values))}
         />
       )}
       {dialog?.kind === 'collection' && spaceId && (
         <PromptDialog
-          title="New collection"
-          label="Collection name"
-          submitLabel="Create"
+          title={t('dlg.newCollection.title')}
+          label={t('dlg.newCollection.label')}
+          submitLabel={t('common.create')}
           onClose={() => setDialog(null)}
-          onSubmit={(t) => run('Creating collection', async () => void (await repo.createCollection(spaceId, t)))}
+          onSubmit={(name) => run(t('run.creatingCollection'), async () => void (await repo.createCollection(spaceId, name)))}
         />
       )}
       {dialog?.kind === 'rename-collection' && (
         <PromptDialog
-          title="Rename collection"
-          label="Collection name"
-          submitLabel="Save"
+          title={t('dlg.renameCollection.title')}
+          label={t('dlg.renameCollection.label')}
+          submitLabel={t('common.save')}
           initialValue={dialog.title}
           onClose={() => setDialog(null)}
-          onSubmit={(t) => run('Renaming collection', () => repo.updateCollection(dialog.id, { title: t }))}
+          onSubmit={(name) => run(t('run.renamingCollection'), () => repo.updateCollection(dialog.id, { title: name }))}
         />
       )}
       {dialog?.kind === 'card' && (
@@ -783,7 +799,7 @@ export function App() {
           collections={collections}
           currentCollectionId={dialog.card.collectionId}
           onClose={() => setDialog(null)}
-          onSubmit={(target) => run('Moving tab', () => repo.moveCard(dialog.card.id, target))}
+          onSubmit={(target) => run(t('run.movingTab'), () => repo.moveCard(dialog.card.id, target))}
         />
       )}
       {dialog?.kind === 'move-many' && (
@@ -793,7 +809,7 @@ export function App() {
           currentCollectionId={null}
           count={dialog.ids.length}
           onClose={() => setDialog(null)}
-          onSubmit={(target) => run('Moving tabs', () => repo.moveCards(dialog.ids, target)).then(clearPicked)}
+          onSubmit={(target) => run(t('run.movingTabs'), () => repo.moveCards(dialog.ids, target)).then(clearPicked)}
         />
       )}
       {dialog?.kind === 'bulk-labels' && (
@@ -801,7 +817,7 @@ export function App() {
           count={dialog.ids.length}
           labels={labelsApi}
           onClose={() => setDialog(null)}
-          onSubmit={(labels) => run('Adding labels', () => repo.addLabelsToCards(dialog.ids, labels)).then(clearPicked)}
+          onSubmit={(labels) => run(t('run.addingLabels'), () => repo.addLabelsToCards(dialog.ids, labels)).then(clearPicked)}
         />
       )}
       {dialog?.kind === 'add-tabs' && (
@@ -825,7 +841,7 @@ export function App() {
         <AiNamesDialog
           suggestions={dialog.suggestions}
           onClose={() => setDialog(null)}
-          onPick={(title) => run('Renaming collection', () => repo.updateCollection(dialog.collectionId, { title }))}
+          onPick={(title) => run(t('run.renamingCollection'), () => repo.updateCollection(dialog.collectionId, { title }))}
         />
       )}
       {dialog?.kind === 'ai-details' && (
@@ -835,7 +851,7 @@ export function App() {
           skipped={dialog.skipped}
           onClose={() => setDialog(null)}
           onApply={(selected, move) =>
-            run('Applying suggestions', async () => {
+            run(t('run.applyingSuggestions'), async () => {
               await applyCardDetails(
                 db,
                 repo,
@@ -851,14 +867,15 @@ export function App() {
           tags={tags}
           collection={tagsDialogCollection}
           onClose={() => setDialog(null)}
-          onCreate={(t, color) => run('Creating tag', async () => void (await repo.createTag(t, color)))}
-          onDelete={(id) => run('Deleting tag', async () => undoable(await repo.deleteTag(id)))}
-          onAssign={(id, tagIds) => run('Updating tags', () => repo.setCollectionTags(id, tagIds))}
+          onCreate={(name, color) => run(t('run.creatingTag'), async () => void (await repo.createTag(name, color)))}
+          onDelete={(id) => run(t('run.deletingTag'), async () => undoable(await repo.deleteTag(id)))}
+          onAssign={(id, tagIds) => run(t('run.updatingTags'), () => repo.setCollectionTags(id, tagIds))}
         />
       )}
       {dialog?.kind === 'session' && spaceId && (
         <SaveSessionDialog
           tabs={dialog.tabs}
+          space={activeSpace}
           collections={collections.filter((c) => c.spaceId === spaceId)}
           onClose={() => setDialog(null)}
           onOrganise={
@@ -867,7 +884,7 @@ export function App() {
                   withProviderAccess(platform, settings.ai, async () => {
                     const groups = await groupTabs(
                       settings.ai,
-                      tabs.map((t) => ({ title: t.title, url: t.url })),
+                      tabs.map((tab) => ({ title: tab.title, url: tab.url })),
                       undefined,
                       await loadLibraryContext(db, spaceId),
                     );
@@ -881,23 +898,23 @@ export function App() {
               : undefined
           }
           onSave={({ tabs, collectionId, newTitle, closeTabs, groups }) =>
-            run('Saving session', async () => {
-              const toCard = (t: OpenTab) => ({ title: t.title, url: t.url, favIconUrl: t.favIconUrl });
+            run(t('run.savingSession'), async () => {
+              const toCard = (tab: OpenTab) => ({ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl });
               const approved = await guard(tabs);
               if (!approved || approved.length === 0) return;
-              const keep = new Set(approved.map((t) => t.id));
+              const keep = new Set(approved.map((tab) => tab.id));
               if (groups) {
                 await applyGroups(
                   db,
                   repo,
                   spaceId,
-                  groups.map((g) => ({ title: g.title, cards: g.tabs.filter((t) => keep.has(t.id)).map(toCard), tags: g.tags, hashtags: g.hashtags })),
+                  groups.map((g) => ({ title: g.title, cards: g.tabs.filter((tab) => keep.has(tab.id)).map(toCard), tags: g.tags, hashtags: g.hashtags })),
                 );
               } else {
                 const targetId = collectionId ?? (await repo.createCollection(spaceId, newTitle)).id;
                 await repo.addCards(targetId, approved.map(toCard));
               }
-              if (closeTabs) await platform.tabs.closeTabs(approved.map((t) => t.id));
+              if (closeTabs) await platform.tabs.closeTabs(approved.map((tab) => tab.id));
             })
           }
         />
@@ -912,12 +929,12 @@ export function App() {
           onClose={() => setPaletteOpen(false)}
           onOpenLink={(c) => {
             setPaletteOpen(false);
-            void run('Opening link', () => platform.tabs.openUrl(c.url));
+            void run(t('run.openingLink'), () => platform.tabs.openUrl(c.url));
           }}
           onGoCollection={(col) => {
             setPaletteOpen(false);
             navigate({ kind: 'space', spaceId: col.spaceId });
-            void run('Opening collection', () => repo.updateCollection(col.id, { expanded: true }));
+            void run(t('run.openingCollection'), () => repo.updateCollection(col.id, { expanded: true }));
             // The section mounts after navigation (and after the expand lands); poll the next frames for it.
             let tries = 0;
             const reveal = () => {
@@ -937,7 +954,7 @@ export function App() {
         deletion={undo}
         onUndo={(deletion) => {
           setUndo(null);
-          void run('Restoring', () => repo.restoreDeletion(deletion));
+          void run(t('run.restoring'), () => repo.restoreDeletion(deletion));
         }}
         onDismiss={() => setUndo(null)}
       />

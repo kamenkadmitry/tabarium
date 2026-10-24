@@ -1,4 +1,5 @@
 import type { Card } from './types';
+import { tr } from '../i18n/runtime';
 
 export const INBOX_SORTS = ['newest', 'oldest', 'title-asc', 'title-desc', 'site'] as const;
 export type InboxSort = (typeof INBOX_SORTS)[number];
@@ -40,14 +41,14 @@ export function dateBucket(createdAt: number, now: number): { order: number; tit
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
   const days = Math.round((startOf(now) - startOf(createdAt)) / DAY);
-  if (days <= 0) return { order: 0, title: 'Today' };
-  if (days === 1) return { order: 1, title: 'Yesterday' };
-  if (days <= 7) return { order: 2, title: 'Last 7 days' };
-  if (days <= 30) return { order: 3, title: 'Last 30 days' };
+  if (days <= 0) return { order: 0, title: tr()('inbox.date.today') };
+  if (days === 1) return { order: 1, title: tr()('inbox.date.yesterday') };
+  if (days <= 7) return { order: 2, title: tr()('inbox.date.last7') };
+  if (days <= 30) return { order: 3, title: tr()('inbox.date.last30') };
   const d = new Date(createdAt);
   // Older links are grouped by month, newest month first.
   const month = d.getFullYear() * 12 + d.getMonth();
-  return { order: 4 + (100_000 - month) / 100_000, title: d.toLocaleDateString('en', { month: 'long', year: 'numeric' }) };
+  return { order: 4 + (100_000 - month) / 100_000, title: tr().date(d, { month: 'long', year: 'numeric' }) };
 }
 
 /** Splits an already sorted list into groups. Cards keep their order inside each group. */

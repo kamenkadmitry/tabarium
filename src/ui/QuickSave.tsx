@@ -5,6 +5,8 @@ import { db } from '../core/instance';
 import { ensureInbox, inboxCards, inboxSpace } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import type { Card } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/messages';
 import { usePlatform } from '../platform/context';
 import { buildLabelsApi } from './labelsApi';
 import { GroupTabsView } from './quick/GroupTabsView';
@@ -14,14 +16,15 @@ import { SaveTabView } from './quick/SaveTabView';
 type Status = { tone: 'ok' | 'error'; text: string } | null;
 type TabKey = 'save' | 'group' | 'inbox';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'save', label: 'Save tab' },
-  { key: 'group', label: 'Group tabs' },
-  { key: 'inbox', label: 'Inbox' },
+const TABS: { key: TabKey; label: StringKey }[] = [
+  { key: 'save', label: 'quick.tab.saveTab' },
+  { key: 'group', label: 'quick.tab.groupTabs' },
+  { key: 'inbox', label: 'quick.tab.inbox' },
 ];
 
 /** Compact surface shared by the side panel (default toolbar action) and the classic popup. */
 export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
+  const t = useT();
   const platform = usePlatform();
   const settings = useLiveQuery(() => loadSettings(db), []);
   const spaces = useLiveQuery(() => db.spaces.orderBy('position').toArray(), []);
@@ -47,9 +50,9 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
   useEffect(() => {
     ensureInbox(db).catch((e: unknown) => {
       console.error('Tabarium: preparing the Inbox failed', e);
-      setStatus({ tone: 'error', text: `Preparing the Inbox failed: ${e instanceof Error ? e.message : String(e)}` });
+      setStatus({ tone: 'error', text: t('quick.preparingFailed', { error: e instanceof Error ? e.message : String(e) }) });
     });
-  }, []);
+  }, [t]);
 
   if (!settings || !spaces || !collections || !cards || !tags || !hashtags) return null;
 
@@ -67,11 +70,11 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
       await platform.backupSchedule.resync();
       setStatus({
         tone: 'ok',
-        text: quickPanel === 'popup' ? 'The toolbar button now opens the classic popup.' : 'The toolbar button now opens the side panel.',
+        text: quickPanel === 'popup' ? t('quick.nowPopup') : t('quick.nowSide'),
       });
     } catch (e) {
       console.error('Tabarium: switching the toolbar behaviour failed', e);
-      setStatus({ tone: 'error', text: `Switching failed: ${e instanceof Error ? e.message : String(e)}` });
+      setStatus({ tone: 'error', text: t('quick.switchFailed', { error: e instanceof Error ? e.message : String(e) }) });
     }
   };
 
@@ -87,41 +90,41 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
           onClick={() => void platform.tabs.openLibrary()}
           className="flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold transition-colors duration-150 hover:bg-surface-2"
         >
-          <LibraryBig size={15} aria-hidden /> Open library
+          <LibraryBig size={15} aria-hidden /> {t('quick.openLibrary')}
         </button>
       </header>
 
       {surface === 'sidepanel' && settings.quickPanel === 'side' && !bannerDismissed && (
         <p className="flex shrink-0 items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
           <span className="flex-1">
-            Prefer the classic popup?{' '}
+            {t('quick.preferPopup')}{' '}
             <button type="button" className="font-bold text-primary underline" onClick={() => void chooseToolbar('popup')}>
-              Switch back
+              {t('quick.switchBack')}
             </button>
           </span>
-          <button type="button" aria-label="Dismiss" className="grid size-6 place-items-center rounded-md text-muted hover:text-fg" onClick={() => setBannerDismissed(true)}>
+          <button type="button" aria-label={t('quick.dismiss')} className="grid size-6 place-items-center rounded-md text-muted hover:text-fg" onClick={() => setBannerDismissed(true)}>
             <X size={14} aria-hidden />
           </button>
         </p>
       )}
 
-      <div role="tablist" aria-label="Quick actions" className="grid shrink-0 grid-cols-3 rounded-xl bg-surface-2 p-1">
-        {TABS.map((t) => (
+      <div role="tablist" aria-label={t('quick.actions')} className="grid shrink-0 grid-cols-3 rounded-xl bg-surface-2 p-1">
+        {TABS.map((item) => (
           <button
-            key={t.key}
+            key={item.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
+            aria-selected={tab === item.key}
             onClick={() => {
-              setTab(t.key);
+              setTab(item.key);
               setStatus(null);
             }}
             className={`h-9 rounded-lg text-sm font-semibold transition-colors duration-150 ${
-              tab === t.key ? 'bg-surface text-fg' : 'text-muted hover:text-fg'
+              tab === item.key ? 'bg-surface text-fg' : 'text-muted hover:text-fg'
             }`}
           >
-            {t.label}
-            {t.key === 'inbox' && inboxItems.length > 0 && <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-xs font-bold text-muted">{inboxItems.length}</span>}
+            {t(item.label)}
+            {item.key === 'inbox' && inboxItems.length > 0 && <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-xs font-bold text-muted">{inboxItems.length}</span>}
           </button>
         ))}
       </div>
@@ -160,7 +163,7 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
 
       {surface === 'popup' && (
         <button type="button" className="shrink-0 self-start text-xs font-semibold text-primary underline" onClick={() => void chooseToolbar('side')}>
-          Open the toolbar button in the side panel instead
+          {t('quick.openSidePanel')}
         </button>
       )}
     </div>

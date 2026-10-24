@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
+import { useT } from '../i18n/I18nProvider';
 import type { OpenTab } from '../platform/ports';
 import { hostOf, PageFavicon } from './CardRow';
 
@@ -24,6 +25,7 @@ interface Props {
  * highlighted, hovering reveals a selection checkbox (in place of the icon) and a close button.
  */
 export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, size = 'compact', itemProps, dropAbove }: Props) {
+  const t = useT();
   const roomy = size === 'roomy';
   const selectable = selected !== undefined && onToggleSelect !== undefined;
   const title = tab.title || tab.url;
@@ -47,7 +49,7 @@ export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, si
         {selectable && (
           <input
             type="checkbox"
-            aria-label={`Select ${title}`}
+            aria-label={t('pill.select', { title })}
             checked={selected}
             onChange={onToggleSelect}
             className={`absolute inset-0 m-auto size-4 cursor-pointer accent-[var(--primary)] transition-opacity duration-100 ${
@@ -70,7 +72,7 @@ export function TabPill({ tab, selected, onToggleSelect, onActivate, onClose, si
       {onClose && (
         <button
           type="button"
-          aria-label={`Close tab ${title}`}
+          aria-label={t('pill.close', { title })}
           onClick={onClose}
           className="grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-0 transition-opacity duration-150 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
         >

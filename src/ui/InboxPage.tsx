@@ -7,20 +7,22 @@ import { type CardRowActions, hostOf, PageFavicon } from './CardRow';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 import { Menu, MenuItem } from './Menu';
 import type { CardSelection } from './useCardSelection';
+import { useT } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/messages';
 
-const SORT_LABELS: Record<InboxSort, string> = {
-  newest: 'Newest first',
-  oldest: 'Oldest first',
-  'title-asc': 'Title A–Z',
-  'title-desc': 'Title Z–A',
-  site: 'Site A–Z',
+const SORT_KEYS: Record<InboxSort, StringKey> = {
+  newest: 'inbox.sort.newest',
+  oldest: 'inbox.sort.oldest',
+  'title-asc': 'inbox.sort.titleAsc',
+  'title-desc': 'inbox.sort.titleDesc',
+  site: 'inbox.sort.siteAsc',
 };
 
-const GROUP_LABELS: Record<InboxGroup, string> = {
-  none: 'No grouping',
-  date: 'Date added',
-  site: 'Site',
-  collection: 'Collection',
+const GROUP_KEYS: Record<InboxGroup, StringKey> = {
+  none: 'inbox.group.none',
+  date: 'inbox.group.date',
+  site: 'inbox.group.site',
+  collection: 'inbox.group.collection',
 };
 
 const COLUMNS = 'grid grid-cols-[1.75rem_minmax(0,1fr)_7rem_auto] items-start gap-x-3 lg:grid-cols-[1.75rem_minmax(0,1.5fr)_minmax(0,2fr)_minmax(0,1.1fr)_7rem_auto]';
@@ -53,15 +55,12 @@ interface Props {
 
 const iconButton = 'grid size-8 place-items-center rounded-md text-muted transition-colors duration-150 hover:bg-surface-2';
 
-function addedText(createdAt: number): string {
-  return new Date(createdAt).toLocaleString('en', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
 /**
  * The Inbox as a table: title and site, what the page says about itself, labels and when it was added. Sorting and
  * grouping are remembered; the AI can propose labels and collections for what is still unsorted.
  */
 export function InboxPage(props: Props) {
+  const t = useT();
   const { cards, selection, editor } = props;
   const [over, setOver] = useState(false);
   // The moment the page was opened decides what counts as "today" for the date groups.
@@ -96,9 +95,9 @@ export function InboxPage(props: Props) {
   };
 
   return (
-    <section aria-label="Inbox links" {...dropProps} className={`rounded-2xl ${over ? 'ring-2 ring-primary' : ''}`}>
-      <div role="toolbar" aria-label="Inbox options" className="mb-4 flex flex-wrap items-center gap-1">
-        <Menu label={SORT_LABELS[props.sort]} ariaLabel="Sort the Inbox" icon={<ArrowDownAZ size={15} aria-hidden />}>
+    <section aria-label={t('inbox.section')} {...dropProps} className={`rounded-2xl ${over ? 'ring-2 ring-primary' : ''}`}>
+      <div role="toolbar" aria-label={t('inbox.options')} className="mb-4 flex flex-wrap items-center gap-1">
+        <Menu label={t(SORT_KEYS[props.sort])} ariaLabel={t('inbox.sortAria')} icon={<ArrowDownAZ size={15} aria-hidden />}>
           {(close) =>
             INBOX_SORTS.map((s) => (
               <MenuItem
@@ -109,12 +108,12 @@ export function InboxPage(props: Props) {
                   close();
                 }}
               >
-                {SORT_LABELS[s]}
+                {t(SORT_KEYS[s])}
               </MenuItem>
             ))
           }
         </Menu>
-        <Menu label={GROUP_LABELS[props.group]} ariaLabel="Group the Inbox" icon={<CalendarDays size={15} aria-hidden />} active={props.group !== 'none'}>
+        <Menu label={t(GROUP_KEYS[props.group])} ariaLabel={t('inbox.groupAria')} icon={<CalendarDays size={15} aria-hidden />} active={props.group !== 'none'}>
           {(close) =>
             INBOX_GROUPS.map((g) => (
               <MenuItem
@@ -125,7 +124,7 @@ export function InboxPage(props: Props) {
                   close();
                 }}
               >
-                {GROUP_LABELS[g]}
+                {t(GROUP_KEYS[g])}
               </MenuItem>
             ))
           }
@@ -138,7 +137,7 @@ export function InboxPage(props: Props) {
           className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg disabled:opacity-50"
         >
           <BookOpenText size={15} aria-hidden />
-          {props.pagesBusy ? 'Reading pages…' : !props.pagesEnabled ? 'Load page descriptions' : selectedCards.length > 0 ? `Re-read ${selectedCards.length} pages` : `Read ${unread.length} new pages`}
+          {props.pagesBusy ? t('inbox.reading') : !props.pagesEnabled ? t('inbox.loadDescriptions') : selectedCards.length > 0 ? t.plural('inbox.reread', selectedCards.length) : t.plural('inbox.readNew', unread.length)}
         </button>
         {props.onSuggest && (
           <button
@@ -147,8 +146,8 @@ export function InboxPage(props: Props) {
             onClick={() => props.onSuggest?.(suggestScope)}
             className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg disabled:opacity-50"
           >
-            <Sparkles size={15} aria-hidden className="text-accent" /> Suggest labels and collections
-            <span className="text-xs">{selectedCards.length > 0 ? `${selectedCards.length} selected` : `${unlabeled.length} unlabelled`}</span>
+            <Sparkles size={15} aria-hidden className="text-accent" /> {t('inbox.suggestLabels')}
+            <span className="text-xs">{selectedCards.length > 0 ? t.plural('inbox.selected', selectedCards.length) : t.plural('inbox.unlabelled', unlabeled.length)}</span>
           </button>
         )}
         {props.pagesNote && (
@@ -161,7 +160,7 @@ export function InboxPage(props: Props) {
           onClick={props.onAdd}
           className="ml-auto flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
         >
-          <Plus size={16} aria-hidden /> Add link
+          <Plus size={16} aria-hidden /> {t('inbox.addLink')}
         </button>
       </div>
 
@@ -170,15 +169,15 @@ export function InboxPage(props: Props) {
       {cards.length === 0 ? (
         <div className="mx-auto mt-16 max-w-sm text-center">
           <Inbox size={34} aria-hidden className="mx-auto text-muted" />
-          <p className="mt-3 font-bold">Nothing waits in the Inbox</p>
-          <p className="mt-1 text-sm text-muted">Tabs you add from the side panel or the right-click menu land here until you sort them.</p>
+          <p className="mt-3 font-bold">{t('inbox.empty.title')}</p>
+          <p className="mt-1 text-sm text-muted">{t('inbox.empty.text')}</p>
         </div>
       ) : (
-        <div role="table" aria-label="Inbox" className="rounded-2xl border border-line bg-surface">
+        <div role="table" aria-label={t('inbox.table')} className="rounded-2xl border border-line bg-surface">
           <div role="row" className={`${COLUMNS} items-center border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted`}>
             <input
               type="checkbox"
-              aria-label="Select all links in the Inbox"
+              aria-label={t('inbox.selectAll')}
               checked={ticked === ids.length && ids.length > 0}
               ref={(el) => {
                 if (el) el.indeterminate = ticked > 0 && ticked < ids.length;
@@ -186,14 +185,14 @@ export function InboxPage(props: Props) {
               onChange={() => selection.setMany(ids, ticked !== ids.length)}
               className="size-4 cursor-pointer accent-[var(--primary)]"
             />
-            <span role="columnheader">Page</span>
+            <span role="columnheader">{t('inbox.col.page')}</span>
             <span role="columnheader" className="hidden lg:block">
-              Description from the page
+              {t('inbox.col.description')}
             </span>
             <span role="columnheader" className="hidden lg:block">
-              Labels
+              {t('inbox.col.labels')}
             </span>
-            <span role="columnheader">Added</span>
+            <span role="columnheader">{t('inbox.col.added')}</span>
             <span aria-hidden className="w-[8.5rem]" />
           </div>
           {groups.map((g) => (
@@ -215,7 +214,7 @@ export function InboxPage(props: Props) {
                         <input
                           type="checkbox"
                           checked={picked}
-                          aria-label={`Select ${title}`}
+                          aria-label={t('card.select', { title })}
                           onClick={(e) => selection.toggle(card.id, e.shiftKey, ids)}
                           onChange={() => undefined}
                           className="mt-1 size-4 cursor-pointer accent-[var(--primary)]"
@@ -236,30 +235,30 @@ export function InboxPage(props: Props) {
                                 {text}
                               </span>
                               {card.description && card.heading && card.heading !== card.description && (
-                                <span className="mt-0.5 block truncate text-xs text-muted">H1: {card.heading}</span>
+                                <span className="mt-0.5 block truncate text-xs text-muted">{t('inbox.h1', { text: card.heading })}</span>
                               )}
                             </>
                           ) : (
-                            <span className="text-xs text-muted">{card.pageInfoAt === null ? '—' : 'The page has no description'}</span>
+                            <span className="text-xs text-muted">{card.pageInfoAt === null ? '—' : t('inbox.noDescription')}</span>
                           )}
                         </div>
                         <div role="cell" className="hidden min-w-0 lg:block">
                           <CardLabels card={card} limitHashtags={3} />
                         </div>
-                        <time role="cell" dateTime={new Date(card.createdAt).toISOString()} title={new Date(card.createdAt).toLocaleString()} className="text-xs text-muted">
-                          {addedText(card.createdAt)}
+                        <time role="cell" dateTime={new Date(card.createdAt).toISOString()} title={t.time(card.createdAt)} className="text-xs text-muted">
+                          {t.time(card.createdAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
                         </time>
                         <div role="cell" className="flex w-[8.5rem] justify-end gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
-                          <button type="button" aria-label="Edit tab and note" onClick={actions.onEdit} className={`${iconButton} hover:text-primary`}>
+                          <button type="button" aria-label={t('card.edit')} onClick={actions.onEdit} className={`${iconButton} hover:text-primary`}>
                             <Pencil size={15} aria-hidden />
                           </button>
-                          <button type="button" aria-label="Move to another collection" onClick={actions.onMove} className={`${iconButton} hover:text-primary`}>
+                          <button type="button" aria-label={t('card.move')} onClick={actions.onMove} className={`${iconButton} hover:text-primary`}>
                             <ArrowRightLeft size={15} aria-hidden />
                           </button>
-                          <button type="button" aria-label={card.starred ? 'Remove star' : 'Star tab'} onClick={actions.onToggleStar} className={`${iconButton} hover:text-accent`}>
+                          <button type="button" aria-label={card.starred ? t('card.unstar') : t('card.star')} onClick={actions.onToggleStar} className={`${iconButton} hover:text-accent`}>
                             <Star size={15} aria-hidden fill={card.starred ? 'currentColor' : 'none'} />
                           </button>
-                          <button type="button" aria-label="Delete tab" onClick={actions.onDelete} className={`${iconButton} hover:text-danger`}>
+                          <button type="button" aria-label={t('card.delete')} onClick={actions.onDelete} className={`${iconButton} hover:text-danger`}>
                             <Trash2 size={15} aria-hidden />
                           </button>
                         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dialog, Field, inputClass, PrimaryButton, SecondaryButton } from '../Dialog';
+import { useT } from '../../i18n/I18nProvider';
 
 interface Props {
   title: string;
@@ -12,6 +13,7 @@ interface Props {
 
 /** Single-text-field dialog used for creating and renaming spaces and collections. */
 export function PromptDialog({ title, label, submitLabel, initialValue = '', onSubmit, onClose }: Props) {
+  const t = useT();
   const [value, setValue] = useState(initialValue);
   const [busy, setBusy] = useState(false);
   const trimmed = value.trim();
@@ -34,7 +36,7 @@ export function PromptDialog({ title, label, submitLabel, initialValue = '', onS
           <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} className={inputClass} />
         </Field>
         <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onClose}>{t('common.cancel')}</SecondaryButton>
           <PrimaryButton disabled={trimmed === '' || busy}>{submitLabel}</PrimaryButton>
         </div>
       </form>

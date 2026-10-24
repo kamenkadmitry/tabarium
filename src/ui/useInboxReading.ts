@@ -3,6 +3,7 @@ import { describeCards } from '../core/describe';
 import { db, repo } from '../core/instance';
 import { updateSettings } from '../core/settings';
 import type { Card } from '../core/types';
+import { tr } from '../i18n/runtime';
 import { usePlatform } from '../platform/context';
 
 interface Options {
@@ -20,7 +21,10 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const running = useRef(false);
-  const summary = (read: number, failed: number) => `Read ${read} page${read === 1 ? '' : 's'}${failed > 0 ? `, ${failed} could not be read` : ''}.`;
+  const summary = (read: number, failed: number) =>
+    failed === 0
+      ? tr()('inbox.pagesNote', { read: tr().plural('inbox.pagesRead', read) })
+      : tr()('inbox.pagesNoteFailed', { read: tr().plural('inbox.pagesRead', read), failed });
 
   // New links that were never read, as one stable key so the effect runs when the set changes, not on every render.
   const unreadKey = active && enabled ? cards.filter((c) => c.pageInfoAt === null).map((c) => c.id).sort().join(',') : '';
@@ -35,7 +39,7 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
       const result = await describeCards(db, repo, unreadKey.split(','));
       if (alive) setNote(summary(result.read, result.failed.length));
     })()
-      .catch((e: unknown) => reportError('Reading pages', e))
+      .catch((e: unknown) => reportError(tr()('run.readingPages'), e))
       .finally(() => {
         running.current = false;
         if (alive) setBusy(false);
@@ -51,12 +55,12 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
       setBusy(true);
       setNote(null);
       try {
-        if (!(await platform.permissions.requestAllSites())) throw new Error('Tabarium needs access to websites to read their descriptions.');
+        if (!(await platform.permissions.requestAllSites())) throw new Error(tr()('err.needSiteAccess'));
         await updateSettings(db, { fetchDescriptions: true });
         const result = await describeCards(db, repo, ids);
         setNote(summary(result.read, result.failed.length));
       } catch (e) {
-        reportError('Reading pages', e);
+        reportError(tr()('run.readingPages'), e);
       } finally {
         setBusy(false);
       }

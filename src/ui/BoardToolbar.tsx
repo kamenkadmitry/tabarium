@@ -3,24 +3,26 @@ import { useState } from 'react';
 import { type BoardFilter, isFiltering, NO_FILTER } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import type { Tag as TagType } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/messages';
 import { SWATCHES } from './colors';
 import { useLabels } from './labels';
 import { Menu, MenuItem } from './Menu';
 
-const SORTS: { value: BoardSort; label: string }[] = [
-  { value: 'custom', label: 'Custom order' },
-  { value: 'name-asc', label: 'Name A–Z' },
-  { value: 'name-desc', label: 'Name Z–A' },
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'most-tabs', label: 'Most tabs' },
+const SORTS: { value: BoardSort; labelKey: StringKey }[] = [
+  { value: 'custom', labelKey: 'board.sort.custom' },
+  { value: 'name-asc', labelKey: 'board.sort.nameAsc' },
+  { value: 'name-desc', labelKey: 'board.sort.nameDesc' },
+  { value: 'newest', labelKey: 'board.sort.newest' },
+  { value: 'oldest', labelKey: 'board.sort.oldest' },
+  { value: 'most-tabs', labelKey: 'board.sort.mostTabs' },
 ];
 
-const VIEWS: { value: BoardView; label: string; icon: React.ReactNode }[] = [
-  { value: 'card', label: 'Card', icon: <LayoutGrid size={16} aria-hidden /> },
-  { value: 'compact', label: 'Compact', icon: <Rows3 size={16} aria-hidden /> },
-  { value: 'list', label: 'List', icon: <List size={16} aria-hidden /> },
-  { value: 'grid', label: 'Grid', icon: <PanelTop size={16} aria-hidden /> },
+const VIEWS: { value: BoardView; labelKey: StringKey; icon: React.ReactNode }[] = [
+  { value: 'card', labelKey: 'board.view.card', icon: <LayoutGrid size={16} aria-hidden /> },
+  { value: 'compact', labelKey: 'board.view.compact', icon: <Rows3 size={16} aria-hidden /> },
+  { value: 'list', labelKey: 'board.view.list', icon: <List size={16} aria-hidden /> },
+  { value: 'grid', labelKey: 'board.view.grid', icon: <PanelTop size={16} aria-hidden /> },
 ];
 
 interface Props {
@@ -42,21 +44,25 @@ interface Props {
 }
 
 function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Props, 'filter' | 'onFilter' | 'tags' | 'colors' | 'hashtags'> & { close: () => void }) {
+  const t = useT();
   const [page, setPage] = useState<'root' | 'colour' | 'tags' | 'hashtags'>('root');
   const [search, setSearch] = useState('');
-  const swatchName = (value: string) => SWATCHES.find((s) => s.value === value)?.name ?? value;
+  const swatchName = (value: string) => {
+    const s = SWATCHES.find((x) => x.value === value);
+    return s ? t(s.key) : value;
+  };
 
   if (page === 'root') {
     return (
       <>
         <MenuItem icon={<Palette size={16} aria-hidden />} onClick={() => setPage('colour')}>
-          Colour <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
+          {t('board.filter.colour')} <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
         </MenuItem>
         <MenuItem icon={<Tag size={16} aria-hidden />} onClick={() => setPage('tags')}>
-          Tags <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
+          {t('board.filter.tags')} <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
         </MenuItem>
         <MenuItem icon={<Hash size={16} aria-hidden />} onClick={() => setPage('hashtags')}>
-          Hashtags <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
+          {t('board.filter.hashtags')} <ChevronRight size={14} aria-hidden className="float-right mt-1 text-muted" />
         </MenuItem>
       </>
     );
@@ -64,7 +70,7 @@ function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Pr
   return (
     <>
       <button type="button" onClick={() => setPage('root')} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary hover:bg-surface-2">
-        <ChevronLeft size={15} aria-hidden /> {page === 'colour' ? 'Colour' : page === 'tags' ? 'Tags' : 'Hashtags'}
+        <ChevronLeft size={15} aria-hidden /> {page === 'colour' ? t('board.filter.colour') : page === 'tags' ? t('board.filter.tags') : t('board.filter.hashtags')}
       </button>
       {page === 'colour' && (
         <>
@@ -88,24 +94,24 @@ function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Pr
               close();
             }}
           >
-            No colour
+            {t('board.filter.noColour')}
           </MenuItem>
         </>
       )}
       {page === 'hashtags' && (
         <div className="w-72">
           <label className="relative m-1 block">
-            <span className="sr-only">Search hashtags</span>
+            <span className="sr-only">{t('board.searchHashtags')}</span>
             <Search size={14} aria-hidden className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search hashtags"
+              placeholder={t('board.searchHashtags')}
               className="h-9 w-full rounded-lg border border-line bg-bg pl-8 pr-2 text-sm placeholder:text-muted"
             />
           </label>
-          <div role="group" aria-label="Hashtags" className="max-h-64 overflow-y-auto">
+          <div role="group" aria-label={t('board.filter.hashtags')} className="max-h-64 overflow-y-auto">
             {hashtags
               .filter((h) => h.name.includes(search.trim().toLowerCase().replace(/^#/, '')))
               .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
@@ -128,31 +134,31 @@ function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Pr
                   </button>
                 );
               })}
-            {hashtags.length === 0 && <p className="px-3 py-3 text-sm text-muted">No hashtags used in this space yet.</p>}
+            {hashtags.length === 0 && <p className="px-3 py-3 text-sm text-muted">{t('board.noHashtagsHere')}</p>}
           </div>
           {filter.hashtagIds.length > 0 && (
             <button type="button" onClick={() => onFilter({ ...filter, hashtagIds: [] })} className="mt-1 w-full border-t border-line px-3 py-2 text-left text-xs font-bold text-primary">
-              Clear hashtags
+              {t('board.clearHashtags')}
             </button>
           )}
         </div>
       )}
       {page === 'tags' && (
         <>
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <MenuItem
-              key={t.id}
-              checked={filter.tagId === t.id}
-              icon={<span aria-hidden className="size-3 rounded-full" style={{ background: t.color }} />}
+              key={tag.id}
+              checked={filter.tagId === tag.id}
+              icon={<span aria-hidden className="size-3 rounded-full" style={{ background: tag.color }} />}
               onClick={() => {
-                onFilter({ ...filter, tagId: filter.tagId === t.id ? null : t.id });
+                onFilter({ ...filter, tagId: filter.tagId === tag.id ? null : tag.id });
                 close();
               }}
             >
-              {t.title}
+              {tag.title}
             </MenuItem>
           ))}
-          {tags.length === 0 && <p className="px-3 py-3 text-sm text-muted">No tags used in this space yet.</p>}
+          {tags.length === 0 && <p className="px-3 py-3 text-sm text-muted">{t('board.noTagsHere')}</p>}
         </>
       )}
     </>
@@ -161,22 +167,24 @@ function FilterMenu({ filter, onFilter, tags, colors, hashtags, close }: Pick<Pr
 
 /** Sort, filter and layout controls above the board, plus expand/collapse-all and "New collection". */
 export function BoardToolbar(props: Props) {
+  const t = useT();
   const activeView = VIEWS.find((v) => v.value === props.view) ?? VIEWS[3];
   const activeSort = SORTS.find((s) => s.value === props.sort) ?? SORTS[0];
   // Link-tag chips come from card clicks, so they may name tags that no collection uses — resolve all, not just props.tags.
   const { tags: allTags } = useLabels();
   const filterChips: { key: string; label: string; clear: () => void }[] = [];
   if (props.filter.color !== null) {
+    const swatch = SWATCHES.find((s) => s.value === props.filter.color);
     filterChips.push({
       key: 'colour',
-      label: props.filter.color === 'none' ? 'No colour' : (SWATCHES.find((s) => s.value === props.filter.color)?.name ?? 'Colour'),
+      label: props.filter.color === 'none' ? t('board.filter.noColour') : swatch ? t(swatch.key) : t('board.filter.colour'),
       clear: () => props.onFilter({ ...props.filter, color: null }),
     });
   }
   if (props.filter.tagId !== null) {
     filterChips.push({
       key: 'tag',
-      label: props.tags.find((t) => t.id === props.filter.tagId)?.title ?? 'Tag',
+      label: props.tags.find((tag) => tag.id === props.filter.tagId)?.title ?? t('board.filter.tag'),
       clear: () => props.onFilter({ ...props.filter, tagId: null }),
     });
   }
@@ -184,21 +192,21 @@ export function BoardToolbar(props: Props) {
   for (const id of props.filter.hashtagIds) {
     filterChips.push({
       key: `hashtag-${id}`,
-      label: `#${props.hashtags.find((h) => h.id === id)?.name ?? 'hashtag'}`,
+      label: `#${props.hashtags.find((h) => h.id === id)?.name ?? t('board.filter.hashtag')}`,
       clear: () => props.onFilter({ ...props.filter, hashtagIds: props.filter.hashtagIds.filter((x) => x !== id) }),
     });
   }
   for (const id of props.filter.cardTagIds) {
     filterChips.push({
       key: `cardtag-${id}`,
-      label: allTags.get(id)?.title ?? 'Tag',
+      label: allTags.get(id)?.title ?? t('board.filter.tag'),
       clear: () => props.onFilter({ ...props.filter, cardTagIds: props.filter.cardTagIds.filter((x) => x !== id) }),
     });
   }
 
   return (
-    <div role="toolbar" aria-label="Board options" className="flex flex-wrap items-center gap-1">
-      <Menu label={activeSort?.label ?? 'Custom order'} ariaLabel="Sort collections" icon={<ArrowUpDown size={15} aria-hidden />}>
+    <div role="toolbar" aria-label={t('board.options')} className="flex flex-wrap items-center gap-1">
+      <Menu label={t(activeSort?.labelKey ?? 'board.sort.custom')} ariaLabel={t('board.sort')} icon={<ArrowUpDown size={15} aria-hidden />}>
         {(close) =>
           SORTS.map((s) => (
             <MenuItem
@@ -209,17 +217,17 @@ export function BoardToolbar(props: Props) {
                 close();
               }}
             >
-              {s.label}
+              {t(s.labelKey)}
             </MenuItem>
           ))
         }
       </Menu>
 
-      <Menu label="Filter" ariaLabel="Filter collections" icon={<SlidersHorizontal size={15} aria-hidden />} active={isFiltering(props.filter)}>
+      <Menu label={t('common.filter')} ariaLabel={t('board.filter')} icon={<SlidersHorizontal size={15} aria-hidden />} active={isFiltering(props.filter)}>
         {(close) => <FilterMenu filter={props.filter} onFilter={props.onFilter} tags={props.tags} colors={props.colors} hashtags={props.hashtags} close={close} />}
       </Menu>
 
-      <Menu label={activeView?.label ?? 'Grid'} ariaLabel="Change view" icon={activeView?.icon}>
+      <Menu label={t(activeView?.labelKey ?? 'board.view.grid')} ariaLabel={t('board.changeView')} icon={activeView?.icon}>
         {(close) =>
           VIEWS.map((v) => (
             <MenuItem
@@ -231,31 +239,31 @@ export function BoardToolbar(props: Props) {
                 close();
               }}
             >
-              {v.label}
+              {t(v.labelKey)}
             </MenuItem>
           ))
         }
       </Menu>
 
       <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-      <button type="button" aria-label="Expand all" onClick={props.onExpandAll} className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg">
+      <button type="button" aria-label={t('board.expandAll')} onClick={props.onExpandAll} className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg">
         <Plus size={16} aria-hidden />
       </button>
-      <button type="button" aria-label="Collapse all" onClick={props.onCollapseAll} className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg">
+      <button type="button" aria-label={t('board.collapseAll')} onClick={props.onCollapseAll} className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg">
         <Minus size={16} aria-hidden />
       </button>
 
       {filterChips.map((c) => (
         <span key={c.key} className="ml-2 flex h-7 items-center gap-1 rounded-full bg-surface-2 pl-3 pr-1 text-xs font-semibold">
           {c.label}
-          <button type="button" aria-label={`Clear filter ${c.label}`} onClick={c.clear} className="grid size-5 place-items-center rounded-full hover:bg-line">
+          <button type="button" aria-label={t('board.clearFilter', { name: c.label })} onClick={c.clear} className="grid size-5 place-items-center rounded-full hover:bg-line">
             <X size={12} aria-hidden />
           </button>
         </span>
       ))}
       {filterChips.length > 1 && (
         <button type="button" onClick={() => props.onFilter(NO_FILTER)} className="ml-1 text-xs font-semibold text-primary underline">
-          Clear all
+          {t('board.clearAll')}
         </button>
       )}
 
@@ -264,7 +272,7 @@ export function BoardToolbar(props: Props) {
         onClick={props.onNewCollection}
         className="anchor-undo ml-auto flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
       >
-        <FolderPlus size={16} aria-hidden /> New collection
+        <FolderPlus size={16} aria-hidden /> {t('board.newCollection')}
       </button>
     </div>
   );

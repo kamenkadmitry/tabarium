@@ -1,5 +1,7 @@
 import { Copy, SearchX } from 'lucide-react';
 import type { Card, Collection, Space } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
+import { displayCollectionName, displaySpaceName } from '../core/quicksave';
 import type { OpenTab } from '../platform/ports';
 import { CardRow, type CardRowActions, hostOf } from './CardRow';
 import { EmptyState } from './EmptyState';
@@ -19,28 +21,29 @@ export function SearchResults(props: {
   onFocusTab: (tabId: number) => void;
   onAddOpenTab: (tabId: number) => void;
 }) {
+  const t = useT();
   if (props.groups.length === 0 && props.openTabs.length === 0) {
-    return <EmptyState className="mt-16" icon={<SearchX />} title={`No tabs match “${props.query}”`} hint="Try another word, or search by #hashtag." />;
+    return <EmptyState className="mt-16" icon={<SearchX />} title={t('empty.noTabsMatch.title', { query: props.query })} hint={t('empty.noTabsMatch.hint')} />;
   }
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       {props.openTabs.length > 0 && (
-        <section aria-label="Open tabs" className="rounded-2xl border border-line bg-surface">
-          <h2 className="border-b border-line px-4 py-3 text-sm font-bold">Open tabs</h2>
+        <section aria-label={t('lv.openTabs')} className="rounded-2xl border border-line bg-surface">
+          <h2 className="border-b border-line px-4 py-3 text-sm font-bold">{t('lv.openTabs')}</h2>
           <ul className="p-2">
-            {props.openTabs.map((t) => (
-              <li key={t.id} className="flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-surface-2">
-                <button type="button" onClick={() => props.onFocusTab(t.id)} className="min-w-0 flex-1 py-1.5 text-left">
-                  <span className="block truncate text-sm font-medium">{t.title}</span>
-                  <span className="block truncate text-xs text-muted">{hostOf(t.url)} · open in the browser</span>
+            {props.openTabs.map((tab) => (
+              <li key={tab.id} className="flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-surface-2">
+                <button type="button" onClick={() => props.onFocusTab(tab.id)} className="min-w-0 flex-1 py-1.5 text-left">
+                  <span className="block truncate text-sm font-medium">{tab.title}</span>
+                  <span className="block truncate text-xs text-muted">{hostOf(tab.url)} · {t('card.openInBrowser')}</span>
                 </button>
                 <button
                   type="button"
-                  aria-label={`Add ${t.title} to a collection`}
-                  onClick={() => props.onAddOpenTab(t.id)}
+                  aria-label={t('lv.addToCollectionAria', { title: tab.title })}
+                  onClick={() => props.onAddOpenTab(tab.id)}
                   className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold hover:bg-surface"
                 >
-                  Add to collection
+                  {t('lv.addToCollection')}
                 </button>
               </li>
             ))}
@@ -48,10 +51,10 @@ export function SearchResults(props: {
         </section>
       )}
       {props.groups.map(({ collection, space, cards }) => (
-        <section key={collection.id} aria-label={collection.title} className="rounded-2xl border border-line bg-surface">
+        <section key={collection.id} aria-label={displayCollectionName(space, collection)} className="rounded-2xl border border-line bg-surface">
           <h2 className="border-b border-line px-4 py-3 text-sm font-bold">
-            <span className="text-muted">{space?.name} / </span>
-            {collection.title}
+            <span className="text-muted">{space ? displaySpaceName(space) : ''} / </span>
+            {displayCollectionName(space, collection)}
           </h2>
           <ul className="p-2">
             {cards.map((c) => (
@@ -68,7 +71,8 @@ export function DuplicatesView(props: {
   groups: readonly { url: string; cards: Card[]; collections: Map<string, Collection> }[];
   cardActions: (card: Card) => CardRowActions;
 }) {
-  if (props.groups.length === 0) return <EmptyState className="mt-16" icon={<Copy />} title="No duplicate tabs" hint="Every link is saved once — nothing to tidy." />;
+  const t = useT();
+  if (props.groups.length === 0) return <EmptyState className="mt-16" icon={<Copy />} title={t('empty.noDuplicates.title')} hint={t('empty.noDuplicates.hint')} />;
   return (
     <div className="flex max-w-2xl flex-col gap-4">
       {props.groups.map((g) => (
@@ -80,7 +84,7 @@ export function DuplicatesView(props: {
                 key={c.id}
                 card={c}
                 draggable={false}
-                meta={`in ${g.collections.get(c.collectionId)?.title ?? 'unknown collection'}`}
+                meta={t('card.inCollection', { name: g.collections.get(c.collectionId)?.title ?? t('card.unknownCollection') })}
                 {...props.cardActions(c)}
               />
             ))}

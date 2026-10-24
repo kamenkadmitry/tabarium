@@ -1,10 +1,11 @@
 import { browser } from 'wxt/browser';
 import type { BookmarkNode } from '../core/bookmarks';
+import { tr } from '../i18n/runtime';
 import type { Capability, OpenOptions, OpenTab, OpenWindow, Platform } from './ports';
 
 function requireExtension(): typeof browser {
   if (!browser?.runtime?.id) {
-    throw new Error('Extension APIs are unavailable: this page is not running as a browser extension');
+    throw new Error(tr()('err.noExtensionApi'));
   }
   return browser;
 }
@@ -36,7 +37,7 @@ const isWebUrl = (url: string | undefined): url is string => url !== undefined &
 async function stripIndexBefore(api: typeof browser, windowId: number, beforeTabId: number, moving: readonly number[]): Promise<number> {
   const strip = await api.tabs.query({ windowId });
   const at = strip.findIndex((t) => t.id === beforeTabId);
-  if (at < 0) throw new Error(`Tab ${beforeTabId} is no longer in window ${windowId}`);
+  if (at < 0) throw new Error(tr()('err.tabLeftWindow', { id: beforeTabId, windowId }));
   const movingSet = new Set(moving);
   return at - strip.slice(0, at).filter((t) => t.id !== undefined && movingSet.has(t.id)).length;
 }
@@ -179,7 +180,7 @@ export function createChromePlatform(): Platform {
       async focusTab(tabId) {
         const api = requireExtension();
         const tab = await api.tabs.update(tabId, { active: true });
-        if (!tab) throw new Error(`Tab ${tabId} no longer exists`);
+        if (!tab) throw new Error(tr()('err.tabGone', { id: tabId }));
         if (tab.windowId !== undefined) await api.windows.update(tab.windowId, { focused: true });
       },
       async closeWindow(windowId) {
@@ -188,7 +189,7 @@ export function createChromePlatform(): Platform {
       async mergeWindows() {
         const api = requireExtension();
         const here = await api.windows.getCurrent();
-        if (here.id === undefined) throw new Error('The current window has no id');
+        if (here.id === undefined) throw new Error(tr()('err.windowNoId'));
         const others = (await api.windows.getAll({ populate: true, windowTypes: ['normal'] })).filter((w) => w.id !== here.id);
         for (const w of others) {
           const ids = (w.tabs ?? []).flatMap((t) => (t.id === undefined ? [] : [t.id]));

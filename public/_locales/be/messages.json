@@ -1,0 +1,11 @@
+{
+  "appDescription": {
+    "message": "Лакальны менеджар укладак і сесій. Без уліковага запісу і сервера."
+  },
+  "commandSaveTab": {
+    "message": "Захаваць бягучую ўкладку ў Tabarium"
+  },
+  "commandPalette": {
+    "message": "Адкрыць палітру каманд Tabarium"
+  }
+}

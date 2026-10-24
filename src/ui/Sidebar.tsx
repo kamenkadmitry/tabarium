@@ -1,7 +1,9 @@
 import { Bookmark, Copy, Hash, Kanban, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
+import { displaySpaceName } from '../core/quicksave';
 import type { Settings as AppSettings } from '../core/settings';
 import type { Space } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 import { SpaceIcon } from './spaceIcons';
 
@@ -61,6 +63,7 @@ function NavButton(props: {
 }
 
 function SpaceItem({ space, active, badge, ...p }: { space: Space; active: boolean; badge?: number } & Pick<Props, 'onSelect' | 'onRenameSpace' | 'onDeleteSpace' | 'onDropCollection' | 'onDropTabs' | 'onDropLinks'>) {
+  const t = useT();
   const [over, setOver] = useState(false);
   return (
     <div
@@ -88,18 +91,18 @@ function SpaceItem({ space, active, badge, ...p }: { space: Space; active: boole
         onClick={() => p.onSelect({ kind: 'space', spaceId: space.id })}
         icon={
           <span className={`grid size-6 shrink-0 place-items-center rounded-md ${active ? 'text-primary-fg' : 'bg-surface-2 text-primary'}`}>
-            <SpaceIcon icon={space.icon} name={space.name} size={space.icon ? 16 : 14} />
+            <SpaceIcon icon={space.icon} name={displaySpaceName(space)} size={space.icon ? 16 : 14} />
           </span>
         }
       >
-        {space.name}
+        {displaySpaceName(space)}
       </NavButton>
       {space.kind !== 'inbox' && (
       <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-        <button type="button" aria-label={`Edit space ${space.name}`} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
+        <button type="button" aria-label={t('sidebar.editSpace', { name: space.name })} onClick={() => p.onRenameSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-primary">
           <Pencil size={14} aria-hidden />
         </button>
-        <button type="button" aria-label={`Delete space ${space.name}`} onClick={() => p.onDeleteSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-danger">
+        <button type="button" aria-label={t('sidebar.deleteSpace', { name: space.name })} onClick={() => p.onDeleteSpace(space)} className="grid size-8 place-items-center rounded-md bg-surface-2 text-muted hover:text-danger">
           <Trash2 size={14} aria-hidden />
         </button>
       </div>
@@ -109,6 +112,7 @@ function SpaceItem({ space, active, badge, ...p }: { space: Space; active: boole
 }
 
 export function Sidebar(props: Props) {
+  const t = useT();
   const { spaces, view } = props;
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-6 border-r border-line bg-surface p-4">
@@ -119,36 +123,36 @@ export function Sidebar(props: Props) {
         <span className="text-lg font-bold tracking-tight">Tabarium</span>
       </div>
 
-      <nav aria-label="Library" className="flex flex-col gap-1">
+      <nav aria-label={t('sidebar.libraryNav')} className="flex flex-col gap-1">
         <NavButton active={view?.kind === 'dashboard'} onClick={() => props.onSelect({ kind: 'dashboard' })} icon={<LayoutDashboard size={18} aria-hidden />}>
-          Dashboard
+          {t('nav.dashboard')}
         </NavButton>
         <NavButton active={view?.kind === 'starred'} onClick={() => props.onSelect({ kind: 'starred' })} icon={<Star size={18} aria-hidden />}>
-          Starred
+          {t('nav.starred')}
         </NavButton>
         <NavButton active={view?.kind === 'duplicates'} onClick={() => props.onSelect({ kind: 'duplicates' })} icon={<Copy size={18} aria-hidden />} badge={props.duplicateCount}>
-          Duplicates
+          {t('nav.duplicates')}
         </NavButton>
         <NavButton active={view?.kind === 'bookmarks'} onClick={() => props.onSelect({ kind: 'bookmarks' })} icon={<Bookmark size={18} aria-hidden />}>
-          Bookmarks
+          {t('nav.bookmarks')}
         </NavButton>
         <NavButton active={view?.kind === 'tags'} onClick={() => props.onSelect({ kind: 'tags' })} icon={<Tag size={18} aria-hidden />}>
-          Tags
+          {t('nav.tags')}
         </NavButton>
         <NavButton active={view?.kind === 'hashtags'} onClick={() => props.onSelect({ kind: 'hashtags' })} icon={<Hash size={18} aria-hidden />}>
-          Hashtags
+          {t('nav.hashtags')}
         </NavButton>
         <NavButton active={view?.kind === 'organizer'} onClick={() => props.onSelect({ kind: 'organizer' })} icon={<Kanban size={18} aria-hidden />}>
-          Groups Organizer
+          {t('nav.organizer')}
         </NavButton>
       </nav>
 
-      <nav aria-label="Spaces" className="flex min-h-0 flex-1 flex-col gap-1">
+      <nav aria-label={t('sidebar.spacesNav')} className="flex min-h-0 flex-1 flex-col gap-1">
         <div className="flex items-center justify-between px-3 pb-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted">Spaces</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted">{t('nav.spaces')}</span>
           <button
             type="button"
-            aria-label="Create space"
+            aria-label={t('sidebar.createSpace')}
             onClick={props.onCreateSpace}
             className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
           >
@@ -175,13 +179,13 @@ export function Sidebar(props: Props) {
 
       <div className="flex flex-col gap-1">
         <NavButton active={view?.kind === 'settings'} onClick={() => props.onSelect({ kind: 'settings' })} icon={<Settings size={18} aria-hidden />}>
-          Settings
+          {t('nav.settings')}
         </NavButton>
       </div>
 
       <button
         type="button"
-        aria-label="Your profile"
+        aria-label={t('sidebar.yourProfile')}
         onClick={() => props.onSelect({ kind: 'settings' })}
         className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface-2"
       >
@@ -192,8 +196,8 @@ export function Sidebar(props: Props) {
             {props.profile.name ? <span className="text-sm font-bold">{props.profile.name[0]?.toUpperCase()}</span> : <User size={18} aria-hidden />}
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{props.profile.name || 'My library'}</span>
-        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Local</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{props.profile.name || t('common.myLibrary')}</span>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">{t('sidebar.localBadge')}</span>
       </button>
     </aside>
   );

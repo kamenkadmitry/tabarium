@@ -1,4 +1,5 @@
 import { type ImportedSpace, isWebUrl } from './formats';
+import { tr } from '../i18n/runtime';
 import { normalizeUrl } from './url';
 
 /** One node of the browser's bookmark tree: a folder has `children`, a bookmark has `url`. */
@@ -78,7 +79,7 @@ export function planBookmarkImport(root: readonly BookmarkNode[], mode: Bookmark
     }
     if (mode === 'folders' && links.length > 0) collections.push({ title: path.join(' / '), links });
     for (const sub of subfolders) {
-      if (!walk(sub, [...path, sub.title || 'Untitled'], depth + 1)) empty = false;
+      if (!walk(sub, [...path, sub.title || tr()('common.untitled')], depth + 1)) empty = false;
     }
     if (empty && depth >= 1 && (folder.children?.length ?? 0) > 0) emptiedFolderIds.push(folder.id);
     return empty;

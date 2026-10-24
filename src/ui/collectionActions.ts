@@ -1,5 +1,6 @@
 import { suggestCollectionNames } from '../core/ai/tasks';
 import { repo } from '../core/instance';
+import { tr } from '../i18n/runtime';
 import { parseDraggedLinks } from './dnd';
 import type { Settings } from '../core/settings';
 import type { Card, Collection } from '../core/types';
@@ -41,9 +42,9 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
   const groupOptions = (col: Collection) => (deps.settings?.tabGroups ? { groupTitle: col.title } : undefined);
 
   return (col: Collection, list: readonly Card[]): CollectionActions => ({
-    toggleExpanded: act('Updating collection', () => repo.updateCollection(col.id, { expanded: !col.expanded })),
+    toggleExpanded: act(tr()('run.updatingCollection'), () => repo.updateCollection(col.id, { expanded: !col.expanded })),
     addLink: () => deps.openAddLink(col.id),
-    openAll: act('Opening tabs', () =>
+    openAll: act(tr()('run.openingTabs'), () =>
       deps.platform.tabs.openUrls(
         list.map((c) => c.url),
         groupOptions(col),
@@ -51,7 +52,7 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
     ),
     suggestName: ai
       ? () =>
-          void deps.run('Suggesting names', async () => {
+          void deps.run(tr()('run.suggestingNames'), async () => {
             const suggestions = await withProviderAccess(deps.platform, ai, () =>
               suggestCollectionNames(
                 ai,
@@ -63,18 +64,18 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
       : undefined,
     suggestDetails: ai
       ? () =>
-          void deps.run('Suggesting details', async () => {
+          void deps.run(tr()('run.suggestingDetails'), async () => {
             const unlabeled = list.filter((c) => c.tagIds.length === 0 && c.hashtagIds.length === 0);
-            if (unlabeled.length === 0) throw new Error('Every link in this collection already has tags or hashtags.');
+            if (unlabeled.length === 0) throw new Error(tr()('err.everythingLabelled'));
             const { items, skipped } = await proposeDetails(deps.platform, ai, unlabeled);
-            deps.setDialog({ kind: 'ai-details', title: `Suggested details for “${col.title}”`, items, skipped });
+            deps.setDialog({ kind: 'ai-details', title: tr()('dlg.aiDetails.title', { title: col.title }), items, skipped });
           })
       : undefined,
     replaceWindow: () => {
-      if (!confirm(`Close the other tabs in this window and open “${col.title}” instead?`)) return;
-      void deps.run('Replacing window tabs', async () => {
+      if (!confirm(tr()('collection.replaceConfirm', { title: col.title }))) return;
+      void deps.run(tr()('run.replacingWindowTabs'), async () => {
         if (!(await deps.platform.permissions.request('tabs'))) {
-          throw new Error('Tabarium needs the "tabs" permission to replace the tabs of this window.');
+          throw new Error(tr()('err.needTabsReplace'));
         }
         await deps.platform.tabs.replaceWindowTabs(
           list.map((c) => c.url),
@@ -83,17 +84,17 @@ export function createCollectionActions(deps: Deps): (collection: Collection, ca
       });
     },
     rename: () => deps.setDialog({ kind: 'rename-collection', id: col.id, title: col.title }),
-    remove: () => void deps.run('Deleting collection', async () => deps.onDeleted(await repo.deleteCollection(col.id))),
+    remove: () => void deps.run(tr()('run.deletingCollection'), async () => deps.onDeleted(await repo.deleteCollection(col.id))),
     editTags: () => deps.setDialog({ kind: 'tags', collectionId: col.id }),
-    setColor: (color) => void deps.run('Setting colour', () => repo.updateCollection(col.id, { color })),
+    setColor: (color) => void deps.run(tr()('run.settingColour'), () => repo.updateCollection(col.id, { color })),
     card: deps.cardActions,
-    dropCard: (cardId, before) => void deps.run('Moving tab', () => repo.moveCard(cardId, col.id, before)),
+    dropCard: (cardId, before) => void deps.run(tr()('run.movingTab'), () => repo.moveCard(cardId, col.id, before)),
     dropTabs: (tabIds, before) => void deps.addTabs(tabIds, { kind: 'collection', collectionId: col.id, before }),
     dropLinks: (raw, before) =>
-      void deps.run('Adding the dropped links', async () => {
+      void deps.run(tr()('run.addingDroppedLinks'), async () => {
         const links = await deps.guard(parseDraggedLinks(raw));
         if (links && links.length > 0) await repo.addCardsBefore(col.id, links, before);
       }),
-    dropCollection: (id) => void deps.run('Moving collection', () => repo.moveCollection(id, col.spaceId, col.id)),
+    dropCollection: (id) => void deps.run(tr()('run.movingCollection'), () => repo.moveCollection(id, col.spaceId, col.id)),
   });
 }

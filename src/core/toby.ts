@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Backup } from './backup';
 import { type ImportedCollection, type ImportedLink, type ImportedSpace, isWebUrl } from './formats';
+import { tr } from '../i18n/runtime';
 
 /**
  * Reading and writing the interchange files that Toby users already have: the JSON export (workspace
@@ -68,15 +69,15 @@ export function parseTobyJson(json: string): ImportedSpace[] {
   try {
     data = JSON.parse(json);
   } catch {
-    throw new Error('Not valid JSON');
+    throw new Error(tr()('err.notJson'));
   }
-  if (typeof data !== 'object' || data === null) throw new Error('Not a Toby export object');
+  if (typeof data !== 'object' || data === null) throw new Error(tr()('err.tobyNotExport'));
 
   const workspace = WorkspaceExport.safeParse(data);
   if (workspace.success) {
     const { groups, labels } = workspace.data;
     return groups.map((g) => ({
-      name: g.name || 'Imported',
+      name: g.name || tr()('common.imported'),
       collections: g.lists.map((l) => ({
         title: l.title,
         links: l.cards,
@@ -92,7 +93,7 @@ export function parseTobyJson(json: string): ImportedSpace[] {
   if (flat.success) {
     return [
       {
-        name: 'Imported',
+        name: tr()('common.imported'),
         collections: flat.data.lists.map((l) => ({
           title: l.title,
           links: l.cards,
@@ -103,21 +104,21 @@ export function parseTobyJson(json: string): ImportedSpace[] {
   }
 
   if ((data as { version?: unknown }).version !== undefined && (data as { version?: unknown }).version !== 4) {
-    throw new Error(`Unsupported Toby export version ${String((data as { version?: unknown }).version)}`);
+    throw new Error(tr()('err.tobyVersion', { version: String((data as { version?: unknown }).version) }));
   }
-  throw new Error('Not a Toby export: expected a "lists" array (v1-v3) or "groups" (v4)');
+  throw new Error(tr()('err.tobyStructure'));
 }
 
 /** Parses the Toby plain-text export (blocks separated by blank lines: a title line followed by URLs). */
 export function parseTobyText(text: string): ImportedSpace[] {
   if (/^VERSION=4$/m.test(text)) {
-    throw new Error('This is a v4 workspace text export; export it as JSON to keep the structure');
+    throw new Error(tr()('err.tobyTextExport'));
   }
   const collections: ImportedCollection[] = [];
   let title: string | null = null;
   let links: ImportedLink[] = [];
   const flush = () => {
-    if (links.length > 0) collections.push({ title: title ?? 'Imported', links });
+    if (links.length > 0) collections.push({ title: title ?? tr()('common.imported'), links });
     title = null;
     links = [];
   };
@@ -128,23 +129,23 @@ export function parseTobyText(text: string): ImportedSpace[] {
     else if (title === null) title = line;
   }
   flush();
-  return collections.length > 0 ? [{ name: 'Imported', collections }] : [];
+  return collections.length > 0 ? [{ name: tr()('common.imported'), collections }] : [];
 }
 
 /** Parses the flat Toby HTML export (a heading per collection followed by its links). */
 export function parseTobyHtml(html: string): ImportedSpace[] {
   if (/Version:\s*4/.test(html)) {
-    throw new Error('This is a v4 workspace HTML export; export it as JSON to keep the structure');
+    throw new Error(tr()('err.tobyHtmlExport'));
   }
   const collections: ImportedCollection[] = [];
-  let current: ImportedCollection = { title: 'Imported', links: [] };
+  let current: ImportedCollection = { title: tr()('common.imported'), links: [] };
   const flush = () => {
     if (current.links.length > 0) collections.push(current);
   };
   for (const m of html.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>|<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     if (m[1] !== undefined) {
       flush();
-      current = { title: m[1].replace(/<[^>]*>/g, '').trim() || 'Imported', links: [] };
+      current = { title: m[1].replace(/<[^>]*>/g, '').trim() || tr()('common.imported'), links: [] };
     } else {
       const href = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(m[2] ?? '');
       const url = (href?.[1] ?? href?.[2] ?? '').replace(/&amp;/g, '&').trim();
@@ -152,7 +153,7 @@ export function parseTobyHtml(html: string): ImportedSpace[] {
     }
   }
   flush();
-  return collections.length > 0 ? [{ name: 'Imported', collections }] : [];
+  return collections.length > 0 ? [{ name: tr()('common.imported'), collections }] : [];
 }
 
 /** Picks the parser from the file name. */
@@ -161,7 +162,7 @@ export function parseTobyFile(filename: string, content: string): ImportedSpace[
   if (ext === 'json') return parseTobyJson(content);
   if (ext === 'txt') return parseTobyText(content);
   if (ext === 'html' || ext === 'htm') return parseTobyHtml(content);
-  throw new Error(`Unsupported file type: .${ext ?? ''}`);
+  throw new Error(tr()('err.unsupportedFileType', { ext: ext ?? '' }));
 }
 
 /** Writes the library in the Toby workspace JSON layout (v4) so it can be imported there. */

@@ -1,12 +1,20 @@
 import type { TabariumDB } from './db';
 import { type NewCard, Repository } from './repo';
 import { loadSettings, updateSettings } from './settings';
+import { tr } from '../i18n/runtime';
 import type { Card, Collection, Space } from './types';
 
 export const INBOX_SPACE = 'Inbox';
 export const INBOX_COLLECTION = 'Saved tabs';
 /** The Inbox always shows an envelope; its icon cannot be changed. */
 export const INBOX_ICON = 'lucide:mail';
+
+/** What the UI shows for a space: the Inbox is a system space, so its name is drawn from the catalogue, not stored data. */
+export const displaySpaceName = (space: Space): string => (space.kind === 'inbox' ? tr()('inbox.spaceName') : space.name);
+
+/** What the UI shows for a collection: the Inbox's default collection is system-named like its space. */
+export const displayCollectionName = (space: Space | undefined, collection: Collection): string =>
+  space?.kind === 'inbox' && collection.title === INBOX_COLLECTION ? tr()('inbox.collectionName') : collection.title;
 
 /** The system space where links wait to be sorted. There is only one; it cannot be renamed, edited or deleted. */
 export const inboxSpace = (spaces: readonly Space[]): Space | undefined => spaces.find((s) => s.kind === 'inbox');
@@ -102,6 +110,6 @@ export async function quickSave(db: TabariumDB, items: readonly NewCard[]): Prom
 }
 
 export async function setQuickTarget(db: TabariumDB, collectionId: string): Promise<void> {
-  if (!(await db.collections.get(collectionId))) throw new Error(`Collection ${collectionId} does not exist`);
+  if (!(await db.collections.get(collectionId))) throw new Error(tr()('err.collectionGone', { id: collectionId }));
   await updateSettings(db, { quickSaveCollectionId: collectionId });
 }

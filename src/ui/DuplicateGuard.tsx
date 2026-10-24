@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import { findExistingLinks, type ExistingLink } from '../core/duplicates';
 import { db, repo } from '../core/instance';
 import { normalizeUrl } from '../core/url';
+import { useT } from '../i18n/I18nProvider';
 import { Dialog, PrimaryButton, SecondaryButton } from './Dialog';
 
 /** Anything about to be added to the library: it needs an address and a title to show. */
@@ -30,6 +31,7 @@ const place = (e: ExistingLink) => [e.space, e.collection].filter((x) => x !== '
 
 /** Provides the check to everything below it and shows the question when needed. */
 export function DuplicateGuardProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [pending, setPending] = useState<Pending | null>(null);
 
   const guard = useCallback<DuplicateGuard>(async (items) => {
@@ -63,27 +65,27 @@ export function DuplicateGuardProvider({ children }: { children: React.ReactNode
     <GuardContext.Provider value={guard}>
       {children}
       {pending && (
-        <Dialog title={single ? 'This link is already saved' : `${pending.hits.length} of ${pending.total} links are already saved`} onClose={() => pending.resolve('cancel')}>
-          <ul aria-label="Links already in the library" className="mb-4 flex max-h-56 flex-col gap-2 overflow-y-auto">
+        <Dialog title={single ? t('dup.title.single') : t.plural('dup.title.multi', pending.total, { hits: pending.hits.length })} onClose={() => pending.resolve('cancel')}>
+          <ul aria-label={t('dup.list')} className="mb-4 flex max-h-56 flex-col gap-2 overflow-y-auto">
             {pending.hits.slice(0, 6).map((h, i) => (
               <li key={i} className="rounded-lg border border-line px-3 py-2">
                 <span className="block truncate text-sm font-semibold">{h.title}</span>
                 <span className="block truncate text-xs text-muted">
-                  Already in {place(h.where)}
-                  {h.where.copies > 1 ? ` and ${h.where.copies - 1} more place${h.where.copies === 2 ? '' : 's'}` : ''}
+                  {t('dup.alreadyIn', { place: place(h.where) })}
+                  {h.where.copies > 1 ? t.plural('dup.morePlaces', h.where.copies - 1) : ''}
                 </span>
               </li>
             ))}
-            {pending.hits.length > 6 && <li className="px-1 text-xs text-muted">and {pending.hits.length - 6} more</li>}
+            {pending.hits.length > 6 && <li className="px-1 text-xs text-muted">{t('dup.andMore', { n: pending.hits.length - 6 })}</li>}
           </ul>
           <p className="mb-4 text-sm text-muted">
-            {single ? 'Do you want to create a duplicate?' : 'Duplicates stay separate links; they are not merged. What should happen?'}
+            {single ? t('dup.ask.single') : t('dup.ask.multi')}
           </p>
           <div className="flex flex-wrap justify-end gap-2">
-            <SecondaryButton onClick={() => pending.resolve('cancel')}>Cancel</SecondaryButton>
-            {!single && fresh > 0 && <SecondaryButton onClick={() => pending.resolve('new')}>{`Add only the ${fresh} new`}</SecondaryButton>}
+            <SecondaryButton onClick={() => pending.resolve('cancel')}>{t('common.cancel')}</SecondaryButton>
+            {!single && fresh > 0 && <SecondaryButton onClick={() => pending.resolve('new')}>{t.plural('dup.addOnlyNew', fresh)}</SecondaryButton>}
             <PrimaryButton type="button" onClick={() => pending.resolve('all')}>
-              {single ? 'Add duplicate' : 'Add all, duplicates too'}
+              {single ? t('dup.addOne') : t('dup.addAll')}
             </PrimaryButton>
           </div>
         </Dialog>

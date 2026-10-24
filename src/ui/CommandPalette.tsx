@@ -1,6 +1,9 @@
 import { CornerDownLeft, Folder, Hash, Kanban, Layers, Tag } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Card, Collection, Hashtag, Space, Tag as TagType } from '../core/types';
+import { displayCollectionName, displaySpaceName } from '../core/quicksave';
+import { useT } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/messages';
 import { Favicon } from './CardRow';
 import { cardSearchText } from './searchModel';
 import type { View } from './Sidebar';
@@ -20,7 +23,8 @@ interface Props {
 }
 
 interface Entry {
-  group: string;
+  /** A pal.group.* message key; translated once per render when the groups are built. */
+  group: StringKey;
   icon: React.ReactNode;
   title: string;
   /** Right-side context, e.g. "Space / Collection" for a link. */
@@ -28,16 +32,16 @@ interface Entry {
   run: () => void;
 }
 
-/** App views the palette can jump to; titles match the header's TITLES map. */
-const PAGES: { title: string; view: View }[] = [
-  { title: 'Dashboard', view: { kind: 'dashboard' } },
-  { title: 'Starred', view: { kind: 'starred' } },
-  { title: 'Duplicates', view: { kind: 'duplicates' } },
-  { title: 'Browser bookmarks', view: { kind: 'bookmarks' } },
-  { title: 'Tags', view: { kind: 'tags' } },
-  { title: 'Hashtags', view: { kind: 'hashtags' } },
-  { title: 'Tab organizer', view: { kind: 'organizer' } },
-  { title: 'Settings', view: { kind: 'settings' } },
+/** App views the palette can jump to; the same nav.* keys the header's TITLE_KEYS map uses. */
+const PAGES: { titleKey: StringKey; view: View }[] = [
+  { titleKey: 'nav.dashboard', view: { kind: 'dashboard' } },
+  { titleKey: 'nav.starred', view: { kind: 'starred' } },
+  { titleKey: 'nav.duplicates', view: { kind: 'duplicates' } },
+  { titleKey: 'nav.bookmarksPage', view: { kind: 'bookmarks' } },
+  { titleKey: 'nav.tags', view: { kind: 'tags' } },
+  { titleKey: 'nav.hashtags', view: { kind: 'hashtags' } },
+  { titleKey: 'nav.organizerTitle', view: { kind: 'organizer' } },
+  { titleKey: 'nav.settings', view: { kind: 'settings' } },
 ];
 
 const MAX = { links: 8, collections: 6, spaces: 5, labels: 5 } as const;
@@ -47,6 +51,7 @@ const MAX = { links: 8, collections: 6, spaces: 5, labels: 5 } as const;
  * labels and app views. A query starting with '#' searches hashtags only, like the main search.
  */
 export function CommandPalette({ spaces, collections, cards, tags, hashtags, onClose, onOpenLink, onGoCollection, onNavigate }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const listId = useId();
   const [query, setQuery] = useState('');
@@ -64,11 +69,11 @@ export function CommandPalette({ spaces, collections, cards, tags, hashtags, onC
 
   const entries = useMemo<Entry[]>(() => {
     const pageEntries = (list: typeof PAGES): Entry[] =>
-      list.map((p) => ({ group: 'Pages', icon: <Kanban size={16} aria-hidden />, title: p.title, run: () => onNavigate(p.view) }));
+      list.map((p) => ({ group: 'pal.group.pages', icon: <Kanban size={16} aria-hidden />, title: t(p.titleKey), run: () => onNavigate(p.view) }));
     const spaceEntries = (list: readonly Space[]): Entry[] =>
-      list.map((s) => ({ group: 'Spaces', icon: <Layers size={16} aria-hidden />, title: s.name, run: () => onNavigate({ kind: 'space', spaceId: s.id }) }));
+      list.map((s) => ({ group: 'pal.group.spaces', icon: <Layers size={16} aria-hidden />, title: displaySpaceName(s), run: () => onNavigate({ kind: 'space', spaceId: s.id }) }));
     const hashtagEntries = (list: readonly Hashtag[]): Entry[] =>
-      list.map((h) => ({ group: 'Hashtags', icon: <Hash size={16} aria-hidden />, title: `#${h.name}`, run: () => onNavigate({ kind: 'hashtags' }) }));
+      list.map((h) => ({ group: 'pal.group.hashtags', icon: <Hash size={16} aria-hidden />, title: `#${h.name}`, run: () => onNavigate({ kind: 'hashtags' }) }));
 
     // '#' restricts the search to hashtags only, matching the main search bar's convention.
     if (q.startsWith('#')) return hashtagEntries(hashtags.filter((h) => h.name.includes(q.slice(1))).slice(0, MAX.labels));
@@ -81,41 +86,44 @@ export function CommandPalette({ spaces, collections, cards, tags, hashtags, onC
         const col = collectionById.get(c.collectionId);
         const space = col ? spaceById.get(col.spaceId) : undefined;
         return {
-          group: 'Links',
+          group: 'pal.group.links',
           icon: <Favicon card={c} size={16} />,
           title: c.customTitle ?? c.title,
-          hint: col && space ? `${space.name} / ${col.title}` : col?.title,
+          hint: col && space ? `${displaySpaceName(space)} / ${displayCollectionName(space, col)}` : col?.title,
           run: () => onOpenLink(c),
         };
       });
     const collectionEntries: Entry[] = collections
-      .filter((c) => c.title.toLowerCase().includes(q))
+      .filter((c) => displayCollectionName(spaceById.get(c.spaceId), c).toLowerCase().includes(q))
       .slice(0, MAX.collections)
-      .map((c) => ({
-        group: 'Collections',
-        icon: <Folder size={16} aria-hidden />,
-        title: c.title,
-        hint: spaceById.get(c.spaceId)?.name,
-        run: () => onGoCollection(c),
-      }));
+      .map((c) => {
+        const space = spaceById.get(c.spaceId);
+        return {
+          group: 'pal.group.collections',
+          icon: <Folder size={16} aria-hidden />,
+          title: displayCollectionName(space, c),
+          hint: space ? displaySpaceName(space) : undefined,
+          run: () => onGoCollection(c),
+        };
+      });
     const tagEntries: Entry[] = tags
-      .filter((t) => t.title.toLowerCase().includes(q))
+      .filter((tag) => tag.title.toLowerCase().includes(q))
       .slice(0, MAX.labels)
-      .map((t) => ({ group: 'Tags', icon: <Tag size={16} aria-hidden />, title: t.title, run: () => onNavigate({ kind: 'tags' }) }));
+      .map((tag) => ({ group: 'pal.group.tags', icon: <Tag size={16} aria-hidden />, title: tag.title, run: () => onNavigate({ kind: 'tags' }) }));
 
     return [
       ...linkEntries,
       ...collectionEntries,
-      ...spaceEntries(spaces.filter((s) => s.name.toLowerCase().includes(q)).slice(0, MAX.spaces)),
+      ...spaceEntries(spaces.filter((s) => displaySpaceName(s).toLowerCase().includes(q)).slice(0, MAX.spaces)),
       ...tagEntries,
       ...hashtagEntries(hashtags.filter((h) => h.name.includes(q)).slice(0, MAX.labels)),
-      ...pageEntries(PAGES.filter((p) => p.title.toLowerCase().includes(q))),
+      ...pageEntries(PAGES.filter((p) => t(p.titleKey).toLowerCase().includes(q))),
     ];
-  }, [q, cards, collections, spaces, tags, hashtags, collectionById, spaceById, onOpenLink, onGoCollection, onNavigate]);
+  }, [q, cards, collections, spaces, tags, hashtags, collectionById, spaceById, onOpenLink, onGoCollection, onNavigate, t]);
 
   // Groups keep their visual order; the flat list is what the arrows walk.
   const groups = useMemo(() => {
-    const out: { label: string; items: { entry: Entry; index: number }[] }[] = [];
+    const out: { label: StringKey; items: { entry: Entry; index: number }[] }[] = [];
     entries.forEach((entry, index) => {
       const last = out[out.length - 1];
       if (last && last.label === entry.group) last.items.push({ entry, index });
@@ -152,7 +160,7 @@ export function CommandPalette({ spaces, collections, cards, tags, hashtags, onC
       className="mx-auto mt-[12vh] w-[min(38rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-0 text-fg shadow-none backdrop:bg-black/50"
     >
       <h2 id={`${listId}-title`} className="sr-only">
-        Command palette
+        {t('pal.title')}
       </h2>
       <div className="border-b border-line p-3">
         <input
@@ -162,23 +170,23 @@ export function CommandPalette({ spaces, collections, cards, tags, hashtags, onC
           aria-expanded="true"
           aria-controls={listId}
           aria-activedescendant={entries.length > 0 ? `${listId}-${activeIndex}` : undefined}
-          aria-label="Search commands"
+          aria-label={t('pal.search')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Type a command or search… # for hashtags"
+          placeholder={t('pal.placeholder')}
           className="h-10 w-full rounded-lg bg-bg px-3 text-sm placeholder:text-muted"
         />
       </div>
       {/* Announces result counts to screen readers as the query changes. */}
       <p role="status" className="sr-only">
-        {q === '' ? '' : `${entries.length} ${entries.length === 1 ? 'result' : 'results'}`}
+        {q === '' ? '' : t.plural('pal.count', entries.length)}
       </p>
-      <ul id={listId} role="listbox" aria-label="Results" className="max-h-[55vh] overflow-y-auto p-2">
+      <ul id={listId} role="listbox" aria-label={t('pal.results')} className="max-h-[55vh] overflow-y-auto p-2">
         {groups.map((g) => (
           <li key={g.label} role="presentation">
-            <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted">{g.label}</div>
-            <ul role="group" aria-label={g.label}>
+            <div className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(g.label)}</div>
+            <ul role="group" aria-label={t(g.label)}>
               {g.items.map(({ entry, index }) => (
                 <li
                   key={index}
@@ -199,9 +207,9 @@ export function CommandPalette({ spaces, collections, cards, tags, hashtags, onC
             </ul>
           </li>
         ))}
-        {entries.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">Nothing matches “{query.trim()}”.</li>}
+        {entries.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">{t('pal.noMatch', { query: query.trim() })}</li>}
       </ul>
-      <p className="border-t border-line px-3 py-2 text-xs text-muted">↑↓ navigate · Enter open · Esc close</p>
+      <p className="border-t border-line px-3 py-2 text-xs text-muted">{t('pal.hint')}</p>
     </dialog>
   );
 }

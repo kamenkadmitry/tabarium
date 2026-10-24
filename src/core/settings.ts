@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { TabariumDB } from './db';
 import { INBOX_GROUPS, INBOX_SORTS } from './inbox';
+import { LANGUAGE_CHOICES } from '../i18n/locale';
 
 export const BOARD_VIEWS = ['card', 'compact', 'list', 'grid'] as const;
 export const BOARD_SORTS = ['custom', 'name-asc', 'name-desc', 'newest', 'oldest', 'most-tabs'] as const;
@@ -12,6 +13,8 @@ export const PALETTE_IDS = ['teal', 'ocean', 'forest', 'violet', 'rose', 'amber'
 
 export const SettingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
+  /** UI language; 'system' follows the browser language, English when it is not one we ship. */
+  language: z.enum(LANGUAGE_CHOICES).default('system'),
   /** Colour palette applied via the `data-palette` attribute; defaults to the original teal/orange. */
   palette: z.enum(PALETTE_IDS).default('teal'),
   autoBackup: z.object({
@@ -59,6 +62,7 @@ export type Settings = z.infer<typeof SettingsSchema>;
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
+  language: 'system',
   palette: 'teal',
   autoBackup: { enabled: false, intervalHours: 24 },
   lastBackupAt: null,

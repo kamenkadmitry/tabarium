@@ -1,0 +1,11 @@
+{
+  "appDescription": {
+    "message": "Lokalny menedżer kart i sesji. Bez konta i serwera."
+  },
+  "commandSaveTab": {
+    "message": "Zapisz bieżącą kartę w Tabarium"
+  },
+  "commandPalette": {
+    "message": "Otwórz paletę poleceń Tabarium"
+  }
+}

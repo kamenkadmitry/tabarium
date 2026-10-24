@@ -1,4 +1,6 @@
 import { FolderInput, Sparkles, X } from 'lucide-react';
+import { useT } from '../i18n/I18nProvider';
+import type { T } from '../i18n/messages';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import { dragSourceProps, linkDragProps } from './dnd';
 import { GROUP_COLORS, segmentTabs } from './openTabsModel';
@@ -7,9 +9,9 @@ import { TabPill } from './TabPill';
 const iconButton =
   'grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent';
 
-export function windowName(w: OpenWindow, index: number, total: number): string {
-  if (w.current) return total > 1 ? 'This window' : 'Open tabs';
-  return `Window ${index + 1}`;
+export function windowName(t: T, w: OpenWindow, index: number, total: number): string {
+  if (w.current) return total > 1 ? t('otp.windowName.thisWindow') : t('otp.windowName.openTabs');
+  return t('otp.windowName.n', { n: index + 1 });
 }
 
 interface Props {
@@ -31,29 +33,30 @@ interface Props {
 
 /** Browser windows as blocks, each with its tab groups and tab chips. Used by the library panel and the side panel. */
 export function TabsByWindow(props: Props) {
+  const t = useT();
   const { windows, selected } = props;
   return (
     <>
       {windows.map((w, index) => {
-        const name = windowName(w, index, windows.length);
+        const name = windowName(t, w, index, windows.length);
         return (
           <section key={w.id} aria-label={name} className="mb-5">
             <div className="flex items-center gap-1 px-2">
               <h3 className="flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted">{name}</h3>
               {props.onCloseWindow && !w.current && (
-                <button type="button" aria-label={`Close ${name}`} onClick={() => props.onCloseWindow?.(w.id)} className={`${iconButton} size-6`}>
+                <button type="button" aria-label={t('otp.closeWindow', { name })} onClick={() => props.onCloseWindow?.(w.id)} className={`${iconButton} size-6`}>
                   <X size={14} aria-hidden />
                 </button>
               )}
             </div>
             <div className="flex items-center gap-1 px-2 pb-1.5">
               <span className="flex-1 text-xs text-muted">
-                {w.tabs.length} tab{w.tabs.length === 1 ? '' : 's'}
+                {t.plural('count.tabs', w.tabs.length)}
               </span>
               {props.onSaveWindow && (
                 <button
                   type="button"
-                  aria-label={`Save ${name} as a collection`}
+                  aria-label={t('otp.saveWindow', { name })}
                   disabled={w.tabs.length === 0}
                   onClick={() => props.onSaveWindow?.(w, name)}
                   className={`${iconButton} size-7`}
@@ -64,7 +67,7 @@ export function TabsByWindow(props: Props) {
               {props.onOrganiseWindow && (
                 <button
                   type="button"
-                  aria-label={`Organise ${name} with AI`}
+                  aria-label={t('otp.organiseWindow', { name })}
                   disabled={w.tabs.length === 0}
                   onClick={() => props.onOrganiseWindow?.(w)}
                   className={`${iconButton} size-7`}
@@ -80,18 +83,18 @@ export function TabsByWindow(props: Props) {
                   <div
                     key={`${run.group?.id ?? 'none'}-${runIndex}`}
                     role={run.group ? 'group' : undefined}
-                    aria-label={run.group ? `Tab group ${run.group.title || 'untitled'}` : undefined}
+                    aria-label={run.group ? t('otp.groupAria', { title: run.group.title || t('org.untitled') }) : undefined}
                   >
                     {run.group && (
                       <div className="mb-1 flex items-center gap-2 px-2 pt-1">
                         <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
-                        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{run.group.title || 'Group'}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{run.group.title || t('org.group')}</span>
                         <span className="text-xs text-muted">{run.tabs.length}</span>
                         {props.onSaveGroup && (
                           <button
                             type="button"
-                            aria-label={`Save group ${run.group.title || 'untitled'} as a collection`}
-                            onClick={() => props.onSaveGroup?.(run.tabs, run.group?.title || 'Group')}
+                            aria-label={t('otp.saveGroup', { title: run.group.title || t('org.untitled') })}
+                            onClick={() => props.onSaveGroup?.(run.tabs, run.group?.title || t('org.group'))}
                             className={`${iconButton} size-6`}
                           >
                             <FolderInput size={13} aria-hidden />

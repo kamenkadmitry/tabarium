@@ -1,7 +1,9 @@
 import { ChevronDown, ChevronRight, ExternalLink, GripVertical, Link2, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Card, Collection, Tag } from '../core/types';
+import type { Card, Collection, Space, Tag } from '../core/types';
 import type { BoardView } from '../core/boardTypes';
+import { useT } from '../i18n/I18nProvider';
+import { displayCollectionName } from '../core/quicksave';
 import { CardRow, type CardDensity, type CardRowActions } from './CardRow';
 import { SWATCHES } from './colors';
 import { dragSourceProps, endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
@@ -42,6 +44,8 @@ export interface EditorSlot {
 }
 
 interface Props {
+  /** Owning space; identifies the system Inbox collection whose title is drawn from the catalogue. */
+  space?: Space;
   collection: Collection;
   cards: readonly Card[];
   tags: readonly Tag[];
@@ -56,6 +60,7 @@ interface Props {
 const menuItem = 'flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2';
 
 function CollectionMenu({ collection, actions, onClose }: { collection: Collection; actions: CollectionActions; onClose: () => void }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -78,34 +83,34 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
   return (
     <div ref={ref} role="menu" className="absolute right-3 top-12 z-10 w-56 rounded-xl border border-line bg-surface p-1">
       <button role="menuitem" type="button" onClick={run(actions.rename)} className={menuItem}>
-        <Pencil size={15} aria-hidden /> Rename
+        <Pencil size={15} aria-hidden /> {t('collection.rename')}
       </button>
       <button role="menuitem" type="button" onClick={run(actions.replaceWindow)} className={menuItem}>
-        <RefreshCw size={15} aria-hidden /> Replace window tabs
+        <RefreshCw size={15} aria-hidden /> {t('collection.replaceTabs')}
       </button>
       {actions.suggestName && (
         <button role="menuitem" type="button" onClick={run(actions.suggestName)} className={menuItem}>
-          <Sparkles size={15} aria-hidden /> Suggest name (AI)
+          <Sparkles size={15} aria-hidden /> {t('collection.suggestNameAI')}
         </button>
       )}
       {actions.suggestDetails && (
         <button role="menuitem" type="button" onClick={run(actions.suggestDetails)} className={menuItem}>
-          <Sparkles size={15} aria-hidden /> Fill details (AI)
+          <Sparkles size={15} aria-hidden /> {t('collection.fillDetailsAI')}
         </button>
       )}
       <button role="menuitem" type="button" onClick={run(actions.editTags)} className={menuItem}>
-        <TagIcon size={15} aria-hidden /> Tags…
+        <TagIcon size={15} aria-hidden /> {t('collection.tagsMenu')}
       </button>
       <div className="px-3 py-2">
         <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-muted">
-          <Palette size={13} aria-hidden /> Colour
+          <Palette size={13} aria-hidden /> {t('collection.colour')}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {SWATCHES.map((s) => (
             <button
               key={s.value}
               type="button"
-              aria-label={s.name}
+              aria-label={t(s.key)}
               aria-pressed={collection.color === s.value}
               onClick={run(() => actions.setColor(s.value))}
               className="size-6 rounded-full border-2 border-transparent aria-pressed:border-fg"
@@ -113,12 +118,12 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
             />
           ))}
           <button type="button" onClick={run(() => actions.setColor(null))} className="h-6 rounded-full border border-line px-2 text-xs">
-            None
+            {t('common.none')}
           </button>
         </div>
       </div>
       <button role="menuitem" type="button" onClick={run(actions.remove)} className={`${menuItem} text-danger`}>
-        <Trash2 size={15} aria-hidden /> Delete collection
+        <Trash2 size={15} aria-hidden /> {t('collection.delete')}
       </button>
     </div>
   );
@@ -127,9 +132,10 @@ function CollectionMenu({ collection, actions, onClose }: { collection: Collecti
 const DENSITY: Record<BoardView, CardDensity> = { grid: 'default', compact: 'compact', list: 'wide', card: 'tile' };
 
 function TagChips({ tags, className = '' }: { tags: readonly Tag[]; className?: string }) {
+  const t = useT();
   if (tags.length === 0) return null;
   return (
-    <ul className={`flex flex-wrap gap-1.5 ${className}`} aria-label="Tags">
+    <ul className={`flex flex-wrap gap-1.5 ${className}`} aria-label={t('label.tags')}>
       {tags.map((t) => (
         <li key={t.id} className="flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold">
           <span aria-hidden className="size-2 rounded-full" style={{ background: t.color }} />
@@ -140,7 +146,9 @@ function TagChips({ tags, className = '' }: { tags: readonly Tag[]; className?: 
   );
 }
 
-export function CollectionCard({ collection, cards, tags, actions, view, reorderable, editor, selection }: Props) {
+export function CollectionCard({ space, collection, cards, tags, actions, view, reorderable, editor, selection }: Props) {
+  const t = useT();
+  const cName = displayCollectionName(space, collection);
   const expanded = collection.expanded;
   const density = DENSITY[view];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -194,7 +202,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
 
   return (
     <section
-      aria-label={collection.title}
+      aria-label={cName}
       data-collection-id={collection.id}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
@@ -207,7 +215,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
       <header className="group/head relative flex items-center gap-2 border-b border-line px-3 py-3">
         <button
           type="button"
-          aria-label={expanded ? `Collapse ${collection.title}` : `Expand ${collection.title}`}
+          aria-label={expanded ? t('collection.collapse', { title: cName }) : t('collection.expand', { title: cName })}
           aria-expanded={expanded}
           onClick={actions.toggleExpanded}
           className="grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2"
@@ -217,7 +225,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
         {cards.length > 0 && (
           <input
             type="checkbox"
-            aria-label={`Select all links in ${collection.title}`}
+            aria-label={t('collection.selectAll', { title: cName })}
             checked={ticked === cards.length}
             ref={(el) => {
               if (el) el.indeterminate = ticked > 0 && ticked < cards.length;
@@ -229,18 +237,18 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
         {reorderable && (
           <span
             {...dragSourceProps({ type: 'collection', id: collection.id })}
-            aria-label="Drag collection"
+            aria-label={t('collection.drag')}
             className="grid size-7 shrink-0 cursor-grab place-items-center rounded-md text-muted hover:bg-surface-2"
           >
             <GripVertical size={16} aria-hidden />
           </span>
         )}
-        <h2 className={`min-w-0 truncate text-base font-bold ${view === 'list' ? '' : 'flex-1'}`}>{collection.title}</h2>
+        <h2 className={`min-w-0 truncate text-base font-bold ${view === 'list' ? '' : 'flex-1'}`}>{cName}</h2>
         {view === 'list' && <TagChips tags={tags} className="min-w-0 flex-1" />}
-        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">{cards.length}</span>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">{t.num(cards.length)}</span>
         <button
           type="button"
-          aria-label="Open all tabs"
+          aria-label={t('collection.openAll')}
           disabled={cards.length === 0}
           onClick={actions.openAll}
           className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-primary disabled:opacity-40"
@@ -249,7 +257,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
         </button>
         <button
           type="button"
-          aria-label="Collection menu"
+          aria-label={t('collection.menu')}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
           className="grid size-8 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
@@ -292,7 +300,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
       ) : (
         <div className={`px-4 py-5 text-center text-sm ${indicator === null ? 'text-primary' : 'text-muted'}`} data-empty-state>
           <Link2 size={20} aria-hidden className="mx-auto" />
-          <p className="mt-1.5">Empty. Add a link below, drop a tab here, or save your open tabs.</p>
+          <p className="mt-1.5">{t('collection.empty')}</p>
         </div>
       )}
       {expanded && (
@@ -301,7 +309,7 @@ export function CollectionCard({ collection, cards, tags, actions, view, reorder
             editor.render(null)
           ) : (
             <button type="button" onClick={actions.addLink} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-line text-sm font-semibold text-primary transition-colors duration-150 hover:bg-surface-2">
-              <Plus size={15} aria-hidden /> Add link
+              <Plus size={15} aria-hidden /> {t('collection.addLink')}
             </button>
           )}
         </footer>

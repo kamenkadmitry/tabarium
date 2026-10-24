@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { tr } from '../i18n/runtime';
 import { usePlatform } from '../platform/context';
 import type { OpenWindow } from '../platform/ports';
 
@@ -58,7 +59,7 @@ export function useOpenTabs(enabled: boolean) {
   const grant = useCallback(async () => {
     try {
       if (await platform.permissions.request('tabs')) setAccess('granted');
-      else setError('Tabarium needs the "tabs" permission to list your open tabs.');
+      else setError(tr()('err.needTabsForList'));
     } catch (e) {
       console.error('Tabarium: requesting the tabs permission failed', e);
       setError(e instanceof Error ? e.message : String(e));
@@ -71,7 +72,7 @@ export function useOpenTabs(enabled: boolean) {
       if (await platform.permissions.request('tabGroups')) {
         setGroupsAccess(true);
         await refresh();
-      } else setError('Tabarium needs the "tabGroups" permission to show browser tab groups.');
+      } else setError(tr()('err.needTabGroupsShow'));
     } catch (e) {
       console.error('Tabarium: requesting the tabGroups permission failed', e);
       setError(e instanceof Error ? e.message : String(e));

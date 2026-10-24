@@ -1,5 +1,6 @@
 import { Group, Kanban, PanelRightClose, Shrink } from 'lucide-react';
 import { useRef } from 'react';
+import { useT } from '../i18n/I18nProvider';
 import type { OpenTab, OpenWindow } from '../platform/ports';
 import { TabsByWindow } from './TabsByWindow';
 import type { TabsAccess } from './useOpenTabs';
@@ -43,6 +44,7 @@ export const PANEL_MAX_WIDTH = 640;
 const clampWidth = (w: number) => Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(w)));
 
 export function OpenTabsPanel(props: Props) {
+  const t = useT();
   const { windows, selected } = props;
   const dragging = useRef(false);
 
@@ -56,11 +58,11 @@ export function OpenTabsPanel(props: Props) {
   };
 
   return (
-    <aside aria-label="Open tabs" style={{ width: props.width }} className="relative hidden shrink-0 flex-col border-l border-line bg-surface lg:flex">
+    <aside aria-label={t('otp.aside')} style={{ width: props.width }} className="relative hidden shrink-0 flex-col border-l border-line bg-surface lg:flex">
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize the open tabs panel"
+        aria-label={t('otp.resize')}
         aria-valuemin={PANEL_MIN_WIDTH}
         aria-valuemax={PANEL_MAX_WIDTH}
         aria-valuenow={props.width}
@@ -82,18 +84,18 @@ export function OpenTabsPanel(props: Props) {
         className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize transition-colors duration-150 hover:bg-primary/30 focus-visible:bg-primary/40"
       />
       <header className="flex items-center gap-1 border-b border-line px-3 py-3">
-        <button type="button" aria-label="Hide open tabs" onClick={props.onHide} className={iconButton}>
+        <button type="button" aria-label={t('otp.hide')} onClick={props.onHide} className={iconButton}>
           <PanelRightClose size={17} aria-hidden />
         </button>
-        <h2 className="flex-1 text-sm font-bold">Open tabs</h2>
+        <h2 className="flex-1 text-sm font-bold">{t('otp.heading')}</h2>
         <button
           type="button"
           onClick={props.onExpand}
           className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
         >
-          <Kanban size={14} aria-hidden /> Groups Organizer
+          <Kanban size={14} aria-hidden /> {t('otp.organizer')}
         </button>
-        <button type="button" aria-label="Merge windows" disabled={windows.length < 2} onClick={props.onMerge} className={iconButton}>
+        <button type="button" aria-label={t('otp.merge')} disabled={windows.length < 2} onClick={props.onMerge} className={iconButton}>
           <Shrink size={17} aria-hidden />
         </button>
       </header>
@@ -101,24 +103,24 @@ export function OpenTabsPanel(props: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         {props.access === 'needed' && (
           <div className="px-2 py-6 text-center">
-            <p className="text-sm text-muted">Allow Tabarium to see your open tabs so you can drag them into collections.</p>
+            <p className="text-sm text-muted">{t('otp.permission')}</p>
             <button
               type="button"
               onClick={props.onGrant}
               className="mt-4 h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
             >
-              Show open tabs
+              {t('otp.show')}
             </button>
           </div>
         )}
-        {props.access === 'checking' && <p className="px-2 py-6 text-center text-sm text-muted">Checking access…</p>}
+        {props.access === 'checking' && <p className="px-2 py-6 text-center text-sm text-muted">{t('otp.checking')}</p>}
         {props.error && (
           <p role="alert" className="mx-2 mb-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-danger">
             {props.error}
           </p>
         )}
         {props.access === 'granted' && windows.length === 0 && (
-          <p className="px-2 py-6 text-center text-sm text-muted">No open tabs. Tabs you open will show up here.</p>
+          <p className="px-2 py-6 text-center text-sm text-muted">{t('otp.empty')}</p>
         )}
 
         {props.access === 'granted' && (
@@ -138,9 +140,9 @@ export function OpenTabsPanel(props: Props) {
       </div>
 
       {selected.size > 0 && (
-        <div role="region" aria-label="Selected tabs" className="flex flex-col gap-2 border-t border-line bg-surface-2 p-3">
+        <div role="region" aria-label={t('otp.selectedRegion')} className="flex flex-col gap-2 border-t border-line bg-surface-2 p-3">
           <p className="text-xs font-semibold">
-            {selected.size} tab{selected.size === 1 ? '' : 's'} selected
+            {t.plural('count.tabsSelected', selected.size)}
           </p>
           <div className="flex gap-2">
             <button
@@ -148,21 +150,21 @@ export function OpenTabsPanel(props: Props) {
               onClick={props.onAddSelected}
               className="h-9 flex-1 rounded-lg bg-primary text-xs font-bold text-primary-fg transition-opacity duration-150 hover:opacity-90"
             >
-              Add to collection
+              {t('otp.addToCollection')}
             </button>
             <button
               type="button"
               onClick={props.onGroupSelected}
               className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold transition-colors duration-150 hover:bg-surface"
             >
-              <Group size={13} aria-hidden /> Group
+              <Group size={13} aria-hidden /> {t('otp.group')}
             </button>
             <button
               type="button"
               onClick={props.onClearSelection}
               className="h-9 rounded-lg border border-line px-3 text-xs font-semibold transition-colors duration-150 hover:bg-surface"
             >
-              Deselect
+              {t('otp.deselect')}
             </button>
           </div>
         </div>
@@ -176,7 +178,7 @@ export function OpenTabsPanel(props: Props) {
             onChange={(e) => props.onAutoClose(e.target.checked)}
             className="size-3.5 accent-[var(--primary)]"
           />
-          Close tabs after adding them
+          {t('otp.closeAfter')}
         </label>
       </footer>
     </aside>

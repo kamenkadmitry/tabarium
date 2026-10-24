@@ -1,0 +1,11 @@
+{
+  "appDescription": {
+    "message": "Local-first tab and session manager. No account, no server."
+  },
+  "commandSaveTab": {
+    "message": "Save the current tab to Tabarium"
+  },
+  "commandPalette": {
+    "message": "Open the Tabarium command palette"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "appDescription": {
+    "message": "Локальный менеджер вкладок и сессий. Без аккаунта и сервера."
+  },
+  "commandSaveTab": {
+    "message": "Сохранить текущую вкладку в Tabarium"
+  },
+  "commandPalette": {
+    "message": "Открыть палитру команд Tabarium"
+  }
+}

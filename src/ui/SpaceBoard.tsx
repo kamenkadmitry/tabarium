@@ -1,13 +1,16 @@
 import { Funnel, Layers } from 'lucide-react';
 import { useState } from 'react';
 import type { BoardView } from '../core/boardTypes';
-import type { Card, Collection, Tag } from '../core/types';
+import type { Card, Collection, Space, Tag } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import { CollectionCard, type CollectionActions } from './CollectionCard';
 import { endDrag, getDragPayload, hasExternalLinks, LINKS_MIME } from './dnd';
 import { EmptyState } from './EmptyState';
 import type { CardSelection } from './useCardSelection';
 
 interface Props {
+  /** Space these collections belong to; drives the localized display name of the Inbox collection. */
+  space?: Space;
   collections: readonly Collection[];
   cardsByCollection: ReadonlyMap<string, Card[]>;
   tags: readonly Tag[];
@@ -37,6 +40,7 @@ const LAYOUT: Record<BoardView, string> = {
 
 /** Collections of one space plus the drop zone that turns dragged browser tabs into a new collection. */
 export function SpaceBoard(props: Props) {
+  const t = useT();
   const [over, setOver] = useState(false);
   const empty = props.collections.length === 0;
 
@@ -68,6 +72,7 @@ export function SpaceBoard(props: Props) {
             return (
               <CollectionCard
                 key={col.id}
+                space={props.space}
                 collection={col}
                 cards={list}
                 tags={props.tags.filter((t) => col.tagIds.includes(t.id))}
@@ -88,17 +93,17 @@ export function SpaceBoard(props: Props) {
 
       <div
         {...zone}
-        aria-label="Drop tabs here to create a collection"
+        aria-label={t('board.dropToCreate')}
         className={`mt-5 grid place-items-center rounded-2xl border-2 border-dashed px-6 text-center transition-colors duration-150 ${
           empty ? 'min-h-72' : 'min-h-24'
         } ${over ? 'border-primary bg-surface-2' : 'border-line'}`}
       >
         {empty && props.filtered ? (
-          <EmptyState icon={<Funnel />} title="No collection matches the current filter" hint="Clear a filter chip above to see everything again." />
+          <EmptyState icon={<Funnel />} title={t('board.emptyFilter.title')} hint={t('board.emptyFilter.hint')} />
         ) : empty ? (
-          <EmptyState icon={<Layers />} title="No collections yet" hint="Drag a tab here, or save tabs, to create your first collection." />
+          <EmptyState icon={<Layers />} title={t('board.empty.title')} hint={t('board.empty.hint')} />
         ) : (
-          <p className="text-sm text-muted">Drop tabs here to create a new collection</p>
+          <p className="text-sm text-muted">{t('board.dropToCreateNew')}</p>
         )}
       </div>
     </>

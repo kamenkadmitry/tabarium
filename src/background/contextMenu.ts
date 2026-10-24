@@ -2,6 +2,8 @@ import { browser } from 'wxt/browser';
 import { db } from '../core/instance';
 import { quickSave } from '../core/quicksave';
 import { loadSettings } from '../core/settings';
+import { resolveLocale } from '../i18n/locale';
+import { makeT } from '../i18n/messages';
 import { flashBadge } from './badge';
 
 const PAGE = 'tabarium-save-page';
@@ -16,12 +18,13 @@ async function hasTabsPermission(): Promise<boolean> {
 export async function syncContextMenu(): Promise<void> {
   if (!browser.contextMenus) return;
   await browser.contextMenus.removeAll();
-  const { contextMenu } = await loadSettings(db);
-  if (!contextMenu) return;
-  browser.contextMenus.create({ id: PAGE, title: 'Save page to Tabarium', contexts: ['page'] });
-  browser.contextMenus.create({ id: LINK, title: 'Save link to Tabarium', contexts: ['link'] });
+  const settings = await loadSettings(db);
+  if (!settings.contextMenu) return;
+  const t = makeT(resolveLocale(settings.language));
+  browser.contextMenus.create({ id: PAGE, title: t('contextMenu.savePage'), contexts: ['page'] });
+  browser.contextMenus.create({ id: LINK, title: t('contextMenu.saveLink'), contexts: ['link'] });
   if (await hasTabsPermission()) {
-    browser.contextMenus.create({ id: ALL, title: 'Save all tabs in this window to Tabarium', contexts: ['page'] });
+    browser.contextMenus.create({ id: ALL, title: t('contextMenu.saveAll'), contexts: ['page'] });
   }
 }
 

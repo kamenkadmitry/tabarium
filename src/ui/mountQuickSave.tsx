@@ -4,6 +4,8 @@ import { loadSettings } from '../core/settings';
 import { createChromePlatform } from '../platform/chrome';
 import { PlatformProvider } from '../platform/context';
 import { createDemoPlatform } from '../platform/demo';
+import { I18nProvider } from '../i18n/I18nProvider';
+import { setRuntimeLanguage } from '../i18n/runtime';
 import { DuplicateGuardProvider } from './DuplicateGuard';
 import { QuickSave } from './QuickSave';
 import { seedDemo } from './seed';
@@ -15,14 +17,17 @@ export async function mountQuickSave(surface: 'popup' | 'sidepanel'): Promise<vo
   if (!root) throw new Error('#root not found');
   const demo = new URLSearchParams(location.search).has('demo');
   if (demo) await seedDemo(db);
-  const { theme, palette } = await loadSettings(db);
+  const { theme, palette, language } = await loadSettings(db);
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.palette = palette;
+  setRuntimeLanguage(language);
   createRoot(root).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
-      <DuplicateGuardProvider>
-        <QuickSave surface={surface} />
-      </DuplicateGuardProvider>
+      <I18nProvider initial={language}>
+        <DuplicateGuardProvider>
+          <QuickSave surface={surface} />
+        </DuplicateGuardProvider>
+      </I18nProvider>
     </PlatformProvider>,
   );
 }

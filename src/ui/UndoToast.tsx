@@ -1,26 +1,28 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Deletion } from '../core/undo';
+import { useT } from '../i18n/I18nProvider';
+import type { T } from '../i18n/messages';
 
 /** How long the undo toast stays up before the delete becomes final. */
 const TOAST_MS = 8000;
 
-function label(d: Deletion): string {
+function label(t: T, d: Deletion): string {
   switch (d.kind) {
     case 'cards':
-      return d.cards.length === 1 ? 'Link deleted.' : `${d.cards.length} links deleted.`;
+      return d.cards.length === 1 ? t('undo.link') : t.plural('undo.links', d.cards.length);
     case 'collection':
-      return 'Collection deleted.';
+      return t('undo.collection');
     case 'space':
-      return 'Space deleted.';
+      return t('undo.space');
     case 'tag':
-      return 'Tag deleted.';
+      return t('undo.tag');
     case 'tags':
-      return `${d.tags.length} tags deleted.`;
+      return t.plural('undo.tags', d.tags.length);
     case 'hashtag':
-      return 'Hashtag deleted.';
+      return t('undo.hashtag');
     case 'hashtags':
-      return `${d.hashtags.length} hashtags deleted.`;
+      return t.plural('undo.hashtags', d.hashtags.length);
   }
 }
 
@@ -32,6 +34,7 @@ interface Props {
 
 /** The "Deleted. Undo" toast shown after a delete; closing it (or waiting it out) makes the delete final. */
 export function UndoToast({ deletion, onUndo, onDismiss }: Props) {
+  const t = useT();
   // Kept in a ref so a fresh onDismiss closure never restarts the countdown.
   const dismissRef = useRef(onDismiss);
   useEffect(() => {
@@ -81,7 +84,7 @@ export function UndoToast({ deletion, onUndo, onDismiss }: Props) {
   if (!deletion) return null;
   return (
     <div ref={ref} popover="manual" role="status" className="fixed left-1/2 top-4 m-0 flex -translate-x-1/2 items-center gap-4 overflow-hidden whitespace-nowrap rounded-xl bg-accent px-6 py-3 text-accent-fg shadow-lg">
-      <span className="text-sm font-bold">{label(deletion)}</span>
+      <span className="text-sm font-bold">{label(t, deletion)}</span>
       <span aria-hidden className="text-sm font-bold tabular-nums opacity-80">
         {Math.ceil(left / 1000)}s
       </span>
@@ -90,11 +93,11 @@ export function UndoToast({ deletion, onUndo, onDismiss }: Props) {
         onClick={() => onUndo(deletion)}
         className="rounded-md bg-white/25 px-3 py-1 text-sm font-bold transition-colors duration-150 hover:bg-white/35"
       >
-        Undo
+        {t('common.undo')}
       </button>
       <button
         type="button"
-        aria-label="Dismiss"
+        aria-label={t('common.dismiss')}
         onClick={onDismiss}
         className="grid size-7 place-items-center rounded-md transition-colors duration-150 hover:bg-white/25"
       >

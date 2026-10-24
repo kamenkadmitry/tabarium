@@ -1,6 +1,7 @@
 import { Hash, Search, Tag as TagIcon, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Card, Hashtag, Tag } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import { hostOf, PageFavicon } from './CardRow';
 import { SWATCHES } from './colors';
 import { inputClass } from './Dialog';
@@ -83,8 +84,9 @@ type TagFilter = 'all' | 'unused';
 
 /** Coloured tags: they can be put on collections and on links. */
 export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUnused }: TagsPageProps) {
+  const t = useT();
   const [title, setTitle] = useState('');
-  const [color, setColor] = useState<string>(SWATCHES[0].value);
+  const [color, setColor] = useState<string>(SWATCHES[0]!.value);
   const [colorFor, setColorFor] = useState<string | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
@@ -92,14 +94,14 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
   const [filter, setFilter] = useState<TagFilter>('all');
 
   const total = (id: string) => (usage.get(id)?.collections ?? 0) + (usage.get(id)?.links ?? 0);
-  const unused = tags.filter((t) => total(t.id) === 0);
+  const unused = tags.filter((tag) => total(tag.id) === 0);
   const shown = tags
-    .filter((t) => t.title.toLowerCase().includes(search.trim().toLowerCase()) && (filter === 'all' || total(t.id) === 0))
+    .filter((tag) => tag.title.toLowerCase().includes(search.trim().toLowerCase()) && (filter === 'all' || total(tag.id) === 0))
     .sort((a, b) => (sort === 'used' ? total(b.id) - total(a.id) : 0) || a.title.localeCompare(b.title));
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
-      <p className="text-sm text-muted">Coloured labels. Put them on collections (collection menu) and on links (when you edit a link).</p>
+      <p className="text-sm text-muted">{t('tags.intro')}</p>
       <form
         className={`${box} p-4`}
         onSubmit={(e) => {
@@ -109,21 +111,21 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
           setTitle('');
         }}
       >
-        <p className="mb-2 text-sm font-semibold">New tag</p>
+        <p className="mb-2 text-sm font-semibold">{t('tags.new')}</p>
         <div className="flex gap-2">
-          <input ref={nameInput} aria-label="Tag name" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tag name" className={inputClass} />
+          <input ref={nameInput} aria-label={t('tags.name')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('tags.name')} className={inputClass} />
           <button className={addButton} disabled={title.trim() === ''}>
-            Add
+            {t('common.add')}
           </button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="New tag colour">
+        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('tags.newColour')}>
           {SWATCHES.map((s) => (
             <button
               key={s.value}
               type="button"
               role="radio"
               aria-checked={color === s.value}
-              aria-label={s.name}
+              aria-label={t(s.key)}
               onClick={() => setColor(s.value)}
               className="size-7 rounded-full border-2 border-transparent aria-checked:border-fg"
               style={{ background: s.value }}
@@ -133,23 +135,23 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
       </form>
 
       <div className="flex flex-wrap items-center gap-3">
-        <SearchBox value={search} onChange={setSearch} label="Filter tags" />
+        <SearchBox value={search} onChange={setSearch} label={t('tags.filter')} />
         <Segmented
-          label="Sort tags"
+          label={t('tags.sort')}
           value={sort}
           onChange={setSort}
           options={[
-            { value: 'az', label: 'A–Z' },
-            { value: 'used', label: 'Most used' },
+            { value: 'az', label: t('common.az') },
+            { value: 'used', label: t('common.mostUsed') },
           ]}
         />
         <FilterChips
-          label="Show tags"
+          label={t('tags.show')}
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: 'All', count: tags.length },
-            { value: 'unused', label: 'Unused', count: unused.length },
+            { value: 'all', label: t('common.all'), count: tags.length },
+            { value: 'unused', label: t('common.unused'), count: unused.length },
           ]}
         />
         {unused.length > 0 && (
@@ -158,59 +160,59 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
             onClick={onDeleteUnused}
             className="ml-auto h-9 rounded-lg border border-line px-3 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-surface-2"
           >
-            Delete {unused.length} unused
+            {t.plural('tags.deleteUnused', unused.length)}
           </button>
         )}
       </div>
 
-      <ul aria-label="Tags" className={`${box} divide-y divide-line`}>
-        {shown.map((t) => {
-          const u = usage.get(t.id) ?? { collections: 0, links: 0 };
+      <ul aria-label={t('tags.list')} className={`${box} divide-y divide-line`}>
+        {shown.map((tag) => {
+          const u = usage.get(tag.id) ?? { collections: 0, links: 0 };
           return (
-            <li key={t.id} className="px-4 py-2">
+            <li key={tag.id} className="px-4 py-2">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  aria-label={`Change colour of ${t.title}`}
-                  aria-expanded={colorFor === t.id}
-                  onClick={() => setColorFor(colorFor === t.id ? null : t.id)}
+                  aria-label={t('tags.changeColour', { title: tag.title })}
+                  aria-expanded={colorFor === tag.id}
+                  onClick={() => setColorFor(colorFor === tag.id ? null : tag.id)}
                   className="size-5 shrink-0 rounded-full"
-                  style={{ background: t.color }}
+                  style={{ background: tag.color }}
                 />
                 <input
-                  aria-label={`Name of tag ${t.title}`}
-                  key={t.title}
-                  defaultValue={t.title}
+                  aria-label={t('tags.nameOf', { title: tag.title })}
+                  key={tag.title}
+                  defaultValue={tag.title}
                   onBlur={(e) => {
                     const next = e.target.value.trim();
-                    if (next !== '' && next !== t.title) onUpdate(t.id, { title: next });
-                    else e.target.value = t.title;
+                    if (next !== '' && next !== tag.title) onUpdate(tag.id, { title: next });
+                    else e.target.value = tag.title;
                   }}
                   className="h-10 min-w-0 flex-1 rounded-md bg-transparent px-2 text-sm font-medium hover:bg-surface-2 focus:bg-surface-2"
                 />
                 <span className="hidden shrink-0 text-xs text-muted sm:block">
-                  {u.collections} collection{u.collections === 1 ? '' : 's'} · {u.links} link{u.links === 1 ? '' : 's'}
+                  {t('tags.usage', { collections: t.plural('count.collections', u.collections), links: t.plural('count.links', u.links) })}
                 </span>
                 <button
                   type="button"
-                  aria-label={`Delete tag ${t.title}`}
-                  onClick={() => onDelete(t.id)}
+                  aria-label={t('tags.deleteTag', { title: tag.title })}
+                  onClick={() => onDelete(tag.id)}
                   className={trash}
                 >
                   <Trash2 size={15} aria-hidden />
                 </button>
               </div>
-              {colorFor === t.id && (
-                <div className="flex flex-wrap gap-2 pb-2 pl-8 pt-1" role="radiogroup" aria-label={`Colour of ${t.title}`}>
+              {colorFor === tag.id && (
+                <div className="flex flex-wrap gap-2 pb-2 pl-8 pt-1" role="radiogroup" aria-label={t('tags.colourOf', { title: tag.title })}>
                   {SWATCHES.map((s) => (
                     <button
                       key={s.value}
                       type="button"
                       role="radio"
-                      aria-checked={t.color === s.value}
-                      aria-label={s.name}
+                      aria-checked={tag.color === s.value}
+                      aria-label={t(s.key)}
                       onClick={() => {
-                        onUpdate(t.id, { color: s.value });
+                        onUpdate(tag.id, { color: s.value });
                         setColorFor(null);
                       }}
                       className="size-6 rounded-full border-2 border-transparent aria-checked:border-fg"
@@ -227,17 +229,17 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
             <li>
               <EmptyState
                 icon={<TagIcon />}
-                title="No tags yet"
-                hint="Tags are coloured labels you can put on collections and on links."
+                title={t('tags.empty.title')}
+                hint={t('tags.empty.hint')}
                 action={
                   <button type="button" className={emptyAction} onClick={() => nameInput.current?.focus()}>
-                    New tag
+                    {t('tags.new')}
                   </button>
                 }
               />
             </li>
           ) : (
-            <li className="p-6 text-center text-sm text-muted">No tag matches.</li>
+            <li className="p-6 text-center text-sm text-muted">{t('tags.noMatch')}</li>
           ))}
       </ul>
     </div>
@@ -266,6 +268,7 @@ const PREVIEW = 8;
 
 /** Free-form #hashtags for links. Built for hundreds of them: letter groups, counts, search, a side panel per hashtag. */
 export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDelete, onMerge, onRemoveFrom, onDeleteUnused }: HashtagsPageProps) {
+  const t = useT();
   const [name, setName] = useState('');
   const nameInput = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
@@ -306,7 +309,7 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="max-w-3xl text-sm text-muted">Quick topic labels for links, like #rust or #to-read. No colours, no limit.</p>
+      <p className="max-w-3xl text-sm text-muted">{t('hashtags.intro')}</p>
       <form
         className="flex max-w-xl gap-2"
         onSubmit={(e) => {
@@ -316,32 +319,32 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
           setName('');
         }}
       >
-        <input ref={nameInput} aria-label="Hashtag name" value={name} onChange={(e) => setName(e.target.value)} placeholder="New hashtag, e.g. #to-read" className={inputClass} />
+        <input ref={nameInput} aria-label={t('hashtags.name')} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('hashtags.new')} className={inputClass} />
         <button className={addButton} disabled={name.trim() === ''}>
-          Add
+          {t('common.add')}
         </button>
       </form>
 
       <div className="flex flex-wrap items-center gap-3">
-        <SearchBox value={search} onChange={setSearch} label="Filter hashtags" />
+        <SearchBox value={search} onChange={setSearch} label={t('hashtags.filter')} />
         <Segmented
-          label="Sort hashtags"
+          label={t('hashtags.sort')}
           value={sort}
           onChange={setSort}
           options={[
-            { value: 'az', label: 'A–Z' },
-            { value: 'used', label: 'Most used' },
-            { value: 'newest', label: 'Newest' },
+            { value: 'az', label: t('common.az') },
+            { value: 'used', label: t('common.mostUsed') },
+            { value: 'newest', label: t('common.newest') },
           ]}
         />
         <FilterChips
-          label="Show hashtags"
+          label={t('hashtags.show')}
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: 'All', count: hashtags.length },
-            { value: 'once', label: 'Used once', count: once.length },
-            { value: 'unused', label: 'Unused', count: unused.length },
+            { value: 'all', label: t('common.all'), count: hashtags.length },
+            { value: 'once', label: t('common.usedOnce'), count: once.length },
+            { value: 'unused', label: t('common.unused'), count: unused.length },
           ]}
         />
         {unused.length > 0 && (
@@ -350,13 +353,13 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
             onClick={onDeleteUnused}
             className="ml-auto h-9 rounded-lg border border-line px-3 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-surface-2"
           >
-            Delete {unused.length} unused
+            {t.plural('hashtags.deleteUnused', unused.length)}
           </button>
         )}
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <div aria-label="Hashtags" role="group" className="min-w-0 flex-1">
+        <div aria-label={t('hashtags.list')} role="group" className="min-w-0 flex-1">
           {[...groups].map(([letter, list]) => (
             <div key={letter} className="mb-3 flex gap-3">
               {letter !== '' && <h3 className="w-5 shrink-0 pt-1.5 text-sm font-extrabold text-muted">{letter}</h3>}
@@ -383,35 +386,35 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
             (hashtags.length === 0 ? (
               <EmptyState
                 icon={<Hash />}
-                title="No hashtags yet"
-                hint="Hashtags are quick topic labels for links, like #rust or #to-read."
+                title={t('hashtags.empty.title')}
+                hint={t('hashtags.empty.hint')}
                 action={
                   <button type="button" className={emptyAction} onClick={() => nameInput.current?.focus()}>
-                    New hashtag
+                    {t('hashtags.newAction')}
                   </button>
                 }
               />
             ) : (
-              <p className="py-6 text-sm text-muted">No hashtag matches.</p>
+              <p className="py-6 text-sm text-muted">{t('hashtags.noMatch')}</p>
             ))}
         </div>
 
         {selected && (
-          <aside aria-label={`Hashtag ${selected.name}`} className={`${box} w-full shrink-0 p-4 lg:sticky lg:top-0 lg:w-[22rem]`}>
+          <aside aria-label={t('hashtags.aside', { name: selected.name })} className={`${box} w-full shrink-0 p-4 lg:sticky lg:top-0 lg:w-[22rem]`}>
             <div className="mb-3 flex items-center gap-2">
               <span className="flex-1 truncate text-xl font-extrabold text-primary">#{selected.name}</span>
               <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-bold text-muted">
-                {links.length} link{links.length === 1 ? '' : 's'}
+                {t.plural('count.links', links.length)}
               </span>
-              <button type="button" aria-label="Close hashtag panel" onClick={() => setSelectedId(null)} className="grid size-8 place-items-center rounded-md text-muted hover:text-fg">
+              <button type="button" aria-label={t('hashtags.closePanel')} onClick={() => setSelectedId(null)} className="grid size-8 place-items-center rounded-md text-muted hover:text-fg">
                 <X size={16} aria-hidden />
               </button>
             </div>
             <label className="mb-3 block">
-              <span className="mb-1.5 block text-xs font-semibold text-muted">Name</span>
+              <span className="mb-1.5 block text-xs font-semibold text-muted">{t('hashtags.nameField')}</span>
               <input
                 key={selected.name}
-                aria-label={`Name of hashtag ${selected.name}`}
+                aria-label={t('hashtags.nameOf', { name: selected.name })}
                 defaultValue={selected.name}
                 onBlur={(e) => {
                   const next = e.target.value.trim();
@@ -423,12 +426,12 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
             </label>
             <div className="mb-4 flex gap-2">
               <select
-                aria-label="Merge into"
+                aria-label={t('hashtags.mergeInto')}
                 value={mergeInto}
                 onChange={(e) => setMergeInto(e.target.value)}
                 className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-bg px-2 text-sm"
               >
-                <option value="">Merge into…</option>
+                <option value="">{t('hashtags.mergeIntoOption')}</option>
                 {hashtags
                   .filter((h) => h.id !== selected.id)
                   .map((h) => (
@@ -450,11 +453,11 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                 }}
                 className="h-10 rounded-lg border border-line px-3 text-sm font-semibold hover:bg-surface-2 disabled:opacity-50"
               >
-                Merge
+                {t('hashtags.merge')}
               </button>
               <button
                 type="button"
-                aria-label={`Delete hashtag ${selected.name}`}
+                aria-label={t('hashtags.delete', { name: selected.name })}
                 onClick={() => {
                   onDelete(selected.id);
                   setSelectedId(null);
@@ -464,8 +467,8 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                 <Trash2 size={15} aria-hidden />
               </button>
             </div>
-            <p className="mb-1 text-xs font-semibold text-muted">Links with this hashtag</p>
-            <ul aria-label="Links with this hashtag">
+            <p className="mb-1 text-xs font-semibold text-muted">{t('hashtags.linksWith')}</p>
+            <ul aria-label={t('hashtags.linksWith')}>
               {(showAll ? links : links.slice(0, PREVIEW)).map((c) => (
                 <li key={c.id} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-surface-2">
                   <PageFavicon url={c.url} favIconUrl={c.favIconUrl} size={18} />
@@ -475,7 +478,7 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                   </a>
                   <button
                     type="button"
-                    aria-label={`Remove #${selected.name} from ${c.customTitle ?? c.title}`}
+                    aria-label={t('hashtags.removeFrom', { name: selected.name, title: c.customTitle ?? c.title })}
                     onClick={() => onRemoveFrom(c, selected.id)}
                     className="grid size-7 place-items-center rounded-md text-muted hover:text-danger"
                   >
@@ -483,11 +486,11 @@ export function HashtagsPage({ hashtags, cards, usage, onCreate, onRename, onDel
                   </button>
                 </li>
               ))}
-              {links.length === 0 && <li className="py-2 text-sm text-muted">No links use it yet.</li>}
+              {links.length === 0 && <li className="py-2 text-sm text-muted">{t('hashtags.noLinks')}</li>}
             </ul>
             {links.length > PREVIEW && (
               <button type="button" onClick={() => setShowAll(!showAll)} className="mt-2 text-sm font-semibold text-primary">
-                {showAll ? 'Show fewer' : `Show all ${links.length}`}
+                {showAll ? t('hashtags.showFewer') : t('hashtags.showAll', { n: links.length })}
               </button>
             )}
           </aside>

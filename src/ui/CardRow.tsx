@@ -1,6 +1,7 @@
 import { ArrowRightLeft, Inbox, NotebookText, Pencil, Star, Trash2 } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
 import type { Card } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import { dragSourceProps } from './dnd';
 import { CardLabels } from './labels';
 
@@ -84,6 +85,7 @@ const BOX: Record<CardDensity, string> = {
 };
 
 export function CardRow({ card, dropAbove, draggable = true, density = 'default', editing = false, selected = false, selectionActive = false, onSelect, meta, rowProps, ...actions }: Props) {
+  const t = useT();
   const title = card.customTitle ?? card.title;
   const tile = density === 'tile';
   return (
@@ -109,7 +111,7 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
           <input
             type="checkbox"
             checked={selected}
-            aria-label={`Select ${title}`}
+            aria-label={t('card.select', { title })}
             // The click carries the Shift key; the change event does not, so the click does the work.
             onClick={(e) => onSelect(e.shiftKey)}
             onChange={() => undefined}
@@ -133,29 +135,29 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
         {density === 'compact' && <CardLabels card={card} variant="dots" />}
         {density === 'wide' && <CardLabels card={card} limitHashtags={2} className="hidden w-56 shrink-0 justify-end sm:flex" onChipClick={actions.onFilterLabel} />}
         {density === 'wide' && <span className="hidden max-w-[30%] shrink-0 truncate text-xs text-muted sm:block">{hostOf(card.url)}</span>}
-        {card.note && !tile && <NotebookText size={14} aria-label="Has a note" className="shrink-0 text-muted" />}
-        {card.starred && !tile && <Star size={14} aria-label="Starred" className="shrink-0 text-accent" fill="currentColor" />}
+        {card.note && !tile && <NotebookText size={14} aria-label={t('card.hasNote')} className="shrink-0 text-muted" />}
+        {card.starred && !tile && <Star size={14} aria-label={t('card.starred')} className="shrink-0 text-accent" fill="currentColor" />}
       </a>
       <div
         className={`pointer-events-none absolute flex items-center gap-0.5 rounded-lg bg-surface-2 pl-1 opacity-0 transition-opacity duration-150 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 ${
           tile ? 'right-1 top-1' : 'inset-y-0 right-1'
         }`}
       >
-        <button type="button" aria-label="Edit tab and note" onClick={actions.onEdit} className={`${iconButton} hover:text-primary`}>
+        <button type="button" aria-label={t('card.edit')} onClick={actions.onEdit} className={`${iconButton} hover:text-primary`}>
           <Pencil size={15} aria-hidden />
         </button>
         {actions.onInbox && (
-          <button type="button" aria-label="Move to Inbox" onClick={actions.onInbox} className={`${iconButton} hover:text-primary`}>
+          <button type="button" aria-label={t('card.toInbox')} onClick={actions.onInbox} className={`${iconButton} hover:text-primary`}>
             <Inbox size={15} aria-hidden />
           </button>
         )}
-        <button type="button" aria-label="Move to another collection" onClick={actions.onMove} className={`${iconButton} hover:text-primary`}>
+        <button type="button" aria-label={t('card.move')} onClick={actions.onMove} className={`${iconButton} hover:text-primary`}>
           <ArrowRightLeft size={15} aria-hidden />
         </button>
-        <button type="button" aria-label={card.starred ? 'Remove star' : 'Star tab'} onClick={actions.onToggleStar} className={`${iconButton} hover:text-accent`}>
+        <button type="button" aria-label={card.starred ? t('card.unstar') : t('card.star')} onClick={actions.onToggleStar} className={`${iconButton} hover:text-accent`}>
           <Star size={15} aria-hidden fill={card.starred ? 'currentColor' : 'none'} />
         </button>
-        <button type="button" aria-label="Delete tab" onClick={actions.onDelete} className={`${iconButton} hover:text-danger`}>
+        <button type="button" aria-label={t('card.delete')} onClick={actions.onDelete} className={`${iconButton} hover:text-danger`}>
           <Trash2 size={15} aria-hidden />
         </button>
       </div>

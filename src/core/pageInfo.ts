@@ -1,3 +1,5 @@
+import { tr } from '../i18n/runtime';
+
 /** What a page says about itself: its description and its first heading. */
 export interface PageInfo {
   description: string | null;
@@ -69,16 +71,16 @@ export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
  * Throws when the page cannot be loaded or is not HTML; the caller decides what to do about it.
  */
 export async function fetchPageInfo(url: string, fetchImpl: FetchLike = (u, i) => fetch(u, i)): Promise<PageInfo> {
-  if (!/^https?:\/\//.test(url)) throw new Error('Only http and https pages can be read');
+  if (!/^https?:\/\//.test(url)) throw new Error(tr()('err.pageNotWeb'));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetchImpl(url, { signal: controller.signal, redirect: 'follow', credentials: 'omit', headers: { accept: 'text/html,application/xhtml+xml' } });
-    if (!response.ok) throw new Error(`The page answered ${response.status}`);
+    if (!response.ok) throw new Error(tr()('err.pageAnswered', { status: response.status }));
     const type = response.headers.get('content-type');
-    if (type !== null && !/html/i.test(type)) throw new Error('The address is not a web page');
+    if (type !== null && !/html/i.test(type)) throw new Error(tr()('err.pageNotHtml'));
     const reader = response.body?.getReader();
-    if (!reader) throw new Error('The page sent nothing');
+    if (!reader) throw new Error(tr()('err.pageEmpty'));
     const chunks: Uint8Array[] = [];
     let size = 0;
     while (size < MAX_BYTES) {

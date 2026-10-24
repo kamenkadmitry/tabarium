@@ -15,6 +15,8 @@ import { UndoToast } from '../UndoToast';
 import { cardPatch } from '../linkInput';
 import { useActiveTab } from './useActiveTab';
 import { type Destination, DestinationPicker } from './DestinationPicker';
+import { useT } from '../../i18n/I18nProvider';
+import { tr } from '../../i18n/runtime';
 
 interface Props {
   /** Spaces a link can be moved to: every space except the Inbox. */
@@ -33,6 +35,7 @@ interface Props {
  * here changes there at once, and the other way round. Moving a link out or removing it takes it off the list.
  */
 export function InboxView({ spaces, collections, cardsByCollection, items, labels, onStatus }: Props) {
+  const t = useT();
   const platform = usePlatform();
   const guard = useDuplicateGuard();
   const { hasAccess, allow } = useActiveTab();
@@ -48,26 +51,26 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
       onStatus({ tone: 'ok', text: await action() });
     } catch (e) {
       console.error(`Tabarium: ${what} failed`, e);
-      onStatus({ tone: 'error', text: `${what} failed: ${e instanceof Error ? e.message : String(e)}` });
+      onStatus({ tone: 'error', text: t('error.failed', { what, error: e instanceof Error ? e.message : String(e) }) });
     } finally {
       setBusy(false);
     }
   };
 
   const addCurrent = () =>
-    run('Adding to Inbox', async () => {
+    run(t('run.addingToInbox'), async () => {
       // Without the "tabs" permission the address of the current tab is hidden; ask first (this runs from a click).
-      if (!hasAccess && !(await allow())) throw new Error('Tabarium needs the "tabs" permission to see which page you are on.');
+      if (!hasAccess && !(await allow())) throw new Error(tr()('err.needTabsForActive'));
       const tab = await platform.tabs.getActiveTab();
-      if (!tab) throw new Error('This page cannot be saved (only http and https pages can).');
+      if (!tab) throw new Error(tr()('err.notWebPage'));
       const approved = await guard([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
-      if (!approved) return 'Not added: the link is already in your library.';
+      if (!approved) return t('qv.notAdded');
       const added = await saveToInbox(db, approved);
-      return added > 0 ? 'Added to Inbox.' : 'Already in Inbox.';
+      return added > 0 ? t('qv.added') : t('qv.alreadyInbox');
     });
 
   const moveTo = (card: Card, dest: Destination) =>
-    run('Moving the link', async () => {
+    run(t('run.movingLink'), async () => {
       const targetId = dest.kind === 'collection' ? dest.collectionId : (await repo.createCollection(dest.spaceId, dest.title)).id;
       const key = normalizeUrl(card.url);
       const already = (cardsByCollection.get(targetId) ?? []).some((c) => normalizeUrl(c.url) === key);
@@ -75,17 +78,17 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
         // The link is already there: only take it out of the Inbox instead of creating a second copy.
         setUndo(await repo.deleteCard(card.id, 'duplicate'));
         setMoving(null);
-        return `Already in ${dest.label}. Removed from Inbox.`;
+        return t('qv.alreadyIn', { dest: dest.label });
       }
       await repo.moveCard(card.id, targetId);
       setMoving(null);
-      return `Moved to ${dest.label}.`;
+      return t('qv.moved', { dest: dest.label });
     });
 
   const remove = (card: Card) => {
-    void run('Removing the link', async () => {
+    void run(t('run.removingLink'), async () => {
       setUndo(await repo.deleteCard(card.id));
-      return 'Removed from Inbox.';
+      return t('qv.removed');
     });
   };
 
@@ -97,21 +100,21 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
         onClick={() => void addCurrent()}
         className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent text-sm font-bold text-accent-fg transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
       >
-        <Inbox size={16} aria-hidden /> Add this tab to Inbox
+        <Inbox size={16} aria-hidden /> {t('qv.addToInbox')}
       </button>
 
       {moving ? (
-        <section aria-label={`Move ${moving.customTitle ?? moving.title}`} className="min-h-0 flex-1 overflow-y-auto">
+        <section aria-label={t('qv.moveSection', { title: moving.customTitle ?? moving.title })} className="min-h-0 flex-1 overflow-y-auto">
           <p className="mb-1 flex items-center justify-between px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-            <span className="truncate">Move “{moving.customTitle ?? moving.title}” to</span>
+            <span className="truncate">{t('qv.moveTo', { title: moving.customTitle ?? moving.title })}</span>
             <button type="button" className="shrink-0 text-primary" onClick={() => setMoving(null)}>
-              Cancel
+              {t('common.cancel')}
             </button>
           </p>
           <DestinationPicker spaces={spaces} collections={collections} cardsByCollection={cardsByCollection} query="" onPick={(d) => void moveTo(moving, d)} />
         </section>
       ) : (
-        <ul aria-label="Inbox" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        <ul aria-label={t('qv.inbox')} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {items.map((card) => {
             const title = card.customTitle ?? card.title;
             return (
@@ -127,7 +130,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
                   </a>
                   <button
                     type="button"
-                    aria-label={`Edit ${title}`}
+                    aria-label={t('qv.edit', { title })}
                     disabled={busy}
                     onClick={() => setEditingId(editingId === card.id ? null : card.id)}
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-bg hover:text-primary"
@@ -136,7 +139,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
                   </button>
                   <button
                     type="button"
-                    aria-label={`Move ${title} out of Inbox`}
+                    aria-label={t('qv.moveOut', { title })}
                     disabled={busy}
                     onClick={() => setMoving(card)}
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-bg hover:text-primary"
@@ -145,7 +148,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
                   </button>
                   <button
                     type="button"
-                    aria-label={`Remove ${title} from Inbox`}
+                    aria-label={t('qv.remove', { title })}
                     disabled={busy}
                     onClick={() => remove(card)}
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-bg hover:text-danger"
@@ -168,7 +171,7 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
                           return true;
                         } catch (e) {
                           console.error('Tabarium: saving the link failed', e);
-                          onStatus({ tone: 'error', text: `Saving the link failed: ${e instanceof Error ? e.message : String(e)}` });
+                          onStatus({ tone: 'error', text: t('qv.saveFailed', { error: e instanceof Error ? e.message : String(e) }) });
                           return false;
                         }
                       }}
@@ -179,16 +182,16 @@ export function InboxView({ spaces, collections, cardsByCollection, items, label
               </li>
             );
           })}
-          {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">Inbox is empty. Tabs you add here wait until you sort them into a collection.</li>}
+          {items.length === 0 && <li className="px-3 py-6 text-center text-sm text-muted">{t('qv.empty')}</li>}
         </ul>
       )}
       <UndoToast
         deletion={undo}
         onUndo={(deletion) =>
-          void run('Restoring', async () => {
+          void run(t('run.restoring'), async () => {
             setUndo(null);
             await repo.restoreDeletion(deletion);
-            return 'Restored.';
+            return t('qv.restored');
           })
         }
         onDismiss={() => setUndo(null)}

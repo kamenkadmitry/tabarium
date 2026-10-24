@@ -10,6 +10,7 @@ import { linkDragProps } from '../dnd';
 import { inputClass } from '../Dialog';
 import { type Destination, DestinationPicker } from './DestinationPicker';
 import { useActiveTab } from './useActiveTab';
+import { useT } from '../../i18n/I18nProvider';
 
 interface Props {
   spaces: readonly Space[];
@@ -22,6 +23,7 @@ interface Props {
 
 /** "Saving this tab" card plus a space/collection picker: choosing a collection saves the tab there. */
 export function SaveTabView({ spaces, collections, cardsByCollection, autoClose, onAutoClose, onStatus }: Props) {
+  const t = useT();
   const platform = usePlatform();
   const guard = useDuplicateGuard();
   const { tab, hasAccess: hasTabsAccess, error: tabError, allow } = useActiveTab();
@@ -30,7 +32,7 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
 
   const allowTabAccess = async () => {
     try {
-      if (!(await allow())) onStatus({ tone: 'error', text: 'Tabarium needs the "tabs" permission to follow the tab you are on.' });
+      if (!(await allow())) onStatus({ tone: 'error', text: t('err.needTabsForFollow') });
     } catch (e) {
       console.error('Tabarium: requesting the tabs permission failed', e);
       onStatus({ tone: 'error', text: e instanceof Error ? e.message : String(e) });
@@ -39,7 +41,7 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
 
   const save = async (dest: Destination) => {
     if (!tab) {
-      onStatus({ tone: 'error', text: 'Open a web page (http or https) to save it.' });
+      onStatus({ tone: 'error', text: t('err.openWebPage') });
       return;
     }
     setBusy(true);
@@ -49,16 +51,16 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
         dest.kind === 'collection' ? dest.collectionId : (await repo.createCollection(dest.spaceId, dest.title)).id;
       const approved = await guard([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]);
       if (!approved) {
-        onStatus({ tone: 'ok', text: 'Not saved: the link is already in your library.' });
+        onStatus({ tone: 'ok', text: t('save.notSaved') });
         return;
       }
       const added = await repo.addCards(collectionId, approved);
       await setQuickTarget(db, collectionId);
       if (autoClose && added.length > 0) await platform.tabs.closeTabs([tab.id]);
-      onStatus({ tone: 'ok', text: added.length > 0 ? `Saved to ${dest.label}.` : `Already in ${dest.label}.` });
+      onStatus({ tone: 'ok', text: added.length > 0 ? t('save.savedTo', { dest: dest.label }) : t('save.alreadyIn', { dest: dest.label }) });
     } catch (e) {
       console.error('Tabarium: saving the tab failed', e);
-      onStatus({ tone: 'error', text: `Saving the tab failed: ${e instanceof Error ? e.message : String(e)}` });
+      onStatus({ tone: 'error', text: t('save.failed', { error: e instanceof Error ? e.message : String(e) }) });
     } finally {
       setBusy(false);
     }
@@ -67,24 +69,24 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <label className="relative block shrink-0">
-        <span className="sr-only">Search collections</span>
+        <span className="sr-only">{t('save.search')}</span>
         <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search collections" className={`${inputClass} pl-9`} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('save.search')} className={`${inputClass} pl-9`} />
       </label>
 
-      <section aria-label="Saving this tab" className="shrink-0">
-        <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">Saving this tab</p>
+      <section aria-label={t('save.heading')} className="shrink-0">
+        <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">{t('save.heading')}</p>
         <div
           className="rounded-xl border border-line bg-surface px-3 py-2.5"
-          {...(tab ? { ...linkDragProps([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]), title: 'Drag into the library to save it there' } : {})}
+          {...(tab ? { ...linkDragProps([{ title: tab.title, url: tab.url, favIconUrl: tab.favIconUrl }]), title: t('save.dragHint') } : {})}
         >
-          {tab === undefined && <p className="text-sm text-muted">Reading the current tab…</p>}
+          {tab === undefined && <p className="text-sm text-muted">{t('save.reading')}</p>}
           {tab === null && (
             <div className="text-sm text-muted">
-              <p>{tabError ?? 'This page cannot be saved (only http and https pages can).'}</p>
+              <p>{tabError ?? t('err.notWebPage')}</p>
               {!hasTabsAccess && (
                 <button type="button" onClick={() => void allowTabAccess()} className="mt-2 font-semibold text-primary underline">
-                  Allow Tabarium to follow the tab you are on
+                  {t('save.allow')}
                 </button>
               )}
             </div>
@@ -111,7 +113,7 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
 
       <label className="flex min-h-9 shrink-0 items-center gap-2 px-1 text-sm">
         <input type="checkbox" checked={autoClose} onChange={(e) => onAutoClose(e.target.checked)} className="size-4 accent-[var(--primary)]" />
-        Close the tab after saving
+        {t('save.closeAfter')}
       </label>
     </div>
   );

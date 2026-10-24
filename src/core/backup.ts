@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tr } from '../i18n/runtime';
 import type { TabariumDB } from './db';
 import {
   ActivitySchema,
@@ -50,9 +51,7 @@ export async function exportBackup(db: TabariumDB): Promise<Backup> {
 export function parseBackup(json: string): Backup {
   const backup = BackupSchema.parse(JSON.parse(json));
   if (backup.schemaVersion > SCHEMA_VERSION) {
-    throw new Error(
-      `Backup schema v${backup.schemaVersion} is newer than supported v${SCHEMA_VERSION}; update the extension`,
-    );
+    throw new Error(tr()('err.backupTooNew', { version: backup.schemaVersion, supported: SCHEMA_VERSION }));
   }
   assertReferentialIntegrity(backup);
   return backup;
@@ -64,17 +63,17 @@ function assertReferentialIntegrity(b: Backup): void {
   const tags = new Set(b.tags.map((t) => t.id));
   const hashtags = new Set(b.hashtags.map((h) => h.id));
   for (const c of b.collections) {
-    if (!spaces.has(c.spaceId)) throw new Error(`Collection ${c.id} references missing space ${c.spaceId}`);
+    if (!spaces.has(c.spaceId)) throw new Error(tr()('err.backupSpaceRef', { id: c.id, spaceId: c.spaceId }));
     for (const t of c.tagIds) {
-      if (!tags.has(t)) throw new Error(`Collection ${c.id} references missing tag ${t}`);
+      if (!tags.has(t)) throw new Error(tr()('err.backupTagRef', { id: c.id, tagId: t }));
     }
   }
   for (const c of b.cards) {
     if (!collections.has(c.collectionId)) {
-      throw new Error(`Card ${c.id} references missing collection ${c.collectionId}`);
+      throw new Error(tr()('err.backupCardRef', { id: c.id, collectionId: c.collectionId }));
     }
-    for (const t of c.tagIds) if (!tags.has(t)) throw new Error(`Card ${c.id} references missing tag ${t}`);
-    for (const h of c.hashtagIds) if (!hashtags.has(h)) throw new Error(`Card ${c.id} references missing hashtag ${h}`);
+    for (const t of c.tagIds) if (!tags.has(t)) throw new Error(tr()('err.backupCardTagRef', { id: c.id, tagId: t }));
+    for (const h of c.hashtagIds) if (!hashtags.has(h)) throw new Error(tr()('err.backupCardHashtagRef', { id: c.id, hashtagId: h }));
   }
 }
 

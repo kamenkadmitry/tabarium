@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { CardDetails } from '../../core/ai/tasks';
 import type { Card } from '../../core/types';
 import { Dialog, PrimaryButton, SecondaryButton } from '../Dialog';
+import { useT } from '../../i18n/I18nProvider';
 
 export interface ProposedDetails {
   card: Card;
@@ -23,6 +24,7 @@ const hasContent = (d: CardDetails) => d.note !== '' || d.tags.length > 0 || d.h
 
 /** Review what the AI proposes for links (note, a tag, hashtags, a collection) and apply the ones you want. */
 export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Props) {
+  const t = useT();
   const [chosen, setChosen] = useState<ReadonlySet<string>>(() => new Set(items.filter((i) => hasContent(i.details)).map((i) => i.card.id)));
   const [move, setMove] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -40,10 +42,9 @@ export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Pro
   return (
     <Dialog title={title} onClose={onClose}>
       <p className="mb-3 text-sm text-muted">
-        The AI saw only titles and addresses, and the tags, hashtags and collections you already have. It reuses them and proposes a new one only when nothing fits.
-        Existing notes and labels are never replaced; suggestions are added. Untick what you do not want.
+        {t('dlg.aiDetails.text')}
       </p>
-      <ul aria-label="Suggestions" className="mb-3 flex max-h-96 flex-col gap-1 overflow-y-auto">
+      <ul aria-label={t('dlg.aiDetails.list')} className="mb-3 flex max-h-96 flex-col gap-1 overflow-y-auto">
         {items.map(({ card, details }) => {
           const empty = !hasContent(details);
           return (
@@ -54,34 +55,34 @@ export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Pro
                   checked={chosen.has(card.id)}
                   disabled={empty}
                   onChange={() => toggle(card.id)}
-                  aria-label={`Apply to ${card.customTitle ?? card.title}`}
+                  aria-label={t('dlg.aiDetails.applyTo', { title: card.customTitle ?? card.title })}
                   className="mt-1 size-4 accent-[var(--primary)]"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{card.customTitle ?? card.title}</span>
                   {empty ? (
-                    <span className="block text-xs text-muted">Nothing suggested.</span>
+                    <span className="block text-xs text-muted">{t('dlg.aiDetails.nothing')}</span>
                   ) : (
                     <>
                       {details.note !== '' && <span className="block text-sm">{details.note}</span>}
                       <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
-                        {details.tags.map((t) => (
-                          <span key={t}>
-                            {t}
-                            {details.newTags.includes(t) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">new</span>}
+                        {details.tags.map((tag) => (
+                          <span key={tag}>
+                            {tag}
+                            {details.newTags.includes(tag) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">{t('common.new')}</span>}
                           </span>
                         ))}
                         {details.hashtags.map((h) => (
                           <span key={h} className="text-primary">
                             #{h}
-                            {details.newHashtags.includes(h) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">new</span>}
+                            {details.newHashtags.includes(h) && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase text-muted">{t('common.new')}</span>}
                           </span>
                         ))}
                       </span>
                       {details.destination && (
                         <span className="mt-1 flex items-center gap-1 text-xs text-muted">
                           <ArrowRight size={12} aria-hidden /> {details.destination.space} / {details.destination.collection}
-                          {details.destination.isNew && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase">new</span>}
+                          {details.destination.isNew && <span className="ml-1 rounded bg-surface-2 px-1 text-[10px] font-bold uppercase">{t('common.new')}</span>}
                         </span>
                       )}
                     </>
@@ -95,12 +96,12 @@ export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Pro
       {anyDestination && (
         <label className="mb-3 flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={move} onChange={() => setMove((v) => !v)} className="size-4 accent-[var(--primary)]" />
-          Also move the links to the suggested collections
+          {t('dlg.aiDetails.move')}
         </label>
       )}
-      {skipped > 0 && <p className="mb-3 text-xs text-muted">{skipped} other links were left out: they already have labels, or this run was limited to 30 links.</p>}
+      {skipped > 0 && <p className="mb-3 text-xs text-muted">{t.plural('dlg.aiDetails.skipped', skipped, { max: 30 })}</p>}
       <div className="flex justify-end gap-2">
-        <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onClose}>{t('common.cancel')}</SecondaryButton>
         <PrimaryButton
           type="button"
           disabled={busy || selected.length === 0}
@@ -114,7 +115,7 @@ export function AiDetailsDialog({ title, items, skipped, onApply, onClose }: Pro
             }
           }}
         >
-          <Sparkles size={15} aria-hidden /> Apply to {selected.length}
+          <Sparkles size={15} aria-hidden /> {t('dlg.aiDetails.apply', { n: selected.length })}
         </PrimaryButton>
       </div>
     </Dialog>

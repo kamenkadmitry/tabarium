@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { repo } from '../core/instance';
 import type { CardDetails } from '../core/ai/tasks';
 import type { Card, Collection } from '../core/types';
+import { useT } from '../i18n/I18nProvider';
 import type { DuplicateGuard } from './DuplicateGuard';
 import type { LabelsApi } from './labels';
 import { LinkEditor } from './LinkEditor';
@@ -27,6 +28,7 @@ const BLANK: LinkValues = { title: '', url: '', note: '', tagIds: [], hashtagIds
  * opening another one while something is typed asks before it is thrown away.
  */
 export function useInlineEditor({ reportError, clearError, guard }: Deps) {
+  const t = useT();
   const [open, setOpen] = useState<Open | null>(null);
   const dirty = useRef(false);
   const setDirty = useCallback((value: boolean) => {
@@ -39,7 +41,7 @@ export function useInlineEditor({ reportError, clearError, guard }: Deps) {
   }, []);
 
   const show = (next: Open) => {
-    if (dirty.current && !confirm('Discard your changes?')) return;
+    if (dirty.current && !confirm(t('le.discard'))) return;
     dirty.current = false;
     setOpen(next);
   };
@@ -51,7 +53,7 @@ export function useInlineEditor({ reportError, clearError, guard }: Deps) {
       close();
       return true;
     } catch (e) {
-      reportError('Saving tab', e);
+      reportError(t('run.savingTab'), e);
       return false;
     }
   };
@@ -71,11 +73,11 @@ export function useInlineEditor({ reportError, clearError, guard }: Deps) {
           hashtagIds: values.hashtagIds,
         },
       ]);
-      if (added.length === 0) throw new Error('This address is already in the collection.');
+      if (added.length === 0) throw new Error(t('err.alreadyInCollection'));
       close();
       return true;
     } catch (e) {
-      reportError('Adding link', e);
+      reportError(t('run.addingLink'), e);
       return false;
     }
   };

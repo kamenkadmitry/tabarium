@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizeHashtag } from '../hashtag';
+import { tr } from '../../i18n/runtime';
 import { AiError, type AiConfig, complete, type FetchLike } from './client';
 
 export interface PageRef {
@@ -12,12 +13,12 @@ export function extractJson(text: string): unknown {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
   const candidate = (fenced?.[1] ?? text).trim();
   const start = candidate.search(/[[{]/);
-  if (start === -1) throw new AiError('The answer did not contain JSON.');
+  if (start === -1) throw new AiError(tr()('err.aiNoJson'));
   const end = Math.max(candidate.lastIndexOf(']'), candidate.lastIndexOf('}'));
   try {
     return JSON.parse(candidate.slice(start, end + 1));
   } catch {
-    throw new AiError('The answer was not valid JSON.');
+    throw new AiError(tr()('err.aiBadJson'));
   }
 }
 
@@ -27,7 +28,7 @@ const NamesSchema = z.array(z.string().trim().min(1).max(60)).min(1);
 
 /** Suggests short names for a collection holding these pages. */
 export async function suggestCollectionNames(config: AiConfig, pages: readonly PageRef[], fetchImpl?: FetchLike): Promise<string[]> {
-  if (pages.length === 0) throw new AiError('The collection is empty, so there is nothing to name.');
+  if (pages.length === 0) throw new AiError(tr()('err.aiEmptyCollection'));
   const answer = await complete(
     config,
     {
@@ -38,7 +39,7 @@ export async function suggestCollectionNames(config: AiConfig, pages: readonly P
     fetchImpl,
   );
   const parsed = NamesSchema.safeParse(extractJson(answer));
-  if (!parsed.success) throw new AiError('The model did not return a list of names.');
+  if (!parsed.success) throw new AiError(tr()('err.aiNoNames'));
   return [...new Set(parsed.data)].slice(0, 5);
 }
 
@@ -84,7 +85,7 @@ export async function groupTabs(
   fetchImpl?: FetchLike,
   context: LibraryContext = { collections: [], tags: [], hashtags: [] },
 ): Promise<TabGroup[]> {
-  if (pages.length === 0) throw new AiError('There are no tabs to group.');
+  if (pages.length === 0) throw new AiError(tr()('err.aiNoTabs'));
   const answer = await complete(
     config,
     {
@@ -102,7 +103,7 @@ export async function groupTabs(
     fetchImpl,
   );
   const parsed = GroupsSchema.safeParse(extractJson(answer));
-  if (!parsed.success) throw new AiError('The model did not return valid groups.');
+  if (!parsed.success) throw new AiError(tr()('err.aiNoGroups'));
 
   const tagByLower = new Map(context.tags.map((t) => [t.toLowerCase(), t]));
   const collectionByLower = new Map(context.collections.map((c) => [c.toLowerCase(), c]));
@@ -118,7 +119,7 @@ export async function groupTabs(
     groups.push({ title: collectionByLower.get(g.title.toLowerCase()) ?? g.title, indexes, tags, hashtags });
   }
   const rest = pages.map((_, i) => i).filter((i) => !assigned.has(i));
-  if (rest.length > 0) groups.push({ title: 'Other', indexes: rest, tags: [], hashtags: [] });
+  if (rest.length > 0) groups.push({ title: tr()('inbox.other'), indexes: rest, tags: [], hashtags: [] });
   return groups;
 }
 
@@ -127,7 +128,7 @@ export async function groupTabs(
  * group; tabs the model leaves out go to "Other". Unlike `groupTabs` it knows nothing about the library.
  */
 export async function proposeTabGroups(config: AiConfig, pages: readonly PageRef[], fetchImpl?: FetchLike): Promise<{ title: string; indexes: number[] }[]> {
-  if (pages.length < 2) throw new AiError('Pick at least two tabs to group.');
+  if (pages.length < 2) throw new AiError(tr()('err.aiNeedTwoTabs'));
   const answer = await complete(
     config,
     {
@@ -142,7 +143,7 @@ export async function proposeTabGroups(config: AiConfig, pages: readonly PageRef
     fetchImpl,
   );
   const parsed = GroupsSchema.safeParse(extractJson(answer));
-  if (!parsed.success) throw new AiError('The model did not return valid groups.');
+  if (!parsed.success) throw new AiError(tr()('err.aiNoGroups'));
 
   const limit = Math.min(pages.length, 80);
   const assigned = new Set<number>();
@@ -153,7 +154,7 @@ export async function proposeTabGroups(config: AiConfig, pages: readonly PageRef
     if (indexes.length > 0) groups.push({ title: g.title, indexes });
   }
   const rest = pages.map((_, i) => i).filter((i) => !assigned.has(i));
-  if (rest.length > 0) groups.push({ title: 'Other', indexes: rest });
+  if (rest.length > 0) groups.push({ title: tr()('inbox.other'), indexes: rest });
   return groups;
 }
 
@@ -216,8 +217,8 @@ export async function suggestCardDetails(
   context: LabelContext,
   fetchImpl?: FetchLike,
 ): Promise<CardDetails[]> {
-  if (pages.length === 0) throw new AiError('There are no links to describe.');
-  if (pages.length > MAX_DETAILS_PER_REQUEST) throw new AiError(`At most ${MAX_DETAILS_PER_REQUEST} links can be described at a time.`);
+  if (pages.length === 0) throw new AiError(tr()('err.aiNoLinks'));
+  if (pages.length > MAX_DETAILS_PER_REQUEST) throw new AiError(tr()('err.aiMaxLinks', { max: MAX_DETAILS_PER_REQUEST }));
   const fullName = (c: { space: string; title: string }) => `${c.space} / ${c.title}`;
   const spaces = [...new Set(context.collections.map((c) => c.space))];
   const answer = await complete(
@@ -246,7 +247,7 @@ export async function suggestCardDetails(
     fetchImpl,
   );
   const parsed = DetailsSchema.safeParse(extractJson(answer));
-  if (!parsed.success) throw new AiError('The model did not return valid suggestions.');
+  if (!parsed.success) throw new AiError(tr()('err.aiNoSuggestions'));
 
   const tagByLower = new Map(context.tags.map((t) => [t.toLowerCase(), t]));
   const knownHashtags = new Set(context.hashtags);

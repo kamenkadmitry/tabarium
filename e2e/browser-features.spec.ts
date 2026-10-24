@@ -1040,7 +1040,7 @@ test('Group tabs: the AI proposes browser tab groups and they are created', asyn
   await expect(panel.getByLabel('Name of group 1')).toHaveValue('Everything');
   // Nothing was added to the library: the proposal is only about how the open tabs belong together.
   await panel.getByRole('button', { name: /^Group in the browser/ }).click();
-  await expect(panel.getByRole('status')).toContainText('browser tab groups');
+  await expect(panel.getByRole('status')).toContainText('browser tab group');
   const groups = await app.worker.evaluate(() => chrome.tabGroups.query({}));
   expect(groups.map((g) => g.title)).toContain('Everything');
   await panel.close();

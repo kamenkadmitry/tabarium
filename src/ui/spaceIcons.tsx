@@ -86,6 +86,7 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react';
+import type { MessageKey } from '../i18n/messages';
 import {
   siAndroid,
   siAnthropic,
@@ -150,97 +151,107 @@ import {
   type SimpleIcon,
 } from 'simple-icons';
 
+/** MessageKey of a lucide icon's translated label. */
+export type IconLabelKey = Extract<MessageKey, `icon.${string}`>;
+
+/** MessageKey of an icon group heading. */
+export type IconGroupKey = Extract<MessageKey, `icons.${string}`>;
+
 export interface IconEntry {
-  key: string;
+  /** Id stored with the space: 'lucide:x' or 'brand:x'. */
+  icon: string;
+  /** English label — the icon search matches it; brand titles are proper nouns. */
   label: string;
+  /** Catalogue key of the translated label; null for brand icons. */
+  key: IconLabelKey | null;
 }
 
-const LUCIDE: Record<string, { label: string; icon: LucideIcon }> = {
-  folder: { label: 'Folder', icon: Folder },
-  'folder-open': { label: 'Open folder', icon: FolderOpen },
-  inbox: { label: 'Inbox', icon: Inbox },
-  bookmark: { label: 'Bookmark', icon: Bookmark },
-  star: { label: 'Star', icon: Star },
-  heart: { label: 'Heart', icon: Heart },
-  flag: { label: 'Flag', icon: Flag },
-  pin: { label: 'Pin', icon: MapPin },
-  tag: { label: 'Tag', icon: Tag },
-  archive: { label: 'Archive', icon: Archive },
-  box: { label: 'Box', icon: Box },
-  layers: { label: 'Layers', icon: Layers },
-  lightbulb: { label: 'Idea', icon: Lightbulb },
-  rocket: { label: 'Rocket', icon: Rocket },
-  sparkles: { label: 'Sparkles', icon: Sparkles },
-  zap: { label: 'Lightning', icon: Zap },
-  target: { label: 'Target', icon: Target },
-  trophy: { label: 'Trophy', icon: Trophy },
-  gift: { label: 'Gift', icon: Gift },
-  bell: { label: 'Bell', icon: Bell },
-  briefcase: { label: 'Briefcase', icon: Briefcase },
-  building: { label: 'Company', icon: Building2 },
-  calendar: { label: 'Calendar', icon: Calendar },
-  clipboard: { label: 'Tasks', icon: ClipboardList },
-  document: { label: 'Document', icon: FileText },
-  presentation: { label: 'Presentation', icon: Presentation },
-  chart: { label: 'Chart', icon: ChartBar },
-  mail: { label: 'Mail', icon: Mail },
-  phone: { label: 'Phone', icon: Phone },
-  team: { label: 'Team', icon: Users },
-  person: { label: 'Person', icon: User },
-  handshake: { label: 'Deal', icon: Handshake },
-  code: { label: 'Code', icon: Code },
-  terminal: { label: 'Terminal', icon: Terminal },
-  cpu: { label: 'Chip', icon: Cpu },
-  database: { label: 'Database', icon: Database },
-  server: { label: 'Server', icon: Server },
-  cloud: { label: 'Cloud', icon: Cloud },
-  globe: { label: 'Web', icon: Globe },
-  smartphone: { label: 'Mobile', icon: Smartphone },
-  laptop: { label: 'Laptop', icon: Laptop },
-  monitor: { label: 'Monitor', icon: Monitor },
-  bug: { label: 'Bug', icon: Bug },
-  branch: { label: 'Git branch', icon: GitBranch },
-  shield: { label: 'Security', icon: Shield },
-  lock: { label: 'Lock', icon: Lock },
-  key: { label: 'Key', icon: Key },
-  settings: { label: 'Settings', icon: Settings },
-  wrench: { label: 'Tools', icon: Wrench },
-  book: { label: 'Book', icon: BookOpen },
-  graduation: { label: 'Study', icon: GraduationCap },
-  library: { label: 'Library', icon: Library },
-  science: { label: 'Science', icon: FlaskConical },
-  brain: { label: 'Brain', icon: Brain },
-  languages: { label: 'Languages', icon: Languages },
-  microscope: { label: 'Research', icon: Microscope },
-  news: { label: 'News', icon: Newspaper },
-  home: { label: 'Home', icon: House },
-  cart: { label: 'Shopping', icon: ShoppingCart },
-  wallet: { label: 'Money', icon: Wallet },
-  card: { label: 'Payments', icon: CreditCard },
-  food: { label: 'Food', icon: Utensils },
-  coffee: { label: 'Coffee', icon: Coffee },
-  plane: { label: 'Travel', icon: Plane },
-  car: { label: 'Car', icon: Car },
-  map: { label: 'Map', icon: MapIcon },
-  compass: { label: 'Compass', icon: Compass },
-  mountain: { label: 'Mountains', icon: Mountain },
-  tree: { label: 'Nature', icon: TreePine },
-  sun: { label: 'Sun', icon: Sun },
-  moon: { label: 'Moon', icon: Moon },
-  umbrella: { label: 'Umbrella', icon: Umbrella },
-  fitness: { label: 'Fitness', icon: Dumbbell },
-  bike: { label: 'Bike', icon: Bike },
-  health: { label: 'Health', icon: Stethoscope },
-  music: { label: 'Music', icon: Music },
-  headphones: { label: 'Podcasts', icon: Headphones },
-  film: { label: 'Film', icon: Film },
-  cinema: { label: 'Cinema', icon: Clapperboard },
-  camera: { label: 'Photo', icon: Camera },
-  image: { label: 'Images', icon: Image },
-  palette: { label: 'Design', icon: Palette },
-  pen: { label: 'Drawing', icon: PenTool },
-  games: { label: 'Games', icon: Gamepad2 },
-  tv: { label: 'TV', icon: Tv },
+const LUCIDE: Record<string, { label: string; key: IconLabelKey; icon: LucideIcon }> = {
+  folder: { label: 'Folder', key: 'icon.folder', icon: Folder },
+  'folder-open': { label: 'Open folder', key: 'icon.folderOpen', icon: FolderOpen },
+  inbox: { label: 'Inbox', key: 'icon.inbox', icon: Inbox },
+  bookmark: { label: 'Bookmark', key: 'icon.bookmark', icon: Bookmark },
+  star: { label: 'Star', key: 'icon.star', icon: Star },
+  heart: { label: 'Heart', key: 'icon.heart', icon: Heart },
+  flag: { label: 'Flag', key: 'icon.flag', icon: Flag },
+  pin: { label: 'Pin', key: 'icon.pin', icon: MapPin },
+  tag: { label: 'Tag', key: 'icon.tag', icon: Tag },
+  archive: { label: 'Archive', key: 'icon.archive', icon: Archive },
+  box: { label: 'Box', key: 'icon.box', icon: Box },
+  layers: { label: 'Layers', key: 'icon.layers', icon: Layers },
+  lightbulb: { label: 'Idea', key: 'icon.idea', icon: Lightbulb },
+  rocket: { label: 'Rocket', key: 'icon.rocket', icon: Rocket },
+  sparkles: { label: 'Sparkles', key: 'icon.sparkles', icon: Sparkles },
+  zap: { label: 'Lightning', key: 'icon.lightning', icon: Zap },
+  target: { label: 'Target', key: 'icon.target', icon: Target },
+  trophy: { label: 'Trophy', key: 'icon.trophy', icon: Trophy },
+  gift: { label: 'Gift', key: 'icon.gift', icon: Gift },
+  bell: { label: 'Bell', key: 'icon.bell', icon: Bell },
+  briefcase: { label: 'Briefcase', key: 'icon.briefcase', icon: Briefcase },
+  building: { label: 'Company', key: 'icon.company', icon: Building2 },
+  calendar: { label: 'Calendar', key: 'icon.calendar', icon: Calendar },
+  clipboard: { label: 'Tasks', key: 'icon.tasks', icon: ClipboardList },
+  document: { label: 'Document', key: 'icon.document', icon: FileText },
+  presentation: { label: 'Presentation', key: 'icon.presentation', icon: Presentation },
+  chart: { label: 'Chart', key: 'icon.chart', icon: ChartBar },
+  mail: { label: 'Mail', key: 'icon.mail', icon: Mail },
+  phone: { label: 'Phone', key: 'icon.phone', icon: Phone },
+  team: { label: 'Team', key: 'icon.team', icon: Users },
+  person: { label: 'Person', key: 'icon.person', icon: User },
+  handshake: { label: 'Deal', key: 'icon.deal', icon: Handshake },
+  code: { label: 'Code', key: 'icon.code', icon: Code },
+  terminal: { label: 'Terminal', key: 'icon.terminal', icon: Terminal },
+  cpu: { label: 'Chip', key: 'icon.chip', icon: Cpu },
+  database: { label: 'Database', key: 'icon.database', icon: Database },
+  server: { label: 'Server', key: 'icon.server', icon: Server },
+  cloud: { label: 'Cloud', key: 'icon.cloud', icon: Cloud },
+  globe: { label: 'Web', key: 'icon.web', icon: Globe },
+  smartphone: { label: 'Mobile', key: 'icon.mobile', icon: Smartphone },
+  laptop: { label: 'Laptop', key: 'icon.laptop', icon: Laptop },
+  monitor: { label: 'Monitor', key: 'icon.monitor', icon: Monitor },
+  bug: { label: 'Bug', key: 'icon.bug', icon: Bug },
+  branch: { label: 'Git branch', key: 'icon.gitBranch', icon: GitBranch },
+  shield: { label: 'Security', key: 'icon.security', icon: Shield },
+  lock: { label: 'Lock', key: 'icon.lock', icon: Lock },
+  key: { label: 'Key', key: 'icon.key', icon: Key },
+  settings: { label: 'Settings', key: 'icon.settings', icon: Settings },
+  wrench: { label: 'Tools', key: 'icon.tools', icon: Wrench },
+  book: { label: 'Book', key: 'icon.book', icon: BookOpen },
+  graduation: { label: 'Study', key: 'icon.study', icon: GraduationCap },
+  library: { label: 'Library', key: 'icon.library', icon: Library },
+  science: { label: 'Science', key: 'icon.science', icon: FlaskConical },
+  brain: { label: 'Brain', key: 'icon.brain', icon: Brain },
+  languages: { label: 'Languages', key: 'icon.languages', icon: Languages },
+  microscope: { label: 'Research', key: 'icon.research', icon: Microscope },
+  news: { label: 'News', key: 'icon.news', icon: Newspaper },
+  home: { label: 'Home', key: 'icon.home', icon: House },
+  cart: { label: 'Shopping', key: 'icon.shopping', icon: ShoppingCart },
+  wallet: { label: 'Money', key: 'icon.money', icon: Wallet },
+  card: { label: 'Payments', key: 'icon.payments', icon: CreditCard },
+  food: { label: 'Food', key: 'icon.food', icon: Utensils },
+  coffee: { label: 'Coffee', key: 'icon.coffee', icon: Coffee },
+  plane: { label: 'Travel', key: 'icon.travel', icon: Plane },
+  car: { label: 'Car', key: 'icon.car', icon: Car },
+  map: { label: 'Map', key: 'icon.map', icon: MapIcon },
+  compass: { label: 'Compass', key: 'icon.compass', icon: Compass },
+  mountain: { label: 'Mountains', key: 'icon.mountains', icon: Mountain },
+  tree: { label: 'Nature', key: 'icon.nature', icon: TreePine },
+  sun: { label: 'Sun', key: 'icon.sun', icon: Sun },
+  moon: { label: 'Moon', key: 'icon.moon', icon: Moon },
+  umbrella: { label: 'Umbrella', key: 'icon.umbrella', icon: Umbrella },
+  fitness: { label: 'Fitness', key: 'icon.fitness', icon: Dumbbell },
+  bike: { label: 'Bike', key: 'icon.bike', icon: Bike },
+  health: { label: 'Health', key: 'icon.health', icon: Stethoscope },
+  music: { label: 'Music', key: 'icon.music', icon: Music },
+  headphones: { label: 'Podcasts', key: 'icon.podcasts', icon: Headphones },
+  film: { label: 'Film', key: 'icon.film', icon: Film },
+  cinema: { label: 'Cinema', key: 'icon.cinema', icon: Clapperboard },
+  camera: { label: 'Photo', key: 'icon.photo', icon: Camera },
+  image: { label: 'Images', key: 'icon.images', icon: Image },
+  palette: { label: 'Design', key: 'icon.design', icon: Palette },
+  pen: { label: 'Drawing', key: 'icon.drawing', icon: PenTool },
+  games: { label: 'Games', key: 'icon.games', icon: Gamepad2 },
+  tv: { label: 'TV', key: 'icon.tv', icon: Tv },
 };
 
 const BRANDS: Record<string, SimpleIcon> = {
@@ -306,21 +317,23 @@ const BRANDS: Record<string, SimpleIcon> = {
   wordpress: siWordpress,
 };
 
-/** Icons offered for a space, in the order they are shown. Keys are stored with the space. */
-export const ICON_GROUPS: { title: string; icons: IconEntry[] }[] = [
-  { title: 'General', icons: ['folder', 'folder-open', 'inbox', 'bookmark', 'star', 'heart', 'flag', 'pin', 'tag', 'archive', 'box', 'layers', 'lightbulb', 'rocket', 'sparkles', 'zap', 'target', 'trophy', 'gift', 'bell'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Work', icons: ['briefcase', 'building', 'calendar', 'clipboard', 'document', 'presentation', 'chart', 'mail', 'phone', 'team', 'person', 'handshake'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Tech', icons: ['code', 'terminal', 'cpu', 'database', 'server', 'cloud', 'globe', 'smartphone', 'laptop', 'monitor', 'bug', 'branch', 'shield', 'lock', 'key', 'settings', 'wrench'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Learning', icons: ['book', 'graduation', 'library', 'science', 'brain', 'languages', 'microscope', 'news'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Life', icons: ['home', 'cart', 'wallet', 'card', 'food', 'coffee', 'plane', 'car', 'map', 'compass', 'mountain', 'tree', 'sun', 'moon', 'umbrella', 'fitness', 'bike', 'health'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Media', icons: ['music', 'headphones', 'film', 'cinema', 'camera', 'image', 'palette', 'pen', 'games', 'tv'].map((k) => ({ key: `lucide:${k}`, label: LUCIDE[k]?.label ?? k })) },
-  { title: 'Brands', icons: Object.entries(BRANDS).map(([k, icon]) => ({ key: `brand:${k}`, label: icon.title })) },
+const lucideIcons = (ids: readonly string[]): IconEntry[] => ids.map((k) => ({ icon: `lucide:${k}`, label: LUCIDE[k]?.label ?? k, key: LUCIDE[k]?.key ?? null }));
+
+/** Icons offered for a space, in the order they are shown. The `icon` id is stored with the space. */
+export const ICON_GROUPS: { title: string; key: IconGroupKey; icons: IconEntry[] }[] = [
+  { title: 'General', key: 'icons.general', icons: lucideIcons(['folder', 'folder-open', 'inbox', 'bookmark', 'star', 'heart', 'flag', 'pin', 'tag', 'archive', 'box', 'layers', 'lightbulb', 'rocket', 'sparkles', 'zap', 'target', 'trophy', 'gift', 'bell']) },
+  { title: 'Work', key: 'icons.work', icons: lucideIcons(['briefcase', 'building', 'calendar', 'clipboard', 'document', 'presentation', 'chart', 'mail', 'phone', 'team', 'person', 'handshake']) },
+  { title: 'Tech', key: 'icons.tech', icons: lucideIcons(['code', 'terminal', 'cpu', 'database', 'server', 'cloud', 'globe', 'smartphone', 'laptop', 'monitor', 'bug', 'branch', 'shield', 'lock', 'key', 'settings', 'wrench']) },
+  { title: 'Learning', key: 'icons.learning', icons: lucideIcons(['book', 'graduation', 'library', 'science', 'brain', 'languages', 'microscope', 'news']) },
+  { title: 'Life', key: 'icons.life', icons: lucideIcons(['home', 'cart', 'wallet', 'card', 'food', 'coffee', 'plane', 'car', 'map', 'compass', 'mountain', 'tree', 'sun', 'moon', 'umbrella', 'fitness', 'bike', 'health']) },
+  { title: 'Media', key: 'icons.media', icons: lucideIcons(['music', 'headphones', 'film', 'cinema', 'camera', 'image', 'palette', 'pen', 'games', 'tv']) },
+  { title: 'Brands', key: 'icons.brands', icons: Object.entries(BRANDS).map(([k, si]) => ({ icon: `brand:${k}`, label: si.title, key: null })) },
 ];
 
-/** Every key the picker offers, for validation and tests. */
-export const ALL_ICON_KEYS: readonly string[] = ICON_GROUPS.flatMap((g) => g.icons.map((i) => i.key));
+/** Every icon id the picker offers, for validation and tests. */
+export const ALL_ICON_KEYS: readonly string[] = ICON_GROUPS.flatMap((g) => g.icons.map((i) => i.icon));
 
-export const isKnownIcon = (key: string): boolean => ALL_ICON_KEYS.includes(key);
+export const isKnownIcon = (icon: string): boolean => ALL_ICON_KEYS.includes(icon);
 
 interface Props {
   /** Stored icon key, or null to show the first letter of the name. */

@@ -1,5 +1,6 @@
 import type { TabariumDB } from './db';
 import { normalizeHashtag } from './hashtag';
+import { tr } from '../i18n/runtime';
 import type { LabelContext, LibraryContext } from './ai/tasks';
 import type { NewCard, Repository } from './repo';
 import { normalizeUrl } from './url';
@@ -103,11 +104,11 @@ export async function applyCardDetails(
   items: readonly DetailsToApply[],
   options: { tagColors: readonly string[]; move: boolean },
 ): Promise<number> {
-  if (options.tagColors.length === 0) throw new Error('Colours for new tags are required');
+  if (options.tagColors.length === 0) throw new Error(tr()('err.coloursRequired'));
   let changed = 0;
   for (const item of items) {
     const card = await db.cards.get(item.cardId);
-    if (!card) throw new Error(`Card ${item.cardId} does not exist`);
+    if (!card) throw new Error(tr()('err.cardGone', { id: item.cardId }));
 
     const tagIds = [...card.tagIds];
     for (const title of item.tags) {
@@ -129,7 +130,7 @@ export async function applyCardDetails(
 
     if (options.move && item.destination) {
       const space = (await db.spaces.toArray()).find((s) => s.kind !== 'inbox' && s.name.toLowerCase() === item.destination?.space.toLowerCase());
-      if (!space) throw new Error(`The space “${item.destination.space}” does not exist`);
+      if (!space) throw new Error(tr()('err.spaceDoesNotExist', { name: item.destination.space }));
       const inSpace = await db.collections.where('spaceId').equals(space.id).toArray();
       const wanted = item.destination.collection.toLowerCase();
       const target = inSpace.find((c) => c.title.toLowerCase() === wanted) ?? (await repo.createCollection(space.id, item.destination.collection));

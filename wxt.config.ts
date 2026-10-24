@@ -13,7 +13,8 @@ export default defineConfig({
     const e2e = mode === 'e2e';
     return {
       name: 'Tabarium',
-      description: 'Local-first tab and session manager. No account, no server.',
+      description: '__MSG_appDescription__',
+      default_locale: 'en',
       // Production: nothing but `activeTab` at install; every capability is requested when a feature needs it.
       permissions: e2e ? ['activeTab', ...OPTIONAL] : ['activeTab'],
       // AI providers are contacted only after the user grants that one origin when using an AI feature.
@@ -23,14 +24,14 @@ export default defineConfig({
       commands: {
         'save-current-tab': {
           suggested_key: { default: 'Ctrl+Shift+S' },
-          description: 'Save the current tab to Tabarium',
+          description: '__MSG_commandSaveTab__',
         },
         'toggle-command-palette': {
           // Chrome keeps Ctrl+K for the omnibox: a page listener never sees it, and a conflicting
           // suggested key is silently left unbound. Ctrl+Shift+K binds cleanly; Ctrl+K still works
           // for anyone who assigns it by hand in chrome://extensions/shortcuts.
           suggested_key: { default: 'Ctrl+Shift+K' },
-          description: 'Open the Tabarium command palette',
+          description: '__MSG_commandPalette__',
         },
       },
     };

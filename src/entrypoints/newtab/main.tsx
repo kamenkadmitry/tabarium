@@ -5,6 +5,8 @@ import { loadSettings } from '../../core/settings';
 import { createChromePlatform } from '../../platform/chrome';
 import { PlatformProvider } from '../../platform/context';
 import { createDemoPlatform } from '../../platform/demo';
+import { I18nProvider } from '../../i18n/I18nProvider';
+import { setRuntimeLanguage } from '../../i18n/runtime';
 import { App } from '../../ui/App';
 import { DuplicateGuardProvider } from '../../ui/DuplicateGuard';
 import { seedDemo } from '../../ui/seed';
@@ -18,9 +20,11 @@ async function start(container: HTMLElement): Promise<void> {
   const demo = new URLSearchParams(location.search).has('demo');
   if (demo) await seedDemo(db);
   // Apply theme/palette before the first paint so a stored choice doesn't flash the default palette.
-  const { theme, palette } = await loadSettings(db);
+  const { theme, palette, language } = await loadSettings(db);
   if (theme !== 'system') document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.palette = palette;
+  // Resolve the language before first paint too, so non-React strings (errors, generated names) match the UI.
+  setRuntimeLanguage(language);
   if (!demo) {
     // The manifest Ctrl+K command can't reach page key listeners (the browser keeps it), so the
     // worker relays it here and the page forwards it to the palette as a DOM event.
@@ -30,9 +34,11 @@ async function start(container: HTMLElement): Promise<void> {
   }
   createRoot(container).render(
     <PlatformProvider value={demo ? createDemoPlatform() : createChromePlatform()}>
-      <DuplicateGuardProvider>
-        <App />
-      </DuplicateGuardProvider>
+      <I18nProvider initial={language}>
+        <DuplicateGuardProvider>
+          <App />
+        </DuplicateGuardProvider>
+      </I18nProvider>
     </PlatformProvider>,
   );
 }

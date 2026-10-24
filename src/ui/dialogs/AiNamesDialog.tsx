@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Dialog, SecondaryButton } from '../Dialog';
+import { useT } from '../../i18n/I18nProvider';
 
 interface Props {
   suggestions: readonly string[];
@@ -9,9 +10,10 @@ interface Props {
 }
 
 export function AiNamesDialog({ suggestions, onPick, onClose }: Props) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   return (
-    <Dialog title="Suggested names" onClose={onClose}>
+    <Dialog title={t('dlg.aiNames.title')} onClose={onClose}>
       <ul className="mb-5 flex flex-col gap-2">
         {suggestions.map((name) => (
           <li key={name}>
@@ -35,7 +37,7 @@ export function AiNamesDialog({ suggestions, onPick, onClose }: Props) {
         ))}
       </ul>
       <div className="flex justify-end">
-        <SecondaryButton onClick={onClose}>Keep current name</SecondaryButton>
+        <SecondaryButton onClick={onClose}>{t('dlg.aiNames.keep')}</SecondaryButton>
       </div>
     </Dialog>
   );

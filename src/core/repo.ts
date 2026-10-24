@@ -1,5 +1,6 @@
 import type { TabariumDB } from './db';
 import { dedupeLinks, type ImportedSpace } from './formats';
+import { tr } from '../i18n/runtime';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
 import { bumpActivity } from './activity';
@@ -42,7 +43,7 @@ export class Repository {
   }
 
   async createCollection(spaceId: string, title: string): Promise<Collection> {
-    if (!(await this.db.spaces.get(spaceId))) throw new Error(`Space ${spaceId} does not exist`);
+    if (!(await this.db.spaces.get(spaceId))) throw new Error(tr()('err.spaceGone', { id: spaceId }));
     const siblings = await this.db.collections.where('spaceId').equals(spaceId).toArray();
     const now = Date.now();
     const collection: Collection = {
@@ -64,7 +65,7 @@ export class Repository {
   async addCards(collectionId: string, items: readonly NewCard[]): Promise<Card[]> {
     return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.activity, async () => {
       if (!(await this.db.collections.get(collectionId))) {
-        throw new Error(`Collection ${collectionId} does not exist`);
+        throw new Error(tr()('err.collectionGone', { id: collectionId }));
       }
       const existing = await this.db.cards.where('collectionId').equals(collectionId).toArray();
       const seen = new Set(existing.map((c) => normalizeUrl(c.url)));
@@ -102,28 +103,28 @@ export class Repository {
   }
 
   /** The Inbox is a system space: it is never renamed, edited or deleted. */
-  private async assertUserSpace(spaceId: string, action: string): Promise<void> {
-    if ((await this.db.spaces.get(spaceId))?.kind === 'inbox') throw new Error(`The Inbox is a system space and cannot be ${action}`);
+  private async assertUserSpace(spaceId: string, key: 'err.inboxSpaceReadonly' | 'err.inboxSpaceNoRename' | 'err.inboxSpaceNoDelete'): Promise<void> {
+    if ((await this.db.spaces.get(spaceId))?.kind === 'inbox') throw new Error(tr()(key));
   }
 
   /** Changes the name and the icon of a space together. */
   async updateSpace(spaceId: string, patch: { name: string; icon: string | null }): Promise<void> {
-    await this.assertUserSpace(spaceId, 'changed');
-    if (patch.name.trim() === '') throw new Error('A space needs a name');
-    if ((await this.db.spaces.update(spaceId, { name: patch.name.trim(), icon: patch.icon })) === 0) throw new Error(`Space ${spaceId} does not exist`);
+    await this.assertUserSpace(spaceId, 'err.inboxSpaceReadonly');
+    if (patch.name.trim() === '') throw new Error(tr()('err.spaceNeedsName'));
+    if ((await this.db.spaces.update(spaceId, { name: patch.name.trim(), icon: patch.icon })) === 0) throw new Error(tr()('err.spaceGone', { id: spaceId }));
   }
 
   async renameSpace(spaceId: string, name: string): Promise<void> {
-    await this.assertUserSpace(spaceId, 'renamed');
-    if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(`Space ${spaceId} does not exist`);
+    await this.assertUserSpace(spaceId, 'err.inboxSpaceNoRename');
+    if ((await this.db.spaces.update(spaceId, { name })) === 0) throw new Error(tr()('err.spaceGone', { id: spaceId }));
   }
 
   /** Deletes a space with all its collections and links in one transaction. */
   async deleteSpace(spaceId: string): Promise<Deletion> {
-    await this.assertUserSpace(spaceId, 'deleted');
+    await this.assertUserSpace(spaceId, 'err.inboxSpaceNoDelete');
     return this.db.transaction('rw', this.db.spaces, this.db.collections, this.db.cards, this.db.activity, async () => {
       const space = await this.db.spaces.get(spaceId);
-      if (!space) throw new Error(`Space ${spaceId} does not exist`);
+      if (!space) throw new Error(tr()('err.spaceGone', { id: spaceId }));
       const collections = await this.db.collections.where('spaceId').equals(spaceId).toArray();
       const collectionIds = collections.map((c) => c.id);
       const cards = await this.db.cards.where('collectionId').anyOf(collectionIds).toArray();
@@ -141,7 +142,7 @@ export class Repository {
     patch: Partial<Pick<Collection, 'title' | 'color' | 'expanded' | 'tagIds'>>,
   ): Promise<void> {
     const updated = await this.db.collections.update(collectionId, { ...patch, updatedAt: Date.now() });
-    if (updated === 0) throw new Error(`Collection ${collectionId} does not exist`);
+    if (updated === 0) throw new Error(tr()('err.collectionGone', { id: collectionId }));
   }
 
   async updateCard(
@@ -153,13 +154,13 @@ export class Repository {
     const changedUrl = patch.url !== undefined && patch.url !== (await this.db.cards.get(cardId))?.url;
     const reset = changedUrl ? { description: null, heading: null, pageInfoAt: null } : {};
     const updated = await this.db.cards.update(cardId, { ...patch, ...reset, updatedAt: Date.now() });
-    if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+    if (updated === 0) throw new Error(tr()('err.cardGone', { id: cardId }));
   }
 
   /** Stores what was read from the page; null records that the page was tried and gave nothing. */
   async setPageInfo(cardId: string, info: PageInfo | null): Promise<void> {
     const updated = await this.db.cards.update(cardId, { description: info?.description ?? null, heading: info?.heading ?? null, pageInfoAt: Date.now() });
-    if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+    if (updated === 0) throw new Error(tr()('err.cardGone', { id: cardId }));
   }
 
   /** Saves the fields and the labels of a card together: either both are stored or neither. */
@@ -177,10 +178,10 @@ export class Repository {
   /** Moves links to the end of a collection, keeping their order. Links already there stay where they are. */
   async moveCards(cardIds: readonly string[], targetCollectionId: string): Promise<void> {
     await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
-      if (!(await this.db.collections.get(targetCollectionId))) throw new Error(`Collection ${targetCollectionId} does not exist`);
+      if (!(await this.db.collections.get(targetCollectionId))) throw new Error(tr()('err.collectionGone', { id: targetCollectionId }));
       const found = await this.db.cards.bulkGet([...cardIds]);
       const cards = found.flatMap((c) => c ?? []);
-      if (cards.length !== cardIds.length) throw new Error('Some of the links no longer exist');
+      if (cards.length !== cardIds.length) throw new Error(tr()('err.linksGone'));
       const moving = cards.filter((c) => c.collectionId !== targetCollectionId).sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
       for (const c of moving) await this.moveCard(c.id, targetCollectionId);
     });
@@ -191,10 +192,10 @@ export class Repository {
     await this.db.transaction('rw', this.db.cards, this.db.tags, this.db.hashtags, async () => {
       const tags = new Set(await this.db.tags.toCollection().primaryKeys());
       const hashtags = new Set(await this.db.hashtags.toCollection().primaryKeys());
-      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(`Tag ${t} does not exist`);
-      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(`Hashtag ${h} does not exist`);
+      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(tr()('err.tagGone', { id: t }));
+      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(tr()('err.hashtagGone', { id: h }));
       const found = await this.db.cards.bulkGet([...cardIds]);
-      if (found.some((c) => !c)) throw new Error('Some of the links no longer exist');
+      if (found.some((c) => !c)) throw new Error(tr()('err.linksGone'));
       for (const c of found) {
         if (!c) continue;
         await this.db.cards.update(c.id, {
@@ -241,7 +242,7 @@ export class Repository {
     if (beforeCardId === cardId) return;
     await this.db.transaction('rw', this.db.cards, this.db.collections, async () => {
       if (!(await this.db.collections.get(targetCollectionId))) {
-        throw new Error(`Collection ${targetCollectionId} does not exist`);
+        throw new Error(tr()('err.collectionGone', { id: targetCollectionId }));
       }
       const siblings = (await this.db.cards.where('collectionId').equals(targetCollectionId).toArray()).filter(
         (c) => c.id !== cardId,
@@ -255,7 +256,7 @@ export class Repository {
         position: plan.position,
         updatedAt: Date.now(),
       });
-      if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+      if (updated === 0) throw new Error(tr()('err.cardGone', { id: cardId }));
     });
   }
 
@@ -263,7 +264,7 @@ export class Repository {
   async moveCollection(collectionId: string, targetSpaceId: string, beforeCollectionId: string | null = null): Promise<void> {
     if (beforeCollectionId === collectionId) return;
     await this.db.transaction('rw', this.db.collections, this.db.spaces, async () => {
-      if (!(await this.db.spaces.get(targetSpaceId))) throw new Error(`Space ${targetSpaceId} does not exist`);
+      if (!(await this.db.spaces.get(targetSpaceId))) throw new Error(tr()('err.spaceGone', { id: targetSpaceId }));
       const siblings = (await this.db.collections.where('spaceId').equals(targetSpaceId).toArray()).filter(
         (c) => c.id !== collectionId,
       );
@@ -276,7 +277,7 @@ export class Repository {
         position: plan.position,
         updatedAt: Date.now(),
       });
-      if (updated === 0) throw new Error(`Collection ${collectionId} does not exist`);
+      if (updated === 0) throw new Error(tr()('err.collectionGone', { id: collectionId }));
     });
   }
 
@@ -288,13 +289,13 @@ export class Repository {
   }
 
   async updateTag(tagId: string, patch: Partial<Pick<Tag, 'title' | 'color'>>): Promise<void> {
-    if ((await this.db.tags.update(tagId, patch)) === 0) throw new Error(`Tag ${tagId} does not exist`);
+    if ((await this.db.tags.update(tagId, patch)) === 0) throw new Error(tr()('err.tagGone', { id: tagId }));
   }
 
   async deleteTag(tagId: string): Promise<Deletion> {
     return this.db.transaction('rw', this.db.tags, this.db.collections, this.db.cards, async () => {
       const tag = await this.db.tags.get(tagId);
-      if (!tag) throw new Error(`Tag ${tagId} does not exist`);
+      if (!tag) throw new Error(tr()('err.tagGone', { id: tagId }));
       const affected = await this.db.collections.where('tagIds').equals(tagId).toArray();
       for (const c of affected) await this.db.collections.update(c.id, { tagIds: c.tagIds.filter((t) => t !== tagId) });
       const cards = await this.db.cards.where('tagIds').equals(tagId).toArray();
@@ -312,7 +313,7 @@ export class Repository {
   /** Finds the hashtag with this name or creates it. Throws when the name has no usable characters. */
   async ensureHashtag(input: string): Promise<Hashtag> {
     const name = normalizeHashtag(input);
-    if (name === '') throw new Error(`"${input}" is not a valid hashtag`);
+    if (name === '') throw new Error(tr()('err.invalidHashtag', { input }));
     return this.db.transaction('rw', this.db.hashtags, async () => {
       const existing = await this.db.hashtags.where('name').equals(name).first();
       if (existing) return existing;
@@ -324,11 +325,11 @@ export class Repository {
 
   /** Moves every link from one hashtag to another (no duplicates) and deletes the first. */
   async mergeHashtag(fromId: string, intoId: string): Promise<Deletion> {
-    if (fromId === intoId) throw new Error('Choose a different hashtag to merge into');
+    if (fromId === intoId) throw new Error(tr()('err.mergeTargetSame'));
     return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
       const hashtag = await this.db.hashtags.get(fromId);
-      if (!hashtag) throw new Error(`Hashtag ${fromId} does not exist`);
-      if (!(await this.db.hashtags.get(intoId))) throw new Error(`Hashtag ${intoId} does not exist`);
+      if (!hashtag) throw new Error(tr()('err.hashtagGone', { id: fromId }));
+      if (!(await this.db.hashtags.get(intoId))) throw new Error(tr()('err.hashtagGone', { id: intoId }));
       const cards = await this.db.cards.where('hashtagIds').equals(fromId).toArray();
       for (const c of cards) {
         await this.db.cards.update(c.id, { hashtagIds: [...new Set(c.hashtagIds.map((h) => (h === fromId ? intoId : h)))] });
@@ -369,16 +370,16 @@ export class Repository {
 
   async renameHashtag(hashtagId: string, input: string): Promise<void> {
     const name = normalizeHashtag(input);
-    if (name === '') throw new Error(`"${input}" is not a valid hashtag`);
+    if (name === '') throw new Error(tr()('err.invalidHashtag', { input }));
     const clash = await this.db.hashtags.where('name').equals(name).first();
-    if (clash && clash.id !== hashtagId) throw new Error(`#${name} already exists`);
-    if ((await this.db.hashtags.update(hashtagId, { name })) === 0) throw new Error(`Hashtag ${hashtagId} does not exist`);
+    if (clash && clash.id !== hashtagId) throw new Error(tr()('err.hashtagExists', { name }));
+    if ((await this.db.hashtags.update(hashtagId, { name })) === 0) throw new Error(tr()('err.hashtagGone', { id: hashtagId }));
   }
 
   async deleteHashtag(hashtagId: string): Promise<Deletion> {
     return this.db.transaction('rw', this.db.hashtags, this.db.cards, async () => {
       const hashtag = await this.db.hashtags.get(hashtagId);
-      if (!hashtag) throw new Error(`Hashtag ${hashtagId} does not exist`);
+      if (!hashtag) throw new Error(tr()('err.hashtagGone', { id: hashtagId }));
       const cards = await this.db.cards.where('hashtagIds').equals(hashtagId).toArray();
       for (const c of cards) await this.db.cards.update(c.id, { hashtagIds: c.hashtagIds.filter((h) => h !== hashtagId) });
       await this.db.hashtags.delete(hashtagId);
@@ -391,20 +392,20 @@ export class Repository {
     await this.db.transaction('rw', this.db.cards, this.db.tags, this.db.hashtags, async () => {
       const tags = new Set(await this.db.tags.toCollection().primaryKeys());
       const hashtags = new Set(await this.db.hashtags.toCollection().primaryKeys());
-      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(`Tag ${t} does not exist`);
-      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(`Hashtag ${h} does not exist`);
+      for (const t of labels.tagIds) if (!tags.has(t)) throw new Error(tr()('err.tagGone', { id: t }));
+      for (const h of labels.hashtagIds) if (!hashtags.has(h)) throw new Error(tr()('err.hashtagGone', { id: h }));
       const updated = await this.db.cards.update(cardId, {
         tagIds: [...new Set(labels.tagIds)],
         hashtagIds: [...new Set(labels.hashtagIds)],
         updatedAt: Date.now(),
       });
-      if (updated === 0) throw new Error(`Card ${cardId} does not exist`);
+      if (updated === 0) throw new Error(tr()('err.cardGone', { id: cardId }));
     });
   }
 
   async setCollectionTags(collectionId: string, tagIds: readonly string[]): Promise<void> {
     const known = new Set(await this.db.tags.toCollection().primaryKeys());
-    for (const t of tagIds) if (!known.has(t)) throw new Error(`Tag ${t} does not exist`);
+    for (const t of tagIds) if (!known.has(t)) throw new Error(tr()('err.tagGone', { id: t }));
     await this.updateCollection(collectionId, { tagIds: [...new Set(tagIds)] });
   }
 
@@ -417,7 +418,7 @@ export class Repository {
       const existing = (await this.db.spaces.toArray()).find((x) => x.name === s.name);
       const space = existing ?? (await this.createSpace(s.name));
       for (const c of s.collections) {
-        const col = await this.createCollection(space.id, c.title || 'Untitled');
+        const col = await this.createCollection(space.id, c.title || tr()('common.untitled'));
         collections += 1;
         cards += (await this.addCards(col.id, dedupeLinks(c.links))).length;
         const tagIds: string[] = [];
@@ -425,7 +426,7 @@ export class Repository {
           const key = tag.title.toLowerCase();
           let id = tagByTitle.get(key);
           if (id === undefined) {
-            id = (await this.createTag(tag.title || 'Untitled', tag.color || '#0d9488')).id;
+            id = (await this.createTag(tag.title || tr()('common.untitled'), tag.color || '#0d9488')).id;
             tagByTitle.set(key, id);
           }
           tagIds.push(id);
@@ -456,7 +457,7 @@ export class Repository {
     if (beforeCardId !== null) {
       const anchor = await this.db.cards.get(beforeCardId);
       if (!anchor || anchor.collectionId !== collectionId) {
-        throw new Error(`Card ${beforeCardId} is not in collection ${collectionId}`);
+        throw new Error(tr()('err.cardNotInCollection', { id: beforeCardId, collectionId }));
       }
     }
     const added = await this.addCards(collectionId, items);
@@ -474,7 +475,7 @@ export class Repository {
   async deleteCollection(collectionId: string): Promise<Deletion> {
     return this.db.transaction('rw', this.db.collections, this.db.cards, this.db.activity, async () => {
       const collection = await this.db.collections.get(collectionId);
-      if (!collection) throw new Error(`Collection ${collectionId} does not exist`);
+      if (!collection) throw new Error(tr()('err.collectionGone', { id: collectionId }));
       const cards = await this.db.cards.where('collectionId').equals(collectionId).toArray();
       const cardIds = cards.map((c) => c.id);
       await bumpActivity(this.db, 'deleted', cardIds.length);
