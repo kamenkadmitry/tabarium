@@ -237,7 +237,8 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
         {reorderable && (
           <span
             {...dragSourceProps({ type: 'collection', id: collection.id })}
-            aria-label={t('collection.drag')}
+            // A plain span may not carry aria-label; the drag affordance is pointer-only, so a tooltip title suffices.
+            title={t('collection.drag')}
             className="grid size-7 shrink-0 cursor-grab place-items-center rounded-md text-muted hover:bg-surface-2"
           >
             <GripVertical size={16} aria-hidden />

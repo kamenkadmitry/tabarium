@@ -55,7 +55,7 @@ function NavButton(props: {
       {props.icon}
       <span className="min-w-0 flex-1 truncate">{props.children}</span>
       {props.badge ? (
-        <span className={`rounded-full px-2 text-xs font-semibold ${props.active ? 'bg-primary-fg/20' : 'bg-surface-2 text-muted'}`}>
+        <span className={`rounded-full px-2 text-xs font-semibold ${props.active ? 'bg-primary-fg text-primary' : 'bg-surface-2 text-muted'}`}>
           {props.badge}
         </span>
       ) : null}
@@ -187,9 +187,9 @@ export function Sidebar(props: Props) {
         </NavButton>
       </div>
 
+      {/* No aria-label: the visible text (profile name + "Local" badge) is the accessible name, so WCAG 2.5.3 holds. */}
       <button
         type="button"
-        aria-label={t('sidebar.yourProfile')}
         onClick={() => props.onSelect({ kind: 'settings' })}
         className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface-2"
       >

@@ -214,7 +214,7 @@ export function LabelChips({ title, noun, nounPlural, prefix = '', items, select
                 >
                   <Plus size={14} aria-hidden /> {t('label.create', { label: `${prefix}${key}` })}
                   {swatches && (
-                    <span className="ml-auto flex gap-1" aria-label={t('label.pickColour')}>
+                    <span className="ml-auto flex gap-1" role="group" aria-label={t('label.pickColour')}>
                       {swatches.map((c) => (
                         <button
                           key={c}

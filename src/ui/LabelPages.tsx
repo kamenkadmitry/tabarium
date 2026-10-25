@@ -2,6 +2,7 @@ import { Hash, Search, Tag as TagIcon, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Card, Hashtag, Tag } from '../core/types';
 import { useT } from '../i18n/I18nProvider';
+import { radioGroupKeyDown, radioTab } from './a11y';
 import { hostOf, PageFavicon } from './CardRow';
 import { SWATCHES } from './colors';
 import { inputClass } from './Dialog';
@@ -15,12 +16,13 @@ const emptyAction = 'h-9 rounded-lg border border-line px-4 text-sm font-semibol
 
 function Segmented<T extends string>(props: { label: string; value: T; options: readonly { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
-    <div role="radiogroup" aria-label={props.label} className="flex overflow-hidden rounded-lg border border-line">
+    <div role="radiogroup" aria-label={props.label} className="flex overflow-hidden rounded-lg border border-line" onKeyDown={radioGroupKeyDown}>
       {props.options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
+          tabIndex={radioTab(props.value === o.value)}
           aria-checked={props.value === o.value}
           onClick={() => props.onChange(o.value)}
           className={`px-3 py-1.5 text-sm font-semibold transition-colors duration-150 ${props.value === o.value ? 'bg-surface-2 text-fg' : 'text-muted hover:text-fg'}`}
@@ -34,12 +36,13 @@ function Segmented<T extends string>(props: { label: string; value: T; options: 
 
 function FilterChips<T extends string>(props: { label: string; value: T; options: readonly { value: T; label: string; count: number }[]; onChange: (v: T) => void }) {
   return (
-    <div role="radiogroup" aria-label={props.label} className="flex flex-wrap gap-2">
+    <div role="radiogroup" aria-label={props.label} className="flex flex-wrap gap-2" onKeyDown={radioGroupKeyDown}>
       {props.options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
+          tabIndex={radioTab(props.value === o.value)}
           aria-checked={props.value === o.value}
           onClick={() => props.onChange(o.value)}
           className={`rounded-full border px-3 py-1 text-sm font-semibold transition-colors duration-150 ${
@@ -118,12 +121,13 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
             {t('common.add')}
           </button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('tags.newColour')}>
+        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('tags.newColour')} onKeyDown={radioGroupKeyDown}>
           {SWATCHES.map((s) => (
             <button
               key={s.value}
               type="button"
               role="radio"
+              tabIndex={radioTab(color === s.value)}
               aria-checked={color === s.value}
               aria-label={t(s.key)}
               onClick={() => setColor(s.value)}
@@ -203,12 +207,14 @@ export function TagsPage({ tags, usage, onCreate, onUpdate, onDelete, onDeleteUn
                 </button>
               </div>
               {colorFor === tag.id && (
-                <div className="flex flex-wrap gap-2 pb-2 pl-8 pt-1" role="radiogroup" aria-label={t('tags.colourOf', { title: tag.title })}>
-                  {SWATCHES.map((s) => (
+                <div className="flex flex-wrap gap-2 pb-2 pl-8 pt-1" role="radiogroup" aria-label={t('tags.colourOf', { title: tag.title })} onKeyDown={radioGroupKeyDown}>
+                  {SWATCHES.map((s, i) => (
                     <button
                       key={s.value}
                       type="button"
                       role="radio"
+                      // A tag can hold a colour outside the palette or none — keep the first swatch tabbable then.
+                      tabIndex={radioTab(tag.color === s.value || (i === 0 && !SWATCHES.some((x) => x.value === tag.color)))}
                       aria-checked={tag.color === s.value}
                       aria-label={t(s.key)}
                       onClick={() => {

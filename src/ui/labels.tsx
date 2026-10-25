@@ -82,7 +82,7 @@ export function CardLabels({ card, lead, variant = 'line', limitTags = 1, limitH
         ),
       )}
       {rest > 0 && (
-        <span aria-label={t.plural('label.moreLabels', rest)} className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-muted">
+        <span title={t.plural('label.moreLabels', rest)} className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-muted">
           +{rest}
         </span>
       )}

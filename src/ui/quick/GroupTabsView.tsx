@@ -270,7 +270,7 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
           </button>
         )}
       </div>
-      <div aria-label={t('gt.openTabs')} className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div role="region" aria-label={t('gt.openTabs')} className="min-h-0 flex-1 overflow-y-auto pr-1">
         <TabsByWindow
           windows={windows}
           selected={selected}

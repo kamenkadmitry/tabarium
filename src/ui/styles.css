@@ -9,12 +9,13 @@
   --fg: #134e4a;
   --fg-muted: #475569;
   --border: #cfeee9;
-  --primary: #0d9488;
+  /* AA: primary/accent sit under white text, so they are one shade darker than their Tailwind -600 origin. */
+  --primary: #0f766e;
   --primary-fg: #ffffff;
-  --accent: #ea580c;
+  --accent: #c2410c;
   --accent-fg: #ffffff;
   --danger: #dc2626;
-  --ring: #0d9488;
+  --ring: #0f766e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -55,15 +56,15 @@
    These blocks come after the base theme rules so the palette wins on the root element. */
 [data-palette='teal'] {
   --bg: #f0fdfa; --surface: #ffffff; --surface-2: #e8f1f4; --fg: #134e4a; --fg-muted: #475569; --border: #cfeee9;
-  --primary: #0d9488; --primary-fg: #ffffff; --accent: #ea580c; --accent-fg: #ffffff; --ring: #0d9488;
+  --primary: #0f766e; --primary-fg: #ffffff; --accent: #c2410c; --accent-fg: #ffffff; --ring: #0f766e;
 }
 [data-palette='ocean'] {
   --bg: #eff6ff; --surface: #ffffff; --surface-2: #dbeafe; --fg: #1e3a8a; --fg-muted: #4b6387; --border: #bfdbfe;
-  --primary: #2563eb; --primary-fg: #ffffff; --accent: #d97706; --accent-fg: #ffffff; --ring: #2563eb;
+  --primary: #2563eb; --primary-fg: #ffffff; --accent: #b45309; --accent-fg: #ffffff; --ring: #2563eb;
 }
 [data-palette='forest'] {
   --bg: #f0fdf4; --surface: #ffffff; --surface-2: #dcfce7; --fg: #14532d; --fg-muted: #3f6b4f; --border: #bbf7d0;
-  --primary: #16a34a; --primary-fg: #ffffff; --accent: #b45309; --accent-fg: #ffffff; --ring: #16a34a;
+  --primary: #15803d; --primary-fg: #ffffff; --accent: #b45309; --accent-fg: #ffffff; --ring: #15803d;
 }
 [data-palette='violet'] {
   --bg: #f5f3ff; --surface: #ffffff; --surface-2: #ede9fe; --fg: #4c1d95; --fg-muted: #6d63a3; --border: #ddd6fe;
@@ -71,11 +72,11 @@
 }
 [data-palette='rose'] {
   --bg: #fff1f2; --surface: #ffffff; --surface-2: #ffe4e6; --fg: #881337; --fg-muted: #a14a5b; --border: #fecdd3;
-  --primary: #e11d48; --primary-fg: #ffffff; --accent: #0d9488; --accent-fg: #ffffff; --ring: #e11d48;
+  --primary: #e11d48; --primary-fg: #ffffff; --accent: #0f766e; --accent-fg: #ffffff; --ring: #e11d48;
 }
 [data-palette='amber'] {
   --bg: #fffbeb; --surface: #ffffff; --surface-2: #fef3c7; --fg: #78350f; --fg-muted: #96662e; --border: #fde68a;
-  --primary: #d97706; --primary-fg: #ffffff; --accent: #059669; --accent-fg: #ffffff; --ring: #d97706;
+  --primary: #b45309; --primary-fg: #ffffff; --accent: #047857; --accent-fg: #ffffff; --ring: #b45309;
 }
 [data-palette='slate'] {
   --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9; --fg: #0f172a; --fg-muted: #475569; --border: #e2e8f0;
@@ -91,7 +92,7 @@
 }
 [data-palette='sunset'] {
   --bg: #fff7ed; --surface: #ffffff; --surface-2: #ffedd5; --fg: #7c2d12; --fg-muted: #9a5c3d; --border: #fed7aa;
-  --primary: #ea580c; --primary-fg: #ffffff; --accent: #0d9488; --accent-fg: #ffffff; --ring: #ea580c;
+  --primary: #c2410c; --primary-fg: #ffffff; --accent: #0f766e; --accent-fg: #ffffff; --ring: #c2410c;
 }
 
 [data-palette='teal'][data-theme='dark'] {

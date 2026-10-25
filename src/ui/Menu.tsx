@@ -37,7 +37,8 @@ export function Menu({ label, ariaLabel, icon, active = false, children }: Props
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={ariaLabel}
+        // The accessible name must contain the visible label (WCAG 2.5.3): "Sort collections: Newest".
+        aria-label={ariaLabel === undefined ? undefined : `${ariaLabel}: ${label}`}
         onClick={() => setOpen((v) => !v)}
         className={`flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150 hover:bg-surface-2 ${
           active || open ? 'bg-surface-2 text-primary' : 'text-muted hover:text-fg'

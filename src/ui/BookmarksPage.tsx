@@ -8,6 +8,7 @@ import { normalizeUrl } from '../core/url';
 import { useT } from '../i18n/I18nProvider';
 import type { StringKey } from '../i18n/messages';
 import { usePlatform } from '../platform/context';
+import { radioGroupKeyDown, radioTab } from './a11y';
 import { hostOf, PageFavicon } from './CardRow';
 import { useDuplicateGuard } from './DuplicateGuard';
 import { inputClass, PrimaryButton, SecondaryButton } from './Dialog';
@@ -223,12 +224,13 @@ export function BookmarksPage({ cards, run }: Props) {
               })}
             </p>
           </div>
-          <div role="radiogroup" aria-label={t('bm.howTo')} className="grid gap-2 md:grid-cols-2">
+          <div role="radiogroup" aria-label={t('bm.howTo')} className="grid gap-2 md:grid-cols-2" onKeyDown={radioGroupKeyDown}>
             {MODES.map((m) => (
               <button
                 key={m.value}
                 type="button"
                 role="radio"
+                tabIndex={radioTab(mode === m.value)}
                 aria-checked={mode === m.value}
                 onClick={() => setMode(m.value)}
                 className={`flex flex-col gap-0.5 rounded-xl border px-4 py-3 text-left transition-colors duration-150 ${mode === m.value ? 'border-primary bg-surface-2' : 'border-line hover:bg-surface-2'}`}

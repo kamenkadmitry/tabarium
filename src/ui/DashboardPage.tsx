@@ -3,6 +3,7 @@ import { computeStats, type Ranked, STATS_PERIODS, type Stats, type StatsPeriod 
 import type { Activity, Card, Collection, Hashtag, Space, Tag } from '../core/types';
 import { useT } from '../i18n/I18nProvider';
 import type { StringKey, T } from '../i18n/messages';
+import { radioGroupKeyDown, radioTab } from './a11y';
 
 const PERIOD_KEYS: Record<StatsPeriod, StringKey> = { today: 'dash.period.today', '7d': 'dash.period.7d', '30d': 'dash.period.30d', all: 'dash.period.all' };
 const PERIOD_PHRASE_KEYS: Record<StatsPeriod, StringKey> = { today: 'dash.phrase.today', '7d': 'dash.phrase.7d', '30d': 'dash.phrase.30d', all: 'dash.phrase.all' };
@@ -142,12 +143,13 @@ export function DashboardPage(props: Props) {
         <p className="text-sm text-muted">
           {t('dash.summary', { links: t.plural('count.links', totals.links), collections: t.plural('count.collections', totals.collections), everAdded: t.num(totals.everAdded) })}
         </p>
-        <div role="radiogroup" aria-label={t('dash.periodAria')} className="flex overflow-hidden rounded-lg border border-line">
+        <div role="radiogroup" aria-label={t('dash.periodAria')} className="flex overflow-hidden rounded-lg border border-line" onKeyDown={radioGroupKeyDown}>
           {STATS_PERIODS.map((value) => (
             <button
               key={value}
               type="button"
               role="radio"
+              tabIndex={radioTab(period === value)}
               aria-checked={period === value}
               onClick={() => setPeriod(value)}
               className={`px-3 py-1.5 text-sm font-semibold transition-colors duration-150 ${period === value ? 'bg-surface-2 text-fg' : 'text-muted hover:text-fg'}`}

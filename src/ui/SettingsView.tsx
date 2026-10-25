@@ -14,6 +14,7 @@ import { detectProviderFromKey } from '../core/ai/client';
 import { testConnection } from '../core/ai/tasks';
 import { isAiConfigured, withProviderAccess } from './ai';
 import { avatarFromFile } from './avatar';
+import { radioGroupKeyDown, radioTab } from './a11y';
 import { inputClass } from './Dialog';
 import { PALETTES } from './palettes';
 import { useT } from '../i18n/I18nProvider';
@@ -355,12 +356,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             <p className="text-sm font-semibold">{t('set.toolbar.title')}</p>
             <p className="text-xs text-muted">{t('set.toolbar.desc')}</p>
           </div>
-          <div role="radiogroup" aria-label={t('set.toolbar.aria')} className="flex gap-1">
+          <div role="radiogroup" aria-label={t('set.toolbar.aria')} className="flex gap-1" onKeyDown={radioGroupKeyDown}>
             {(['side', 'popup'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 role="radio"
+                tabIndex={radioTab(settings.quickPanel === mode)}
                 aria-checked={settings.quickPanel === mode}
                 onClick={() => setToolbar(mode)}
                 className={`h-9 rounded-lg border px-3 text-sm font-semibold transition-colors duration-150 ${
@@ -448,12 +450,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       </Section>
 
       <Section title={t('set.appearance.title')} description={t('set.appearance.desc')}>
-        <div role="radiogroup" aria-label={t('set.theme.aria')} className="flex gap-2">
+        <div role="radiogroup" aria-label={t('set.theme.aria')} className="flex gap-2" onKeyDown={radioGroupKeyDown}>
           {(['system', 'light', 'dark'] as const).map((v) => (
             <button
               key={v}
               type="button"
               role="radio"
+              tabIndex={radioTab(settings.theme === v)}
               aria-checked={settings.theme === v}
               onClick={guard(t('run.theme'), async () => void (await updateSettings(db, { theme: v })))}
               className={`h-10 flex-1 rounded-lg border text-sm font-semibold capitalize transition-colors duration-150 ${
@@ -464,12 +467,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             </button>
           ))}
         </div>
-        <div role="radiogroup" aria-label={t('set.palette.aria')} className="mt-4 flex flex-wrap gap-3">
+        <div role="radiogroup" aria-label={t('set.palette.aria')} className="mt-4 flex flex-wrap gap-3" onKeyDown={radioGroupKeyDown}>
           {PALETTES.map((p) => (
             <button
               key={p.id}
               type="button"
               role="radio"
+              tabIndex={radioTab(settings.palette === p.id)}
               aria-checked={settings.palette === p.id}
               aria-label={t(p.key)}
               title={t(p.key)}
@@ -492,12 +496,13 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       </Section>
 
       <Section title={t('set.language.title')}>
-        <div role="radiogroup" aria-label={t('set.language.title')} className="flex gap-2">
+        <div role="radiogroup" aria-label={t('set.language.title')} className="flex gap-2" onKeyDown={radioGroupKeyDown}>
           {(['system', 'en', 'ru', 'pl', 'be'] as const).map((v) => (
             <button
               key={v}
               type="button"
               role="radio"
+              tabIndex={radioTab(settings.language === v)}
               aria-checked={settings.language === v}
               onClick={guard(t('run.savingSetting'), async () => void (await updateSettings(db, { language: v })))}
               className={`h-10 flex-1 rounded-lg border text-sm font-semibold capitalize transition-colors duration-150 ${

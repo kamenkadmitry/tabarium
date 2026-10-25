@@ -184,7 +184,7 @@ test('open tabs panel: width is adjustable by dragging its edge and is remembere
 
 test('profile: the sidebar shows a Local badge and the name set in Settings', async () => {
   const p = await openLibraryWithSpace('Profile');
-  const profile = p.getByRole('button', { name: 'Your profile' });
+  const profile = p.getByRole('button').filter({ hasText: 'Local' });
   await expect(profile).toContainText('My library');
   await expect(profile).toContainText('Local');
 

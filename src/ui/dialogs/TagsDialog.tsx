@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { Collection, Tag } from '../../core/types';
+import { radioGroupKeyDown, radioTab } from '../a11y';
 import { SWATCHES } from '../colors';
 import { Dialog, inputClass, PrimaryButton, SecondaryButton } from '../Dialog';
 import { useT } from '../../i18n/I18nProvider';
@@ -68,12 +69,13 @@ export function TagsDialog({ tags, collection, onCreate, onDelete, onAssign, onC
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('dlg.tags.name')} className={inputClass} />
           <PrimaryButton disabled={title.trim() === ''}>{t('common.add')}</PrimaryButton>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('dlg.tags.colour')}>
+        <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t('dlg.tags.colour')} onKeyDown={radioGroupKeyDown}>
           {SWATCHES.map((s) => (
             <button
               key={s.value}
               type="button"
               role="radio"
+              tabIndex={radioTab(color === s.value)}
               aria-checked={color === s.value}
               aria-label={t(s.key)}
               onClick={() => setColor(s.value)}
