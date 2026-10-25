@@ -1,12 +1,13 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers, SquareArrowOutUpRight } from 'lucide-react';
 import { useState } from 'react';
-import type { Card, Collection, Space } from '../../core/types';
+import type { Card, Collection, Hashtag, Space, Tag } from '../../core/types';
 import { normalizeUrl } from '../../core/url';
-import { Favicon } from '../CardRow';
+import { Favicon, hostOf } from '../CardRow';
 import { SpaceIcon } from '../spaceIcons';
 import { inputClass } from '../Dialog';
 import { useT } from '../../i18n/I18nProvider';
 import { displayCollectionName, displaySpaceName } from '../../core/quicksave';
+import { cardSearchText } from '../searchModel';
 
 export type Destination =
   | { kind: 'collection'; collectionId: string; label: string }
@@ -19,8 +20,15 @@ interface Props {
   cardsByCollection?: ReadonlyMap<string, readonly Card[]>;
   /** Address of the tab being saved; collections that already hold it get a check mark. */
   currentUrl?: string | null;
-  /** Filters collections across all spaces when not empty. */
+  /** Filters collections across all spaces when not empty; saved links matching it are listed too. */
   query: string;
+  /** Labels for link-text matching; without them the link search skips tags and hashtags. */
+  tags?: readonly Tag[];
+  hashtags?: readonly Hashtag[];
+  /** Opened when a link hit is picked; absent surfaces never offer link results. */
+  onOpenLink?: (card: Card) => void;
+  /** Jumped to in the library when the hit's "reveal" affordance is used. */
+  onReveal?: (collection: Collection) => void;
   /** Offer "New collection…" inside a space. */
   allowNew?: boolean;
   /** Offer to pick a whole space (used when the result becomes several new collections). */
@@ -31,8 +39,24 @@ interface Props {
 const row =
   'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors duration-150 hover:bg-surface-2';
 
+/** How many matching links a single collection contributes to the search list; refine the query for the rest. */
+const MAX_CARDS_PER_COLLECTION = 5;
+
 /** Spaces list that drills into a space's collections, or a flat search over all collections. */
-export function DestinationPicker({ spaces, collections, query, cardsByCollection, currentUrl, allowNew = true, pickSpace = false, onPick }: Props) {
+export function DestinationPicker({
+  spaces,
+  collections,
+  query,
+  cardsByCollection,
+  currentUrl,
+  tags = [],
+  hashtags = [],
+  onOpenLink,
+  onReveal,
+  allowNew = true,
+  pickSpace = false,
+  onPick,
+}: Props) {
   const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
@@ -64,26 +88,76 @@ export function DestinationPicker({ spaces, collections, query, cardsByCollectio
 
   if (q !== '') {
     const hits = collections.filter((c) => `${collectionName(c)} ${c.title} ${spaceName(c.spaceId)}`.toLowerCase().includes(q));
+    // Saved links that match the query, grouped under the collection they sit in (collection order).
+    // Only offered where links can be opened — pickers that only choose a destination skip them.
+    const linkGroups = !onOpenLink
+      ? []
+      : collections
+          .map((c) => ({
+            collection: c,
+            cards: (cardsByCollection?.get(c.id) ?? []).filter((card) => cardSearchText(card, tags, hashtags).includes(q)).slice(0, MAX_CARDS_PER_COLLECTION),
+          }))
+          .filter((g) => g.cards.length > 0);
+    const empty = hits.length === 0 && linkGroups.length === 0;
     return (
-      <ul aria-label={t('dp.matching')} className="flex flex-col gap-0.5">
-        {hits.map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              className={row}
-              onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${spaceName(c.spaceId)} / ${collectionName(c)}` })}
-            >
-              <Layers size={16} aria-hidden className="shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 truncate">
-                {collectionName(c)}
-                <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
-              </span>
-              <span className="truncate text-xs text-muted">{spaceName(c.spaceId)}</span>
-            </button>
-          </li>
-        ))}
-        {hits.length === 0 && <li className="px-3 py-4 text-center text-sm text-muted">{t('collection.noneFound', { query: query.trim() })}</li>}
-      </ul>
+      <div>
+        <ul aria-label={t('dp.matching')} className="flex flex-col gap-0.5">
+          {hits.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className={row}
+                onClick={() => onPick({ kind: 'collection', collectionId: c.id, label: `${spaceName(c.spaceId)} / ${collectionName(c)}` })}
+              >
+                <Layers size={16} aria-hidden className="shrink-0 text-muted" />
+                <span className="min-w-0 flex-1 truncate">
+                  {collectionName(c)}
+                  <span className="text-xs font-normal text-muted">{countOf(c.id)}</span>
+                </span>
+                <span className="truncate text-xs text-muted">{spaceName(c.spaceId)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {linkGroups.length > 0 && (
+          <>
+            <p className="mb-1 mt-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted">{t('dp.links')}</p>
+            <ul aria-label={t('dp.links')} className="flex flex-col gap-0.5">
+              {linkGroups.map(({ collection: c, cards: hitCards }) => (
+                <li key={c.id}>
+                  <p className="flex items-center gap-1.5 px-3 pt-2 text-xs font-semibold text-muted">
+                    <span className="truncate">{spaceName(c.spaceId)} / {collectionName(c)}</span>
+                  </p>
+                  <ul className="flex flex-col gap-0.5">
+                    {hitCards.map((card) => (
+                      <li key={card.id} className="flex items-center">
+                        <button type="button" className={`${row} min-w-0 flex-1`} onClick={() => onOpenLink?.(card)}>
+                          <Favicon card={card} size={16} />
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            <span className="block truncate">{card.customTitle ?? card.title}</span>
+                            <span className="block truncate text-xs font-normal text-muted">{hostOf(card.url)}</span>
+                          </span>
+                        </button>
+                        {onReveal && (
+                          <button
+                            type="button"
+                            aria-label={t('dp.reveal', { collection: collectionName(c) })}
+                            onClick={() => onReveal(c)}
+                            className="grid size-9 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-primary"
+                          >
+                            <SquareArrowOutUpRight size={15} aria-hidden />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {empty && <p className="px-3 py-4 text-center text-sm text-muted">{t('collection.noneFound', { query: query.trim() })}</p>}
+      </div>
     );
   }
 

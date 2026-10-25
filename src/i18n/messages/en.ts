@@ -1062,7 +1062,7 @@ export const en = {
   'quick.switchFailed': 'Switching failed: {error}',
 
   'save.heading': 'Saving this tab',
-  'save.search': 'Search collections',
+  'save.search': 'Search links and collections',
   'save.dragHint': 'Drag into the library to save it there',
   'save.reading': 'Reading the current tab…',
   'save.allow': 'Allow Tabarium to follow the tab you are on',
@@ -1132,6 +1132,8 @@ export const en = {
   'qv.saveFailed': 'Saving the link failed: {error}',
 
   'dp.matching': 'Matching collections',
+  'dp.links': 'Matching links',
+  'dp.reveal': 'Show {collection} in the library',
   'dp.spaces': 'Spaces',
   'dp.noSpaces': 'No spaces yet. Open the library to create one.',
   'dp.newIn': 'New collection in {space}',

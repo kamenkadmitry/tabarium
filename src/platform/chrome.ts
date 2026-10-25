@@ -99,9 +99,9 @@ export function createChromePlatform(): Platform {
         if (!t || t.id === undefined || !t.url || !/^https?:\/\//.test(t.url)) return null;
         return { id: t.id, title: t.title ?? t.url, url: t.url, favIconUrl: t.favIconUrl ?? null };
       },
-      async openLibrary() {
+      async openLibrary(collectionId) {
         const api = requireExtension();
-        await api.tabs.create({ url: api.runtime.getURL('/newtab.html') });
+        await api.tabs.create({ url: api.runtime.getURL(`/newtab.html${collectionId ? `?collection=${collectionId}` : ''}`) });
       },
       async listWindows() {
         const api = requireExtension();

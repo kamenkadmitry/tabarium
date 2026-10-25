@@ -10,7 +10,7 @@ import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } f
 import { displaySpaceName, ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import { cardSearchText } from './searchModel';
-import type { Card, Space } from '../core/types';
+import type { Card, Collection, Space } from '../core/types';
 import type { Deletion } from '../core/undo';
 import { usePlatform } from '../platform/context';
 import { isAiConfigured, withProviderAccess } from './ai';
@@ -210,6 +210,39 @@ export function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  /** Jumps to a collection on its space board: navigates, expands and scrolls the section into view. */
+  const revealCollection = (col: Collection) => {
+    navigate({ kind: 'space', spaceId: col.spaceId });
+    void run(t('run.openingCollection'), () => repo.updateCollection(col.id, { expanded: true }));
+    // The section mounts after navigation (and after the expand lands); poll the next frames for it.
+    let tries = 0;
+    const reveal = () => {
+      const el = document.querySelector(`[data-collection-id="${col.id}"]`);
+      if (el) el.scrollIntoView({ block: 'center' });
+      else if (++tries < 30) requestAnimationFrame(reveal);
+    };
+    requestAnimationFrame(reveal);
+  };
+  /** Latest revealCollection for the one-shot deep-link effect below (same pattern as popRef). */
+  const revealRef = useRef(revealCollection);
+  useEffect(() => {
+    revealRef.current = revealCollection;
+  });
+
+  // `newtab.html?collection=<id>` is how the side panel's "show in the library" lands on a collection.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current || !data) return;
+    const id = new URLSearchParams(location.search).get('collection');
+    const col = id ? data.collections.find((c) => c.id === id) : undefined;
+    if (!col) return;
+    deepLinked.current = true;
+    history.replaceState({ pos: 0, view: { kind: 'space', spaceId: col.spaceId } } satisfies NavEntry, '', location.pathname);
+    // Deferred: navigating sets state, which must not happen inside the effect body.
+    // No cleanup on purpose — a re-run is a no-op, while cancelling would lose the one reveal.
+    requestAnimationFrame(() => revealRef.current(col));
+  }, [data]);
 
   // Esc drops the selection, unless it is used by something that is open (a field, the editor, a dialog).
   const hasPicked = picked.selected.size > 0;
@@ -933,16 +966,7 @@ export function App() {
           }}
           onGoCollection={(col) => {
             setPaletteOpen(false);
-            navigate({ kind: 'space', spaceId: col.spaceId });
-            void run(t('run.openingCollection'), () => repo.updateCollection(col.id, { expanded: true }));
-            // The section mounts after navigation (and after the expand lands); poll the next frames for it.
-            let tries = 0;
-            const reveal = () => {
-              const el = document.querySelector(`[data-collection-id="${col.id}"]`);
-              if (el) el.scrollIntoView({ block: 'center' });
-              else if (++tries < 30) requestAnimationFrame(reveal);
-            };
-            requestAnimationFrame(reveal);
+            revealCollection(col);
           }}
           onNavigate={(v) => {
             setPaletteOpen(false);

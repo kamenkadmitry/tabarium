@@ -135,6 +135,8 @@ export function QuickSave({ surface }: { surface: 'popup' | 'sidepanel' }) {
             spaces={spaces}
             collections={collections}
             cardsByCollection={cardsByCollection}
+            tags={tags}
+            hashtags={hashtags}
             autoClose={settings.autoCloseTabs}
             onAutoClose={(v) => void updateSettings(db, { autoCloseTabs: v })}
             onStatus={setStatus}

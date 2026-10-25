@@ -96,8 +96,8 @@ export interface TabsPort {
   mergeWindows(): Promise<void>;
   /** Calls `listener` whenever tabs or windows change; returns an unsubscribe function. */
   watch(listener: () => void): () => void;
-  /** Opens (or focuses) the full Tabarium page. */
-  openLibrary(): Promise<void>;
+  /** Opens (or focuses) the full Tabarium page; `collectionId` lands on that collection's board. */
+  openLibrary(collectionId?: string): Promise<void>;
 }
 
 export interface BookmarksPort {

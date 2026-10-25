@@ -1034,7 +1034,7 @@ export const be: Messages = {
   'quick.switchFailed': 'Не ўдалося пераключыць: {error}',
 
   'save.heading': 'Захоўваем укладку',
-  'save.search': 'Шукаць калекцыі',
+  'save.search': 'Шукаць спасылкі і калекцыі',
   'save.dragHint': 'Перацягніце ў бібліятэку, каб захаваць там',
   'save.reading': 'Чытаю бягучую ўкладку…',
   'save.allow': 'Дазволіць Tabarium сачыць за актыўнай укладкай',
@@ -1104,6 +1104,8 @@ export const be: Messages = {
   'qv.saveFailed': 'Не ўдалося захаваць спасылку: {error}',
 
   'dp.matching': 'Падыходныя калекцыі',
+  'dp.links': 'Падыходныя спасылкі',
+  'dp.reveal': 'Паказаць «{collection}» у бібліятэцы',
   'dp.spaces': 'Прасторы',
   'dp.noSpaces': 'Прастор пакуль няма. Адкрыйце бібліятэку, каб стварыць.',
   'dp.newIn': 'Новая калекцыя ў {space}',

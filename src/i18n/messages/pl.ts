@@ -1034,7 +1034,7 @@ export const pl: Messages = {
   'quick.switchFailed': 'Nie udało się przełączyć: {error}',
 
   'save.heading': 'Zapisywanie karty',
-  'save.search': 'Szukaj kolekcji',
+  'save.search': 'Szukaj linków i kolekcji',
   'save.dragHint': 'Przeciągnij do biblioteki, by zapisać tam',
   'save.reading': 'Odczytywanie bieżącej karty…',
   'save.allow': 'Zezwól Tabarium śledzić aktywną kartę',
@@ -1104,6 +1104,8 @@ export const pl: Messages = {
   'qv.saveFailed': 'Nie udało się zapisać linku: {error}',
 
   'dp.matching': 'Pasujące kolekcje',
+  'dp.links': 'Pasujące linki',
+  'dp.reveal': 'Pokaż „{collection}” w bibliotece',
   'dp.spaces': 'Obszary',
   'dp.noSpaces': 'Brak obszarów. Otwórz bibliotekę, by utworzyć.',
   'dp.newIn': 'Nowa kolekcja w {space}',

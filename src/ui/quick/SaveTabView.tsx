@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { db, repo } from '../../core/instance';
 import { setQuickTarget } from '../../core/quicksave';
-import type { Card, Collection, Space } from '../../core/types';
+import type { Card, Collection, Hashtag, Space, Tag } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { hostOf } from '../CardRow';
 import { useDuplicateGuard } from '../DuplicateGuard';
@@ -16,13 +16,16 @@ interface Props {
   spaces: readonly Space[];
   collections: readonly Collection[];
   cardsByCollection: ReadonlyMap<string, readonly Card[]>;
+  /** Labels the link search matches on. */
+  tags: readonly Tag[];
+  hashtags: readonly Hashtag[];
   autoClose: boolean;
   onAutoClose: (value: boolean) => void;
   onStatus: (status: { tone: 'ok' | 'error'; text: string } | null) => void;
 }
 
 /** "Saving this tab" card plus a space/collection picker: choosing a collection saves the tab there. */
-export function SaveTabView({ spaces, collections, cardsByCollection, autoClose, onAutoClose, onStatus }: Props) {
+export function SaveTabView({ spaces, collections, cardsByCollection, tags, hashtags, autoClose, onAutoClose, onStatus }: Props) {
   const t = useT();
   const platform = usePlatform();
   const guard = useDuplicateGuard();
@@ -107,6 +110,10 @@ export function SaveTabView({ spaces, collections, cardsByCollection, autoClose,
           cardsByCollection={cardsByCollection}
           currentUrl={tab?.url ?? null}
           query={query}
+          tags={tags}
+          hashtags={hashtags}
+          onOpenLink={(card) => void platform.tabs.openUrl(card.url)}
+          onReveal={(c) => void platform.tabs.openLibrary(c.id)}
           onPick={(d) => void save(d)}
         />
       </div>

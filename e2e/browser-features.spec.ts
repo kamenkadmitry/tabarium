@@ -723,6 +723,41 @@ test('AI: suggest details in the editor and fill a whole collection', async () =
   await p.close();
 });
 
+test('side panel search: saved links are found by title, opened, and revealed in the library', async () => {
+  const lib = await openLibraryWithSpace('Shelf');
+  await addCollectionWithLinks(lib, 'SciFi', []);
+  // A link with a distinctive title so the search has something unambiguous to match.
+  const form = lib.locator('section[aria-label="SciFi"]');
+  await form.getByRole('button', { name: 'Add link' }).click();
+  await lib.getByLabel('Title').fill('Dune novel companion');
+  await lib.getByLabel('Address').fill(web('dune-companion'));
+  await form.locator('form[aria-label="Add link"]').getByRole('button', { name: 'Add link', exact: true }).click();
+  await expect(form.locator('a[href="https://example.test/dune-companion"]')).toBeVisible();
+
+  const panel = await app.context.newPage();
+  panel.setDefaultTimeout(10_000);
+  await panel.goto(`chrome-extension://${app.extensionId}/sidepanel.html`);
+  // Typing part of a saved link's title finds it, grouped under its collection.
+  await panel.getByPlaceholder('Search links and collections').fill('dune');
+  const links = panel.getByRole('list', { name: 'Matching links' });
+  await expect(links).toContainText('Shelf / SciFi');
+  await expect(links.getByText('Dune novel companion')).toBeVisible();
+
+  // Picking a link opens it in a new foreground tab.
+  const [opened] = await Promise.all([app.context.waitForEvent('page'), links.getByRole('button', { name: /Dune novel companion/ }).click()]);
+  await expect(opened).toHaveURL('https://example.test/dune-companion');
+  await opened.close();
+
+  // "Show in the library" lands on the collection's board, section in view.
+  const [libPage] = await Promise.all([app.context.waitForEvent('page'), panel.getByRole('button', { name: 'Show SciFi in the library' }).click()]);
+  await libPage.waitForLoadState();
+  await expect(libPage.locator('section[aria-label="SciFi"]')).toBeInViewport();
+
+  await libPage.close();
+  await panel.close();
+  await lib.close();
+});
+
 test('side panel Inbox: a link leaves the list when it is moved or removed', async () => {
   const lib = await openLibraryWithSpace('Sorting');
   await addCollectionWithLinks(lib, 'Sorted', []);

@@ -1034,7 +1034,7 @@ export const ru: Messages = {
   'quick.switchFailed': 'Не удалось переключить: {error}',
 
   'save.heading': 'Сохраняем вкладку',
-  'save.search': 'Искать коллекции',
+  'save.search': 'Искать ссылки и коллекции',
   'save.dragHint': 'Перетащите в библиотеку, чтобы сохранить там',
   'save.reading': 'Читаю текущую вкладку…',
   'save.allow': 'Разрешить Tabarium следить за активной вкладкой',
@@ -1104,6 +1104,8 @@ export const ru: Messages = {
   'qv.saveFailed': 'Не удалось сохранить ссылку: {error}',
 
   'dp.matching': 'Подходящие коллекции',
+  'dp.links': 'Подходящие ссылки',
+  'dp.reveal': 'Показать «{collection}» в библиотеке',
   'dp.spaces': 'Пространства',
   'dp.noSpaces': 'Пространств пока нет. Откройте библиотеку, чтобы создать.',
   'dp.newIn': 'Новая коллекция в {space}',
