@@ -6,6 +6,7 @@ import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/format
 import { parseTobyFile, toTobyJson } from '../core/toby';
 import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
+import { MAX_SNAPSHOTS } from '../core/snapshots';
 import { usePlatform } from '../platform/context';
 import { backupFilename, downloadTextFile } from '../platform/files';
 import type { ShortcutInfo } from '../platform/ports';
@@ -43,6 +44,9 @@ const INTERVALS: readonly { hours: number; label: Extract<StringKey, `set.auto.$
   { hours: 24, label: 'set.auto.daily' },
   { hours: 168, label: 'set.auto.weekly' },
 ];
+
+/** How often open windows are snapshotted, in minutes. */
+const SNAP_INTERVALS: readonly number[] = [5, 15, 30, 60];
 
 const THEME_KEYS: Record<Settings['theme'], Extract<StringKey, `set.theme.${string}`>> = {
   system: 'set.theme.system',
@@ -182,6 +186,18 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       setStatus(enabled ? t('set.auto.enabled') : t('set.auto.disabled'));
     })();
 
+  const setSnapshots = (enabled: boolean, intervalMinutes: number) =>
+    guard(t('run.snapshotsSetting'), async () => {
+      if (enabled) {
+        const granted =
+          (await platform.permissions.request('tabs')) && (await platform.permissions.request('alarms'));
+        if (!granted) throw new Error(tr()('err.needTabsAlarms'));
+      }
+      await updateSettings(db, { sessionSnapshots: { enabled, intervalMinutes } });
+      await platform.backupSchedule.resync();
+      setStatus(enabled ? t('set.snap.enabled') : t('set.snap.disabled'));
+    })();
+
   const setToolbar = (quickPanel: 'side' | 'popup') =>
     guard(t('run.toolbarButton'), async () => {
       await updateSettings(db, { quickPanel });
@@ -302,6 +318,33 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             checked={settings.autoBackup.enabled}
             label={t('set.auto.switch')}
             onChange={(v) => setAutoBackup(v, settings.autoBackup.intervalHours)}
+          />
+        </div>
+      </Section>
+
+      <Section title={t('set.snap.title')} description={t('set.snap.desc', { kept: MAX_SNAPSHOTS })}>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">{t('set.snap.switch')}</p>
+            <p className="text-xs text-muted">{t('ses.empty.hint')}</p>
+          </div>
+          <select
+            aria-label={t('set.snap.interval')}
+            value={settings.sessionSnapshots.intervalMinutes}
+            disabled={!settings.sessionSnapshots.enabled}
+            onChange={(e) => setSnapshots(true, Number(e.target.value))}
+            className="h-10 rounded-lg border border-line bg-bg px-3 text-sm disabled:opacity-50"
+          >
+            {SNAP_INTERVALS.map((m) => (
+              <option key={m} value={m}>
+                {t.plural('count.minutes', m)}
+              </option>
+            ))}
+          </select>
+          <Switch
+            checked={settings.sessionSnapshots.enabled}
+            label={t('set.snap.switch')}
+            onChange={(v) => setSnapshots(v, settings.sessionSnapshots.intervalMinutes)}
           />
         </div>
       </Section>

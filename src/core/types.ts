@@ -85,3 +85,25 @@ export type Tag = z.infer<typeof TagSchema>;
 export type Hashtag = z.infer<typeof HashtagSchema>;
 export type Activity = z.infer<typeof ActivitySchema>;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
+
+/** One saveable tab of a snapshot window; groupId points at the window's remembered groups. */
+export interface SnapshotTab {
+  title: string;
+  url: string;
+  favIconUrl: string | null;
+  groupId?: number;
+}
+
+/** A browser window's contents when the snapshot ran. */
+export interface SnapshotWindow {
+  tabs: SnapshotTab[];
+  /** Tab groups as they were then; restoring only borrows their titles and colours. */
+  groups: { id: number; title: string; color: string }[];
+}
+
+/** The set of open windows stored by the periodic session-snapshot alarm. */
+export interface SessionSnapshot {
+  id: string;
+  createdAt: number;
+  windows: SnapshotWindow[];
+}

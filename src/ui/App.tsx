@@ -48,6 +48,7 @@ import { useLibraryData } from './useLibraryData';
 import { useDuplicateGuard } from './DuplicateGuard';
 import { buildLabelsApi } from './labelsApi';
 import { BookmarksPage } from './BookmarksPage';
+import { SessionsPage } from './SessionsPage';
 import { DashboardPage } from './DashboardPage';
 import { InboxPage } from './InboxPage';
 import { SWATCHES } from './colors';
@@ -83,6 +84,7 @@ const TITLE_KEYS = {
   hashtags: 'nav.hashtags',
   settings: 'nav.settings',
   organizer: 'nav.organizerTitle',
+  sessions: 'ses.title',
 } as const;
 
 /** One entry in the tab's history stack; pos orders entries so the chevrons know where the edges are. */
@@ -301,7 +303,7 @@ export function App() {
   }, []);
 
   const plainPage =
-    organizerOpen || view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags';
+    organizerOpen || view?.kind === 'dashboard' || view?.kind === 'bookmarks' || view?.kind === 'settings' || view?.kind === 'tags' || view?.kind === 'hashtags' || view?.kind === 'sessions';
   const panelEnabled = settings?.openTabsPanel !== false && !plainPage;
   const tabsCtl = useOpenTabsController({
     enabled: panelEnabled || organizerOpen,
@@ -587,6 +589,8 @@ export function App() {
           )}
 
           {view?.kind === 'bookmarks' && <BookmarksPage cards={cards} run={run} />}
+
+          {view?.kind === 'sessions' && <SessionsPage run={run} groupTitles={settings?.tabGroups === true} />}
 
           {view?.kind === 'settings' && <SettingsView onError={reportError} />}
 

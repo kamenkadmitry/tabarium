@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { attachAlarmHandler, syncBackupAlarm } from '../background/backupAlarm';
 import { attachCommandHandler, runCommand, saveActiveTab } from '../background/commands';
 import { attachContextMenuHandler, handleClick, syncContextMenu } from '../background/contextMenu';
+import { attachSnapshotHandler, captureSnapshot, syncSnapshotAlarm } from '../background/sessionShots';
 import { applyToolbarBehavior } from '../background/toolbar';
 import { db, repo } from '../core/instance';
 import { saveToInbox } from '../core/quicksave';
@@ -11,7 +12,8 @@ async function syncAll(): Promise<void> {
   attachAlarmHandler();
   attachContextMenuHandler();
   attachCommandHandler();
-  await Promise.all([syncBackupAlarm(), syncContextMenu(), applyToolbarBehavior()]);
+  attachSnapshotHandler();
+  await Promise.all([syncBackupAlarm(), syncSnapshotAlarm(), syncContextMenu(), applyToolbarBehavior()]);
 }
 
 export default defineBackground(() => {
@@ -19,6 +21,7 @@ export default defineBackground(() => {
   attachAlarmHandler();
   attachContextMenuHandler();
   attachCommandHandler();
+  attachSnapshotHandler();
   // The popup override is not persisted by the browser, so it is re-applied every time the worker starts.
   applyToolbarBehavior().catch((e: unknown) => console.error('Tabarium: applying the toolbar behaviour failed', e));
   browser.runtime.onInstalled.addListener(() => void syncAll());
@@ -39,6 +42,7 @@ export default defineBackground(() => {
       if (m.type === 'e2e-save-current-tab') return saveActiveTab(); // real key presses can't reach the commands API from tests
       if (m.type === 'e2e-invoke-command' && typeof m.name === 'string') return runCommand(m.name);
       if (m.type === 'e2e-ensure-hashtag' && typeof m.name === 'string') return repo.ensureHashtag(m.name); // seeds a label the UI can't create headlessly
+      if (m.type === 'e2e-take-snapshot') return captureSnapshot(); // alarm firing waits real minutes, so tests trigger the capture themselves
       return m.type === 'e2e-context-click' && m.info ? handleClick(m.info, m.tab) : undefined;
     });
   }

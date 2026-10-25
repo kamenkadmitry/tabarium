@@ -1,4 +1,4 @@
-import { Bookmark, Copy, Hash, Kanban, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
+import { Bookmark, Copy, Hash, History, Kanban, Layers, LayoutDashboard, Pencil, Plus, Settings, Star, Tag, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
 import { displaySpaceName } from '../core/quicksave';
 import type { Settings as AppSettings } from '../core/settings';
@@ -16,7 +16,8 @@ export type View =
   | { kind: 'tags' }
   | { kind: 'hashtags' }
   | { kind: 'settings' }
-  | { kind: 'organizer' };
+  | { kind: 'organizer' }
+  | { kind: 'sessions' };
 
 interface Props {
   spaces: readonly Space[];
@@ -144,6 +145,9 @@ export function Sidebar(props: Props) {
         </NavButton>
         <NavButton active={view?.kind === 'organizer'} onClick={() => props.onSelect({ kind: 'organizer' })} icon={<Kanban size={18} aria-hidden />}>
           {t('nav.organizer')}
+        </NavButton>
+        <NavButton active={view?.kind === 'sessions'} onClick={() => props.onSelect({ kind: 'sessions' })} icon={<History size={18} aria-hidden />}>
+          {t('nav.sessions')}
         </NavButton>
       </nav>
 

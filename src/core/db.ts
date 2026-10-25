@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { dayKey } from './activity';
-import type { Activity, Card, Collection, Hashtag, Space, Tag } from './types';
+import type { Activity, Card, Collection, Hashtag, SessionSnapshot, Space, Tag } from './types';
 
 export interface SettingRow {
   key: string;
@@ -14,6 +14,7 @@ export class TabariumDB extends Dexie {
   tags!: EntityTable<Tag, 'id'>;
   hashtags!: EntityTable<Hashtag, 'id'>;
   activity!: EntityTable<Activity, 'id'>;
+  snapshots!: EntityTable<SessionSnapshot, 'id'>;
   settings!: EntityTable<SettingRow, 'key'>;
 
   constructor(name = 'tabarium') {
@@ -67,5 +68,7 @@ export class TabariumDB extends Dexie {
       });
     // v6: the retired Next queue is dropped for good. Null means "delete this table".
     this.version(6).stores({ nexts: null });
+    // v7: periodic snapshots of open windows for crash/accidental-close recovery.
+    this.version(7).stores({ snapshots: 'id, createdAt' });
   }
 }

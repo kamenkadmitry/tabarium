@@ -21,6 +21,13 @@ export const SettingsSchema = z.object({
     enabled: z.boolean(),
     intervalHours: z.number().int().min(1).max(24 * 30),
   }),
+  /** Periodic snapshots of open windows for recovery; the alarm needs `alarms` and `tabs`. */
+  sessionSnapshots: z
+    .object({
+      enabled: z.boolean(),
+      intervalMinutes: z.number().int().min(1).max(24 * 60),
+    })
+    .default({ enabled: false, intervalMinutes: 15 }),
   lastBackupAt: z.number().int().nullable(),
   /** Collection used by the popup, side panel and context menu. Null until the first quick save. */
   quickSaveCollectionId: z.string().nullable().default(null),
@@ -65,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'system',
   palette: 'teal',
   autoBackup: { enabled: false, intervalHours: 24 },
+  sessionSnapshots: { enabled: false, intervalMinutes: 15 },
   lastBackupAt: null,
   quickSaveCollectionId: null,
   contextMenu: false,

@@ -41,6 +41,7 @@ const PAGES: { titleKey: StringKey; view: View }[] = [
   { titleKey: 'nav.tags', view: { kind: 'tags' } },
   { titleKey: 'nav.hashtags', view: { kind: 'hashtags' } },
   { titleKey: 'nav.organizerTitle', view: { kind: 'organizer' } },
+  { titleKey: 'nav.sessions', view: { kind: 'sessions' } },
   { titleKey: 'nav.settings', view: { kind: 'settings' } },
 ];
 

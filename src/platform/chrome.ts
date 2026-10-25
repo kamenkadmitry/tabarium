@@ -117,7 +117,8 @@ export function createChromePlatform(): Platform {
           const groups = api.tabGroups
             ? (await api.tabGroups.query({ windowId: w.id })).map((g) => ({ id: g.id, title: g.title ?? '', color: g.color }))
             : [];
-          result.push({ id: w.id, current: w.id === here.id, tabs, groups });
+          // `getCurrent` has no associated window in the service worker and may resolve without one.
+          result.push({ id: w.id, current: w.id === here?.id, tabs, groups });
         }
         // Windows that hold nothing saveable (only the library, settings pages, ...) are not worth showing.
         return result.filter((w) => w.tabs.length > 0 || w.current);
