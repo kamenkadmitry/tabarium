@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, Eye, EyeOff, Upload } from 'lucide-react';
+import { Download, Eye, EyeOff, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
 import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
@@ -90,6 +90,20 @@ function Switch(props: { checked: boolean; onChange: (v: boolean) => void; label
 }
 
 type ImportSource = 'auto' | 'bookmarks' | 'toby' | 'linkwarden';
+type ExportFormat = 'json' | 'html' | 'txt' | 'toby';
+
+const SOURCE_LABELS: Record<ImportSource, StringKey> = {
+  auto: 'set.backup.srcAuto',
+  bookmarks: 'set.backup.srcBookmarks',
+  toby: 'set.backup.srcToby',
+  linkwarden: 'set.backup.srcLinkwarden',
+};
+const FORMAT_LABELS: Record<ExportFormat, StringKey> = {
+  json: 'set.backup.nativeBackup',
+  html: 'set.backup.bookmarksHtml',
+  txt: 'set.backup.text',
+  toby: 'set.backup.tobyJson',
+};
 
 export function SettingsView({ onError }: { onError: (what: string, e: unknown) => void }) {
   const t = useT();
@@ -102,6 +116,9 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const [status, setStatus] = useState<string | null>(null);
   /** 'busy' shows an indeterminate bar; a number shows real progress (fraction 0..1). */
   const [progress, setProgress] = useState<number | 'busy' | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('json');
+  /** A file picked through the source menu, waiting for the Import button. */
+  const [pendingImport, setPendingImport] = useState<{ file: File; source: ImportSource | 'native'; label: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
   const [shortcuts, setShortcuts] = useState<ShortcutInfo[]>([]);
@@ -143,22 +160,22 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       .finally(() => setProgress(null));
   };
 
-  const exportNow = tracked(t('run.export'), async () => {
+  const exportFile = async (format: ExportFormat) => {
     const backup = await exportBackup(db);
-    downloadTextFile(backupFilename(), JSON.stringify(backup, null, 2));
-    await recordBackup(db);
-    setStatus(t('set.backup.exported', { tabs: t.plural('count.tabs', backup.cards.length), collections: t.plural('count.collections', backup.collections.length) }));
-  });
+    if (format === 'json') {
+      downloadTextFile(backupFilename(), JSON.stringify(backup, null, 2));
+      await recordBackup(db);
+      setStatus(t('set.backup.exported', { tabs: t.plural('count.tabs', backup.cards.length), collections: t.plural('count.collections', backup.collections.length) }));
+      return;
+    }
+    const base = backupFilename().replace(/\.json$/, '');
+    if (format === 'html') downloadTextFile(`${base}.html`, toBookmarksHtml(backup), 'text/html');
+    else if (format === 'txt') downloadTextFile(`${base}.txt`, toPlainText(backup), 'text/plain');
+    else downloadTextFile(`${base}-toby.json`, toTobyJson(backup));
+    setStatus(t('set.backup.exportedAs', { tabs: t.plural('count.tabs', backup.cards.length), format: format === 'toby' ? 'Toby-compatible JSON' : format.toUpperCase() }));
+  };
 
-  const exportAs = (format: 'html' | 'txt' | 'toby') =>
-    tracked(t('run.export'), async () => {
-      const backup = await exportBackup(db);
-      const base = backupFilename().replace(/\.json$/, '');
-      if (format === 'html') downloadTextFile(`${base}.html`, toBookmarksHtml(backup), 'text/html');
-      else if (format === 'txt') downloadTextFile(`${base}.txt`, toPlainText(backup), 'text/plain');
-      else downloadTextFile(`${base}-toby.json`, toTobyJson(backup));
-      setStatus(t('set.backup.exportedAs', { tabs: t.plural('count.tabs', backup.cards.length), format: format === 'toby' ? 'Toby-compatible JSON' : format.toUpperCase() }));
-    })();
+  const runExport = tracked(t('run.export'), () => exportFile(exportFormat));
 
   /** Bookmarks/Toby/Linkwarden export picked by `source`; 'auto' guesses from the file shape. */
   const importBookmarks = async (file: File, source: ImportSource = 'auto') => {
@@ -212,6 +229,15 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     await restoreBackup(db, backup);
     setStatus(t('set.backup.restored', { tabs: t.plural('count.tabs', backup.cards.length), file: file.name }));
   };
+
+  /** Executes the staged import chosen via the source menu. */
+  const runImport = tracked(t('run.import'), async () => {
+    const pending = pendingImport;
+    if (!pending) return;
+    setPendingImport(null);
+    if (pending.source === 'native') await importFile(pending.file);
+    else await importBookmarks(pending.file, pending.source);
+  });
 
   const setAutoBackup = (enabled: boolean, intervalHours: number) =>
     guard(t('run.autoBackup'), async () => {
@@ -285,23 +311,34 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
 
       <Section title={t('set.backup.title')} description={t('set.backup.desc')}>
         <div className="flex flex-wrap items-center gap-2">
-          <Menu label={t('set.backup.export')} icon={<Download size={16} aria-hidden />}>
+          <Menu label={t(FORMAT_LABELS[exportFormat])} ariaLabel={t('set.backup.exportFormat')} icon={<Download size={16} aria-hidden />}>
             {(close) => (
               <>
-                <MenuItem
-                  onClick={() => {
-                    close();
-                    exportNow();
-                  }}
-                >
-                  {t('set.backup.nativeBackup')}
-                </MenuItem>
-                <MenuItem onClick={() => { close(); exportAs('html'); }}>{t('set.backup.bookmarksHtml')}</MenuItem>
-                <MenuItem onClick={() => { close(); exportAs('txt'); }}>{t('set.backup.text')}</MenuItem>
-                <MenuItem onClick={() => { close(); exportAs('toby'); }}>{t('set.backup.tobyJson')}</MenuItem>
+                {(
+                  [
+                    ['json', t('set.backup.nativeBackup')],
+                    ['html', t('set.backup.bookmarksHtml')],
+                    ['txt', t('set.backup.text')],
+                    ['toby', t('set.backup.tobyJson')],
+                  ] as [ExportFormat, string][]
+                ).map(([format, label]) => (
+                  <MenuItem
+                    key={format}
+                    checked={exportFormat === format}
+                    onClick={() => {
+                      setExportFormat(format);
+                      close();
+                    }}
+                  >
+                    {label}
+                  </MenuItem>
+                ))}
               </>
             )}
           </Menu>
+          <button type="button" className={buttonClass} onClick={runExport}>
+            {t('set.backup.doExport')}
+          </button>
           <Menu label={t('set.backup.import')} icon={<Upload size={16} aria-hidden />}>
             {(close) => (
               <>
@@ -344,7 +381,7 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
-              if (file) tracked(t('run.import'), () => importFile(file))();
+              if (file) setPendingImport({ file, source: 'native', label: t('set.backup.nativeBackup') });
             }}
           />
           <input
@@ -359,11 +396,29 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
               if (file) {
                 const source = importSource.current;
                 importSource.current = 'auto';
-                tracked(t('run.import'), () => importBookmarks(file, source))();
+                setPendingImport({ file, source, label: t(SOURCE_LABELS[source]) });
               }
             }}
           />
         </div>
+        {pendingImport !== null && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+            <Upload size={14} aria-hidden className="text-muted" />
+            <span className="font-medium">{pendingImport.file.name}</span>
+            <span className="text-muted">· {pendingImport.label}</span>
+            <button type="button" className={buttonClass} onClick={runImport}>
+              {t('set.backup.doImport')}
+            </button>
+            <button
+              type="button"
+              aria-label={t('common.cancel')}
+              onClick={() => setPendingImport(null)}
+              className="grid size-7 place-items-center rounded-md text-muted transition-colors hover:bg-surface hover:text-fg"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          </div>
+        )}
         {progress !== null && (
           <div
             role="progressbar"

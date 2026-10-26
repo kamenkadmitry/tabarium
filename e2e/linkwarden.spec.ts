@@ -11,6 +11,9 @@ test('imports a Linkwarden export through the source picker', async () => {
   await page.getByRole('button', { name: 'Import…' }).click();
   await page.getByRole('menuitem', { name: 'Linkwarden', exact: true }).click();
   await page.getByLabel('Import source file').setInputFiles(path.resolve('e2e/fixtures/linkwarden.json'));
+  // The file is staged — nothing imported until the Import button is pressed.
+  await expect(page.getByText('linkwarden.json')).toBeVisible();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Imported' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Linkwarden', exact: true }).click();
@@ -39,6 +42,7 @@ test('auto-detect recognises a Linkwarden file without a source choice', async (
   await page.getByRole('button', { name: 'Import…' }).click();
   await page.getByRole('menuitem', { name: 'Auto-detect format' }).click();
   await page.getByLabel('Import source file').setInputFiles(path.resolve('e2e/fixtures/linkwarden.json'));
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Imported' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Linkwarden', exact: true })).toBeVisible();
 

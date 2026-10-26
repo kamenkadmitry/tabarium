@@ -50,10 +50,11 @@ test('settings: export produces a valid backup that restores after deletion', as
   await page.goto(`chrome-extension://${extensionId}/newtab.html`);
   await page.getByRole('button', { name: 'Settings' }).click();
 
-  await page.getByRole('button', { name: 'Export…' }).click();
+  await page.getByRole('button', { name: /Export format/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Tabarium backup (JSON)' }).click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('menuitem', { name: 'Tabarium backup (JSON)' }).click(),
+    page.getByRole('button', { name: 'Export', exact: true }).click(),
   ]);
   const file = path.join(mkdtempSync(path.join(tmpdir(), 'tabarium-backup-')), 'backup.json');
   await download.saveAs(file);
@@ -66,6 +67,7 @@ test('settings: export produces a valid backup that restores after deletion', as
   await page.getByRole('button', { name: 'Settings' }).click();
   page.once('dialog', (d) => void d.accept());
   await page.getByLabel('Backup file').setInputFiles(file);
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Restored' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Work', exact: true }).click();
