@@ -158,7 +158,7 @@ describe('export and import formats', () => {
     await seed();
     const html = `<DL><p><DT><H3>Loose</H3><DL><p><DT><A HREF="https://x.io/">X</A><DT><A HREF="https://x.io">X dup</A><DT><A HREF="javascript:alert(1)">bad</A></DL><p></DL>`;
     const result = await repo.importStructure(parseBookmarksHtml(html));
-    expect(result).toEqual({ collections: 1, cards: 1 });
+    expect(result).toEqual({ collections: 1, cards: 1, duplicates: 1, tags: 0, hashtags: 0 });
     expect(await db.cards.count()).toBe(4);
     expect(await db.spaces.count()).toBe(2);
   });

@@ -93,7 +93,7 @@ describe('importing a Linkwarden export', () => {
   it('creates the space, collections, cards with notes, tags and stars', async () => {
     const ticks: [number, number][] = [];
     const result = await repo.importStructure(parseLinkwarden(json), (d, t) => ticks.push([d, t]));
-    expect(result).toEqual({ collections: 5, cards: 5 });
+    expect(result).toEqual({ collections: 5, cards: 5, duplicates: 0, tags: 2, hashtags: 0 });
     expect(ticks).toEqual([[1, 5], [2, 5], [3, 5], [4, 5], [5, 5]]);
     expect((await db.spaces.toArray()).map((s) => s.name)).toContain('Linkwarden');
 

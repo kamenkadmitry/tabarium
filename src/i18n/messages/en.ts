@@ -971,6 +971,24 @@ export const en = {
     many: '{n} new',
   },
   'count.savedAlready': '{n} already in the library',
+  'count.duplicates': {
+    one: '{n} duplicate',
+    other: '{n} duplicates',
+    few: '{n} duplicates',
+    many: '{n} duplicates',
+  },
+  'count.tags': {
+    one: '{n} tag',
+    other: '{n} tags',
+    few: '{n} tags',
+    many: '{n} tags',
+  },
+  'count.hashtags': {
+    one: '{n} hashtag',
+    other: '{n} hashtags',
+    few: '{n} hashtags',
+    many: '{n} hashtags',
+  },
 
   // --- settings ------------------------------------------------------------------------
   'set.backup.title': 'Backup',
@@ -990,7 +1008,7 @@ export const en = {
   'set.backup.srcLinkwarden': 'Linkwarden',
   'set.backup.exported': 'Exported {tabs} in {collections}.',
   'set.backup.exportedAs': 'Exported {tabs} as {format}.',
-  'set.backup.imported': 'Imported {tabs} into {collections} from {file}.',
+  'set.backup.imported': 'Imported {tabs} into {collections} from {file}. Skipped: {dups}. Created: {tags}, {hashtags}.',
   'set.backup.replaceConfirm': 'Replace ALL current data ({current}) with this backup ({summary})? This cannot be undone.',
   'set.backup.restored': 'Restored {tabs} from {file}.',
   'set.auto.title': 'Automatic backup',

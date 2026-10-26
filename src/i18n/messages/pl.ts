@@ -945,6 +945,24 @@ export const pl: Messages = {
     other: '{n} nowe',
   },
   'count.savedAlready': '{n} już w bibliotece',
+  'count.duplicates': {
+    one: '{n} duplikat',
+    few: '{n} duplikaty',
+    many: '{n} duplikatów',
+    other: '{n} duplikatów',
+  },
+  'count.tags': {
+    one: '{n} tag',
+    few: '{n} tagi',
+    many: '{n} tagów',
+    other: '{n} tagów',
+  },
+  'count.hashtags': {
+    one: '{n} hashtag',
+    few: '{n} hashtagi',
+    many: '{n} hashtagów',
+    other: '{n} hashtagów',
+  },
 
   'set.backup.title': 'Kopia zapasowa',
   'set.backup.desc': 'Twoja biblioteka żyje tylko w tej przeglądarce. Trzymaj kopię pod kontrolą.',
@@ -963,7 +981,7 @@ export const pl: Messages = {
   'set.backup.srcLinkwarden': 'Linkwarden',
   'set.backup.exported': 'Wyeksportowano: {tabs}, {collections}.',
   'set.backup.exportedAs': 'Wyeksportowano: {tabs} jako {format}.',
-  'set.backup.imported': 'Zaimportowano z {file}: {tabs}, {collections}.',
+  'set.backup.imported': 'Zaimportowano z {file}: {tabs}, {collections}. Pominięto: {dups}. Utworzono: {tags}, {hashtags}.',
   'set.backup.replaceConfirm': 'Zastąpić WSZYSTKIE obecne dane ({current}) tą kopią ({summary})? Tego nie można cofnąć.',
   'set.backup.restored': 'Przywrócono z {file}: {tabs}.',
   'set.auto.title': 'Automatyczna kopia zapasowa',

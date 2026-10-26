@@ -62,6 +62,8 @@ export interface ImportedLink {
   customTitle?: string | null;
   note?: string | null;
   tags?: ImportedTag[];
+  /** Free-form #hashtag names (without the #). */
+  hashtags?: string[];
   starred?: boolean;
 }
 export interface ImportedCollection {

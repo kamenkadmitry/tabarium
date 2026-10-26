@@ -10,6 +10,17 @@ import type { ActivityType, Card, Collection, Hashtag, Space, Tag } from './type
 import { restoreDeletion, type Deletion } from './undo';
 import { normalizeUrl } from './url';
 
+/** Result of importing an external structure: what was added, skipped and created. */
+export interface ImportReport {
+  collections: number;
+  cards: number;
+  /** Links dropped because their URL repeats inside the import or already sits in the target collection. */
+  duplicates: number;
+  /** Tags created by the import (existing ones are reused silently). */
+  tags: number;
+  hashtags: number;
+}
+
 export interface NewCard {
   title: string;
   url: string;
@@ -414,18 +425,34 @@ export class Repository {
   async importStructure(
     spaces: readonly ImportedSpace[],
     onProgress?: (done: number, total: number) => void,
-  ): Promise<{ collections: number; cards: number }> {
+  ): Promise<ImportReport> {
     let collections = 0;
     let cards = 0;
+    let duplicates = 0;
+    let tags = 0;
+    let hashtags = 0;
     const total = spaces.reduce((n, s) => n + s.collections.length, 0);
     let done = 0;
     const tagByTitle = new Map((await this.db.tags.toArray()).map((t) => [t.title.toLowerCase(), t.id]));
+    const hashtagByName = new Map((await this.db.hashtags.toArray()).map((h) => [h.name, h.id]));
     const ensureTag = async (tag: { title: string; color: string }) => {
       const key = tag.title.toLowerCase();
       let id = tagByTitle.get(key);
       if (id === undefined) {
         id = (await this.createTag(tag.title || tr()('common.untitled'), tag.color || '#0d9488')).id;
         tagByTitle.set(key, id);
+        tags += 1;
+      }
+      return id;
+    };
+    const ensureHashtag = async (raw: string) => {
+      const name = normalizeHashtag(raw);
+      if (name === '') return null;
+      let id = hashtagByName.get(name);
+      if (id === undefined) {
+        id = (await this.ensureHashtag(name)).id;
+        hashtagByName.set(name, id);
+        hashtags += 1;
       }
       return id;
     };
@@ -436,12 +463,21 @@ export class Repository {
         const col = await this.createCollection(space.id, c.title || tr()('common.untitled'));
         collections += 1;
         const links: NewCard[] = [];
-        for (const link of dedupeLinks(c.links)) {
+        const deduped = dedupeLinks(c.links);
+        duplicates += c.links.length - deduped.length;
+        for (const link of deduped) {
           const tagIds: string[] = [];
           for (const tag of link.tags ?? []) tagIds.push(await ensureTag(tag));
-          links.push({ ...link, tagIds });
+          const hashtagIds: string[] = [];
+          for (const name of link.hashtags ?? []) {
+            const id = await ensureHashtag(name);
+            if (id !== null) hashtagIds.push(id);
+          }
+          links.push({ ...link, tagIds, hashtagIds });
         }
-        cards += (await this.addCards(col.id, links)).length;
+        const added = await this.addCards(col.id, links);
+        cards += added.length;
+        duplicates += links.length - added.length;
         const tagIds: string[] = [];
         for (const tag of c.tags ?? []) tagIds.push(await ensureTag(tag));
         if (tagIds.length > 0) await this.setCollectionTags(col.id, tagIds);
@@ -449,7 +485,7 @@ export class Repository {
         onProgress?.(done, total);
       }
     }
-    return { collections, cards };
+    return { collections, cards, duplicates, tags, hashtags };
   }
 
   /** Groups of cards (across the whole library) that share a normalised URL. */

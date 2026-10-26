@@ -945,6 +945,24 @@ export const ru: Messages = {
     other: '{n} новые',
   },
   'count.savedAlready': '{n} уже в библиотеке',
+  'count.duplicates': {
+    one: '{n} дубликат',
+    few: '{n} дубликата',
+    many: '{n} дубликатов',
+    other: '{n} дубликатов',
+  },
+  'count.tags': {
+    one: '{n} тег',
+    few: '{n} тега',
+    many: '{n} тегов',
+    other: '{n} тегов',
+  },
+  'count.hashtags': {
+    one: '{n} хештег',
+    few: '{n} хештега',
+    many: '{n} хештегов',
+    other: '{n} хештегов',
+  },
 
   'set.backup.title': 'Резервная копия',
   'set.backup.desc': 'Ваша библиотека живёт только в этом браузере. Держите копию под контролем.',
@@ -963,7 +981,7 @@ export const ru: Messages = {
   'set.backup.srcLinkwarden': 'Linkwarden',
   'set.backup.exported': 'Экспортировано: {tabs}, {collections}.',
   'set.backup.exportedAs': 'Экспортировано: {tabs} как {format}.',
-  'set.backup.imported': 'Импортировано из {file}: {tabs}, {collections}.',
+  'set.backup.imported': 'Импортировано из {file}: {tabs}, {collections}. Пропущено: {dups}. Создано: {tags}, {hashtags}.',
   'set.backup.replaceConfirm': 'Заменить ВСЕ текущие данные ({current}) этим бэкапом ({summary})? Это необратимо.',
   'set.backup.restored': 'Восстановлено из {file}: {tabs}.',
   'set.auto.title': 'Автоматический бэкап',

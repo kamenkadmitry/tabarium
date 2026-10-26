@@ -945,6 +945,24 @@ export const be: Messages = {
     other: '{n} новыя',
   },
   'count.savedAlready': '{n} ужо ў бібліятэцы',
+  'count.duplicates': {
+    one: '{n} дублікат',
+    few: '{n} дублікаты',
+    many: '{n} дублікатаў',
+    other: '{n} дублікатаў',
+  },
+  'count.tags': {
+    one: '{n} тэг',
+    few: '{n} тэгі',
+    many: '{n} тэгаў',
+    other: '{n} тэгаў',
+  },
+  'count.hashtags': {
+    one: '{n} хэштэг',
+    few: '{n} хэштэгі',
+    many: '{n} хэштэгаў',
+    other: '{n} хэштэгаў',
+  },
 
   'set.backup.title': 'Рэзервовая копія',
   'set.backup.desc': 'Ваша бібліятэка жыве толькі ў гэтым браўзеры. Трымайце копію пад кантролем.',
@@ -963,7 +981,7 @@ export const be: Messages = {
   'set.backup.srcLinkwarden': 'Linkwarden',
   'set.backup.exported': 'Экспартавана: {tabs}, {collections}.',
   'set.backup.exportedAs': 'Экспартавана: {tabs} як {format}.',
-  'set.backup.imported': 'Імпартавана з {file}: {tabs}, {collections}.',
+  'set.backup.imported': 'Імпартавана з {file}: {tabs}, {collections}. Прапушчана: {dups}. Створана: {tags}, {hashtags}.',
   'set.backup.replaceConfirm': 'Замяніць УСЕ бягучыя даныя ({current}) гэтай копіяй ({summary})? Гэта нельга адмяніць.',
   'set.backup.restored': 'Адноўлена з {file}: {tabs}.',
   'set.auto.title': 'Аўтаматычная рэзервовая копія',

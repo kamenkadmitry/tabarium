@@ -183,7 +183,16 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     const result = await repo.importStructure(imported, (done, total) =>
       setProgress(total > 0 ? done / total : 'busy'),
     );
-    setStatus(t('set.backup.imported', { tabs: t.plural('count.tabs', result.cards), collections: t.plural('count.collections', result.collections), file: file.name }));
+    setStatus(
+      t('set.backup.imported', {
+        tabs: t.plural('count.tabs', result.cards),
+        collections: t.plural('count.collections', result.collections),
+        file: file.name,
+        dups: t.plural('count.duplicates', result.duplicates),
+        tags: t.plural('count.tags', result.tags),
+        hashtags: t.plural('count.hashtags', result.hashtags),
+      }),
+    );
   };
 
   const importFile = async (file: File) => {
