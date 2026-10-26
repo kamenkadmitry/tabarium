@@ -100,6 +100,8 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   const importSource = useRef<ImportSource>('auto');
   const avatarInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
+  /** 'busy' shows an indeterminate bar; a number shows real progress (fraction 0..1). */
+  const [progress, setProgress] = useState<number | 'busy' | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [aiDraft, setAiDraft] = useState<Settings['ai'] | null>(null);
   const [shortcuts, setShortcuts] = useState<ShortcutInfo[]>([]);
@@ -132,7 +134,16 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     fn().catch((e: unknown) => onError(what, e));
   };
 
-  const exportNow = guard(t('run.export'), async () => {
+  /** Same as guard, but shows the progress bar while the operation runs. */
+  const tracked = (what: string, fn: () => Promise<void>) => () => {
+    setStatus(null);
+    setProgress('busy');
+    void fn()
+      .catch((e: unknown) => onError(what, e))
+      .finally(() => setProgress(null));
+  };
+
+  const exportNow = tracked(t('run.export'), async () => {
     const backup = await exportBackup(db);
     downloadTextFile(backupFilename(), JSON.stringify(backup, null, 2));
     await recordBackup(db);
@@ -140,7 +151,7 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
   });
 
   const exportAs = (format: 'html' | 'txt' | 'toby') =>
-    guard(t('run.export'), async () => {
+    tracked(t('run.export'), async () => {
       const backup = await exportBackup(db);
       const base = backupFilename().replace(/\.json$/, '');
       if (format === 'html') downloadTextFile(`${base}.html`, toBookmarksHtml(backup), 'text/html');
@@ -169,7 +180,9 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
     if (imported.every((s) => s.collections.every((c) => c.links.length === 0))) {
       throw new Error(t('err.importNoLinks'));
     }
-    const result = await repo.importStructure(imported);
+    const result = await repo.importStructure(imported, (done, total) =>
+      setProgress(total > 0 ? done / total : 'busy'),
+    );
     setStatus(t('set.backup.imported', { tabs: t.plural('count.tabs', result.cards), collections: t.plural('count.collections', result.collections), file: file.name }));
   };
 
@@ -262,40 +275,35 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       )}
 
       <Section title={t('set.backup.title')} description={t('set.backup.desc')}>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={buttonClass} onClick={exportNow}>
-            <Download size={16} aria-hidden /> {t('set.backup.export')}
-          </button>
-          <button type="button" className={buttonClass} onClick={() => fileInput.current?.click()}>
-            <Upload size={16} aria-hidden /> {t('set.backup.import')}
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            aria-label={t('set.backup.file')}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) guard(t('run.import'), () => importFile(file))();
-            }}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          <span className="mr-2 text-sm font-semibold">{t('set.backup.otherFormats')}</span>
-          <button type="button" className={buttonClass} onClick={() => exportAs('html')}>
-            <Download size={16} aria-hidden /> {t('set.backup.bookmarksHtml')}
-          </button>
-          <button type="button" className={buttonClass} onClick={() => exportAs('txt')}>
-            <Download size={16} aria-hidden /> {t('set.backup.text')}
-          </button>
-          <button type="button" className={buttonClass} onClick={() => exportAs('toby')}>
-            <Download size={16} aria-hidden /> {t('set.backup.tobyJson')}
-          </button>
-          <Menu label={t('set.backup.importFile')} icon={<Upload size={16} aria-hidden />}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Menu label={t('set.backup.export')} icon={<Download size={16} aria-hidden />}>
             {(close) => (
               <>
+                <MenuItem
+                  onClick={() => {
+                    close();
+                    exportNow();
+                  }}
+                >
+                  {t('set.backup.nativeBackup')}
+                </MenuItem>
+                <MenuItem onClick={() => { close(); exportAs('html'); }}>{t('set.backup.bookmarksHtml')}</MenuItem>
+                <MenuItem onClick={() => { close(); exportAs('txt'); }}>{t('set.backup.text')}</MenuItem>
+                <MenuItem onClick={() => { close(); exportAs('toby'); }}>{t('set.backup.tobyJson')}</MenuItem>
+              </>
+            )}
+          </Menu>
+          <Menu label={t('set.backup.import')} icon={<Upload size={16} aria-hidden />}>
+            {(close) => (
+              <>
+                <MenuItem
+                  onClick={() => {
+                    close();
+                    fileInput.current?.click();
+                  }}
+                >
+                  {t('set.backup.nativeBackup')}
+                </MenuItem>
                 {(
                   [
                     ['auto', t('set.backup.srcAuto')],
@@ -319,6 +327,18 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             )}
           </Menu>
           <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            aria-label={t('set.backup.file')}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) tracked(t('run.import'), () => importFile(file))();
+            }}
+          />
+          <input
             ref={bookmarksInput}
             type="file"
             accept=".html,.htm,.json,.txt"
@@ -330,11 +350,26 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
               if (file) {
                 const source = importSource.current;
                 importSource.current = 'auto';
-                guard(t('run.import'), () => importBookmarks(file, source))();
+                tracked(t('run.import'), () => importBookmarks(file, source))();
               }
             }}
           />
         </div>
+        {progress !== null && (
+          <div
+            role="progressbar"
+            aria-label={t('set.backup.progress')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress === 'busy' ? undefined : Math.round(progress * 100)}
+            className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+          >
+            <div
+              className={`h-full rounded-full bg-primary ${progress === 'busy' ? 'w-1/3 animate-pulse' : 'transition-[width]'}`}
+              style={progress === 'busy' ? undefined : { width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+        )}
         <div className="flex items-center gap-4 border-t border-line pt-4">
           <div className="flex-1">
             <p className="text-sm font-semibold">{t('set.auto.title')}</p>

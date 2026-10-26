@@ -50,7 +50,11 @@ test('settings: export produces a valid backup that restores after deletion', as
   await page.goto(`chrome-extension://${extensionId}/newtab.html`);
   await page.getByRole('button', { name: 'Settings' }).click();
 
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export to file' }).click()]);
+  await page.getByRole('button', { name: 'Export…' }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('menuitem', { name: 'Tabarium backup (JSON)' }).click(),
+  ]);
   const file = path.join(mkdtempSync(path.join(tmpdir(), 'tabarium-backup-')), 'backup.json');
   await download.saveAs(file);
 

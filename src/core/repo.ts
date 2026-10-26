@@ -411,9 +411,14 @@ export class Repository {
   }
 
   /** Adds imported spaces/collections/links. Existing data is untouched; spaces with the same name are reused. */
-  async importStructure(spaces: readonly ImportedSpace[]): Promise<{ collections: number; cards: number }> {
+  async importStructure(
+    spaces: readonly ImportedSpace[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<{ collections: number; cards: number }> {
     let collections = 0;
     let cards = 0;
+    const total = spaces.reduce((n, s) => n + s.collections.length, 0);
+    let done = 0;
     const tagByTitle = new Map((await this.db.tags.toArray()).map((t) => [t.title.toLowerCase(), t.id]));
     const ensureTag = async (tag: { title: string; color: string }) => {
       const key = tag.title.toLowerCase();
@@ -440,6 +445,8 @@ export class Repository {
         const tagIds: string[] = [];
         for (const tag of c.tags ?? []) tagIds.push(await ensureTag(tag));
         if (tagIds.length > 0) await this.setCollectionTags(col.id, tagIds);
+        done += 1;
+        onProgress?.(done, total);
       }
     }
     return { collections, cards };
