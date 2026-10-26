@@ -1,0 +1,41 @@
+{
+  "name": "Test User",
+  "username": "admin",
+  "collectionOrder": [2, 1],
+  "collections": [
+    {
+      "id": 1,
+      "name": "Reading",
+      "parentId": null,
+      "links": [
+        {
+          "id": 11,
+          "name": "Deep article",
+          "type": "url",
+          "description": "worth reading later",
+          "url": "https://example.test/deep",
+          "tags": [{ "name": "Docs" }]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Tools",
+      "parentId": null,
+      "links": [
+        {
+          "id": 21,
+          "name": "Toolkit",
+          "type": "url",
+          "description": "",
+          "url": "https://example.test/toolkit",
+          "tags": []
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "pinnedLinks": [
+    { "id": 21, "name": "Toolkit", "url": "https://example.test/toolkit", "collectionId": 2 }
+  ]
+}

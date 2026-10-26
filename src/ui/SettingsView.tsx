@@ -3,6 +3,7 @@ import { Download, Eye, EyeOff, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { exportBackup, parseBackup, restoreBackup } from '../core/backup';
 import { parseBookmarksHtml, toBookmarksHtml, toPlainText } from '../core/formats';
+import { looksLikeLinkwarden, parseLinkwarden } from '../core/linkwarden';
 import { parseTobyFile, toTobyJson } from '../core/toby';
 import { db, repo } from '../core/instance';
 import { AI_PROVIDERS, loadSettings, recordBackup, type Settings, updateSettings } from '../core/settings';
@@ -16,6 +17,7 @@ import { isAiConfigured, withProviderAccess } from './ai';
 import { avatarFromFile } from './avatar';
 import { radioGroupKeyDown, radioTab } from './a11y';
 import { inputClass } from './Dialog';
+import { Menu, MenuItem } from './Menu';
 import { PALETTES } from './palettes';
 import { useT } from '../i18n/I18nProvider';
 import { LOCALE_NAMES } from '../i18n/locale';
@@ -87,12 +89,15 @@ function Switch(props: { checked: boolean; onChange: (v: boolean) => void; label
   );
 }
 
+type ImportSource = 'auto' | 'bookmarks' | 'toby' | 'linkwarden';
+
 export function SettingsView({ onError }: { onError: (what: string, e: unknown) => void }) {
   const t = useT();
   const platform = usePlatform();
   const settings = useLiveQuery(() => loadSettings(db), []);
   const fileInput = useRef<HTMLInputElement>(null);
   const bookmarksInput = useRef<HTMLInputElement>(null);
+  const importSource = useRef<ImportSource>('auto');
   const avatarInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
@@ -144,15 +149,26 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
       setStatus(t('set.backup.exportedAs', { tabs: t.plural('count.tabs', backup.cards.length), format: format === 'toby' ? 'Toby-compatible JSON' : format.toUpperCase() }));
     })();
 
-  /** Browser bookmarks (.html with folders) or a Toby export (.json, .txt, flat .html). */
-  const importBookmarks = async (file: File) => {
+  /** Bookmarks/Toby/Linkwarden export picked by `source`; 'auto' guesses from the file shape. */
+  const importBookmarks = async (file: File, source: ImportSource = 'auto') => {
     const text = await file.text();
+    const isHtml = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm');
     const isNetscape = /<!DOCTYPE NETSCAPE-Bookmark-file/i.test(text) || /<dl\b/i.test(text);
-    const imported = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm')
-      ? isNetscape
-        ? parseBookmarksHtml(text)
-        : parseTobyFile(file.name, text)
-      : parseTobyFile(file.name, text);
+    const imported =
+      source === 'linkwarden'
+        ? parseLinkwarden(text)
+        : source === 'toby'
+          ? parseTobyFile(file.name, text)
+          : source === 'bookmarks'
+            ? parseBookmarksHtml(text)
+            : !isHtml && looksLikeLinkwarden(text)
+              ? parseLinkwarden(text)
+              : isHtml && isNetscape
+                ? parseBookmarksHtml(text)
+                : parseTobyFile(file.name, text);
+    if (imported.every((s) => s.collections.every((c) => c.links.length === 0))) {
+      throw new Error(t('err.importNoLinks'));
+    }
     const result = await repo.importStructure(imported);
     setStatus(t('set.backup.imported', { tabs: t.plural('count.tabs', result.cards), collections: t.plural('count.collections', result.collections), file: file.name }));
   };
@@ -277,9 +293,31 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
           <button type="button" className={buttonClass} onClick={() => exportAs('toby')}>
             <Download size={16} aria-hidden /> {t('set.backup.tobyJson')}
           </button>
-          <button type="button" className={buttonClass} onClick={() => bookmarksInput.current?.click()}>
-            <Upload size={16} aria-hidden /> {t('set.backup.importFile')}
-          </button>
+          <Menu label={t('set.backup.importFile')} icon={<Upload size={16} aria-hidden />}>
+            {(close) => (
+              <>
+                {(
+                  [
+                    ['auto', t('set.backup.srcAuto')],
+                    ['bookmarks', t('set.backup.srcBookmarks')],
+                    ['toby', t('set.backup.srcToby')],
+                    ['linkwarden', t('set.backup.srcLinkwarden')],
+                  ] as [ImportSource, string][]
+                ).map(([source, label]) => (
+                  <MenuItem
+                    key={source}
+                    onClick={() => {
+                      importSource.current = source;
+                      close();
+                      bookmarksInput.current?.click();
+                    }}
+                  >
+                    {label}
+                  </MenuItem>
+                ))}
+              </>
+            )}
+          </Menu>
           <input
             ref={bookmarksInput}
             type="file"
@@ -289,7 +327,11 @@ export function SettingsView({ onError }: { onError: (what: string, e: unknown) 
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = '';
-              if (file) guard(t('run.import'), () => importBookmarks(file))();
+              if (file) {
+                const source = importSource.current;
+                importSource.current = 'auto';
+                guard(t('run.import'), () => importBookmarks(file, source))();
+              }
             }}
           />
         </div>

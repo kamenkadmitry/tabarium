@@ -51,16 +51,18 @@ export function toPlainText(b: Backup): string {
   return out.join('\n');
 }
 
+export interface ImportedTag {
+  title: string;
+  color: string;
+}
 export interface ImportedLink {
   title: string;
   url: string;
   favIconUrl?: string | null;
   customTitle?: string | null;
   note?: string | null;
-}
-export interface ImportedTag {
-  title: string;
-  color: string;
+  tags?: ImportedTag[];
+  starred?: boolean;
 }
 export interface ImportedCollection {
   title: string;

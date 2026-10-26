@@ -18,6 +18,7 @@ export interface NewCard {
   note?: string | null;
   tagIds?: readonly string[];
   hashtagIds?: readonly string[];
+  starred?: boolean;
 }
 
 export { normalizeUrl };
@@ -87,7 +88,7 @@ export class Repository {
           description: null,
           heading: null,
           pageInfoAt: null,
-          starred: false,
+          starred: item.starred ?? false,
           tagIds: [...(item.tagIds ?? [])],
           hashtagIds: [...(item.hashtagIds ?? [])],
           position,
@@ -414,23 +415,30 @@ export class Repository {
     let collections = 0;
     let cards = 0;
     const tagByTitle = new Map((await this.db.tags.toArray()).map((t) => [t.title.toLowerCase(), t.id]));
+    const ensureTag = async (tag: { title: string; color: string }) => {
+      const key = tag.title.toLowerCase();
+      let id = tagByTitle.get(key);
+      if (id === undefined) {
+        id = (await this.createTag(tag.title || tr()('common.untitled'), tag.color || '#0d9488')).id;
+        tagByTitle.set(key, id);
+      }
+      return id;
+    };
     for (const s of spaces) {
       const existing = (await this.db.spaces.toArray()).find((x) => x.name === s.name);
       const space = existing ?? (await this.createSpace(s.name));
       for (const c of s.collections) {
         const col = await this.createCollection(space.id, c.title || tr()('common.untitled'));
         collections += 1;
-        cards += (await this.addCards(col.id, dedupeLinks(c.links))).length;
-        const tagIds: string[] = [];
-        for (const tag of c.tags ?? []) {
-          const key = tag.title.toLowerCase();
-          let id = tagByTitle.get(key);
-          if (id === undefined) {
-            id = (await this.createTag(tag.title || tr()('common.untitled'), tag.color || '#0d9488')).id;
-            tagByTitle.set(key, id);
-          }
-          tagIds.push(id);
+        const links: NewCard[] = [];
+        for (const link of dedupeLinks(c.links)) {
+          const tagIds: string[] = [];
+          for (const tag of link.tags ?? []) tagIds.push(await ensureTag(tag));
+          links.push({ ...link, tagIds });
         }
+        cards += (await this.addCards(col.id, links)).length;
+        const tagIds: string[] = [];
+        for (const tag of c.tags ?? []) tagIds.push(await ensureTag(tag));
         if (tagIds.length > 0) await this.setCollectionTags(col.id, tagIds);
       }
     }
