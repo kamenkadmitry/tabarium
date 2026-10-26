@@ -104,4 +104,15 @@ describe('importing a Linkwarden export', () => {
     expect(tagTitles.sort()).toEqual(['Soft', 'Tools']);
     expect(cards.find((c) => c.url === 'https://pin.dev/')?.starred).toBe(true);
   });
+
+  it('skips URLs already in the library and reports them as duplicates', async () => {
+    await repo.importStructure(parseLinkwarden(json));
+    const second = await repo.importStructure(parseLinkwarden(json));
+    expect(second.cards).toBe(0);
+    expect(second.duplicates).toBe(5);
+    // Only the collection that was empty in the source is recreated; all-duplicate ones are skipped entirely.
+    expect(second.collections).toBe(1);
+    expect(await db.collections.count()).toBe(6);
+    expect(await db.cards.count()).toBe(5);
+  });
 });

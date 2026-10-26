@@ -1,5 +1,5 @@
 import type { TabariumDB } from './db';
-import { dedupeLinks, type ImportedSpace } from './formats';
+import { type ImportedSpace } from './formats';
 import { tr } from '../i18n/runtime';
 import { planInsert } from './ordering';
 import { POSITION_STEP, positionAfterLast } from './position';
@@ -14,7 +14,7 @@ import { normalizeUrl } from './url';
 export interface ImportReport {
   collections: number;
   cards: number;
-  /** Links dropped because their URL repeats inside the import or already sits in the target collection. */
+  /** Links dropped because their URL already exists in the library or appeared earlier in the import. */
   duplicates: number;
   /** Tags created by the import (existing ones are reused silently). */
   tags: number;
@@ -435,6 +435,8 @@ export class Repository {
     let done = 0;
     const tagByTitle = new Map((await this.db.tags.toArray()).map((t) => [t.title.toLowerCase(), t.id]));
     const hashtagByName = new Map((await this.db.hashtags.toArray()).map((h) => [h.name, h.id]));
+    /** URLs already in the library or taken by an earlier collection in this import — those links are skipped. */
+    const seen = new Set((await this.db.cards.toArray()).map((c) => normalizeUrl(c.url)));
     const ensureTag = async (tag: { title: string; color: string }) => {
       const key = tag.title.toLowerCase();
       let id = tagByTitle.get(key);
@@ -460,12 +462,14 @@ export class Repository {
       const existing = (await this.db.spaces.toArray()).find((x) => x.name === s.name);
       const space = existing ?? (await this.createSpace(s.name));
       for (const c of s.collections) {
-        const col = await this.createCollection(space.id, c.title || tr()('common.untitled'));
-        collections += 1;
         const links: NewCard[] = [];
-        const deduped = dedupeLinks(c.links);
-        duplicates += c.links.length - deduped.length;
-        for (const link of deduped) {
+        for (const link of c.links) {
+          const key = normalizeUrl(link.url);
+          if (seen.has(key)) {
+            duplicates += 1;
+            continue;
+          }
+          seen.add(key);
           const tagIds: string[] = [];
           for (const tag of link.tags ?? []) tagIds.push(await ensureTag(tag));
           const hashtagIds: string[] = [];
@@ -475,6 +479,14 @@ export class Repository {
           }
           links.push({ ...link, tagIds, hashtagIds });
         }
+        // A collection whose links were all duplicates is skipped; one that was empty in the source is still created.
+        if (c.links.length > 0 && links.length === 0) {
+          done += 1;
+          onProgress?.(done, total);
+          continue;
+        }
+        const col = await this.createCollection(space.id, c.title || tr()('common.untitled'));
+        collections += 1;
         const added = await this.addCards(col.id, links);
         cards += added.length;
         duplicates += links.length - added.length;
