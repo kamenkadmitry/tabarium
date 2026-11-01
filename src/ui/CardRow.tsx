@@ -16,7 +16,7 @@ export function PageFavicon({ url, favIconUrl, size = 20 }: { url: string; favIc
   const host = hostOf(url);
   const box = { width: size, height: size };
   if (favIconUrl) {
-    return <img src={favIconUrl} alt="" style={box} className="shrink-0 rounded" />;
+    return <img src={favIconUrl} alt="" style={box} className="shrink-0 rounded bg-surface-2" />;
   }
   let hash = 0;
   for (const ch of host) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
