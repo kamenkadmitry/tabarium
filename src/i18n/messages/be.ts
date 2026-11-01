@@ -352,8 +352,14 @@ export const be: Messages = {
   'empty.noDuplicates.title': 'Дублікатаў няма',
   'empty.noDuplicates.hint': 'Кожная спасылка захавана адзін раз — чысціць няма чаго.',
   'empty.welcome.title': 'Вітаем у Tabarium',
-  'empty.welcome.text': 'Усё застаецца ў вашым браўзеры. Пачніце са стварэння прасторы для калекцый.',
+  'empty.welcome.text': 'Усё застаецца ў вашым браўзеры. Вось карта:',
+  'empty.welcome.space': 'Прастора — дошка для часткі вашага жыцця: Праца, Асабістае, што заўгодна.',
+  'empty.welcome.collection': 'Калекцыі — калонкі на дошцы; у кожнай — стос спасылак.',
+  'empty.welcome.panel': 'Кнопка на панэлі адкрывае бакавую панэль — самы хуткі спосаб захаваць бягучую ўкладку.',
+  'empty.welcome.tabs': 'Open tabs каля правага краю паказвае вашы рэальныя ўкладкі — перацягніце іх на дошку.',
   'empty.welcome.action': 'Стварыць першую прастору',
+  'empty.welcome.example': 'Паспрабуйце прыклад прасторы',
+  'empty.welcome.toby': 'Імпарт з Toby',
 
   'space.deleteConfirm': {
     one: 'Выдаліць прастору «{name}» з {n} калекцыяй і ўсімі яе укладкамі?',

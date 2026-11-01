@@ -352,8 +352,14 @@ export const pl: Messages = {
   'empty.noDuplicates.title': 'Brak zduplikowanych kart',
   'empty.noDuplicates.hint': 'Każdy link zapisany jest raz — nie ma czego porządkować.',
   'empty.welcome.title': 'Witamy w Tabarium',
-  'empty.welcome.text': 'Wszystko zostaje w Twojej przeglądarce. Zacznij od utworzenia obszaru na kolekcje.',
+  'empty.welcome.text': 'Wszystko zostaje w Twojej przeglądarce. Oto mapa:',
+  'empty.welcome.space': 'Obszar to tablica dla części Twojego życia — Praca, Prywatne, cokolwiek.',
+  'empty.welcome.collection': 'Kolekcje to kolumny na tablicy; każda trzyma stos linków.',
+  'empty.welcome.panel': 'Przycisk na pasku otwiera panel boczny — najszybszy sposób zapisać bieżącą kartę.',
+  'empty.welcome.tabs': 'Open tabs przy prawej krawędzi pokazuje prawdziwe karty — przeciągnij je na tablicę.',
   'empty.welcome.action': 'Utwórz pierwszy obszar',
+  'empty.welcome.example': 'Wypróbuj przykładowy obszar',
+  'empty.welcome.toby': 'Importuj z Toby',
 
   'space.deleteConfirm': {
     one: 'Usunąć obszar „{name}” z {n} kolekcją i wszystkimi jej kartami?',

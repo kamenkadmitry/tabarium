@@ -363,8 +363,14 @@ export const en = {
   'empty.noDuplicates.title': 'No duplicate tabs',
   'empty.noDuplicates.hint': 'Every link is saved once — nothing to tidy.',
   'empty.welcome.title': 'Welcome to Tabarium',
-  'empty.welcome.text': 'Everything stays in your browser. Start by creating a space for your collections.',
+  'empty.welcome.text': 'Everything stays in your browser. Here is the map:',
+  'empty.welcome.space': 'A space is a board for a part of your life — Work, Personal, anything.',
+  'empty.welcome.collection': 'Collections are the columns on a board; each holds a stack of links.',
+  'empty.welcome.panel': 'The toolbar button opens the side panel — the fastest way to save the tab you are on.',
+  'empty.welcome.tabs': 'Open tabs on the right edge shows your real tabs — drag them onto the board.',
   'empty.welcome.action': 'Create your first space',
+  'empty.welcome.example': 'Try an example space',
+  'empty.welcome.toby': 'Import from Toby',
 
   // --- space delete confirm ---------------------------------------------------
   'space.deleteConfirm': {

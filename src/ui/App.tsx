@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, ArrowRight, PanelRightOpen, Plus, Search, Star, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { type BoardFilter, filterCards, filterCollections, isFiltering, NO_FILTER, sortCollections } from '../core/board';
 import type { BoardSort, BoardView } from '../core/boardTypes';
 import { db, repo } from '../core/instance';
@@ -10,6 +10,7 @@ import { applyCardDetails, applyGroups, loadLabelContext, loadLibraryContext } f
 import { displaySpaceName, ensureInbox, inboxCards, inboxSpace, moveToInbox } from '../core/quicksave';
 import { loadSettings, updateSettings } from '../core/settings';
 import { cardSearchText } from './searchModel';
+import { parseTobyFile } from '../core/toby';
 import type { Card, Collection, Space } from '../core/types';
 import type { Deletion } from '../core/undo';
 import { usePlatform } from '../platform/context';
@@ -161,6 +162,34 @@ export function App() {
     [reportError],
   );
   const act = (what: string, action: () => Promise<void>) => () => void run(what, action);
+
+  /** First run: a sample space the user can remove in one step (space menu → Delete space). */
+  const createExample = () =>
+    void run(t('run.creatingSpace'), async () => {
+      const space = await repo.createSpace('Example');
+      const reading = await repo.createCollection(space.id, 'Reading');
+      await repo.addCards(reading.id, [
+        { title: 'Hacker News', url: 'https://news.ycombinator.com' },
+        { title: 'Trending on GitHub', url: 'https://github.com/trending' },
+        { title: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Main_Page' },
+      ]);
+      const docs = await repo.createCollection(space.id, 'Documentation');
+      await repo.addCards(docs.id, [
+        { title: 'MDN Web Docs', url: 'https://developer.mozilla.org/en-US/docs/Web' },
+        { title: 'Chrome Extensions', url: 'https://developer.chrome.com/docs/extensions' },
+      ]);
+    });
+
+  const onTobyFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    void run(t('run.importingBookmarks'), async () => {
+      const imported = parseTobyFile(file.name, await file.text());
+      if (imported.every((s) => s.collections.every((c) => c.links.length === 0))) throw new Error(t('err.importNoLinks'));
+      await repo.importStructure(imported);
+    });
+  };
   const guard = useDuplicateGuard();
   const editor = useInlineEditor({ reportError, clearError: () => setError(null), guard });
   // Creates the Inbox on first use and adopts an older one, so it exists before anything is saved to it.
@@ -188,6 +217,7 @@ export function App() {
   });
   /** Latest applyView for the popstate listener bound once below; a stale space falls back where `view` is derived. */
   const popRef = useRef<(v: View | null) => void>(() => {});
+  const tobyRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     popRef.current = applyView;
   });
@@ -721,9 +751,15 @@ export function App() {
           )}
 
           {view === null && (
-            <div className="mx-auto mt-24 max-w-sm text-center">
+            <div className="mx-auto mt-24 max-w-md text-center">
               <h2 className="text-lg font-bold">{t('empty.welcome.title')}</h2>
               <p className="mt-2 text-muted">{t('empty.welcome.text')}</p>
+              <ul className="mx-auto mt-3 max-w-sm space-y-1.5 text-left text-sm text-muted">
+                <li>• {t('empty.welcome.space')}</li>
+                <li>• {t('empty.welcome.collection')}</li>
+                <li>• {t('empty.welcome.panel')}</li>
+                <li>• {t('empty.welcome.tabs')}</li>
+              </ul>
               <button
                 type="button"
                 onClick={() => setDialog({ kind: 'space' })}
@@ -731,6 +767,15 @@ export function App() {
               >
                 {t('empty.welcome.action')}
               </button>
+              <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+                <button type="button" onClick={createExample} className="font-semibold text-primary hover:underline">
+                  {t('empty.welcome.example')}
+                </button>
+                <button type="button" onClick={() => tobyRef.current?.click()} className="font-semibold text-primary hover:underline">
+                  {t('empty.welcome.toby')}
+                </button>
+                <input ref={tobyRef} type="file" accept=".json" hidden onChange={onTobyFile} />
+              </div>
             </div>
           )}
         </div>

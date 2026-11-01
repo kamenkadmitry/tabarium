@@ -1,0 +1,13 @@
+{
+  "title": "Toby export",
+  "lists": [
+    {
+      "title": "Work tools",
+      "labels": [],
+      "cards": [
+        { "title": "Board", "url": "https://example.test/board", "favIconUrl": "", "favIconURL": "", "customTitle": "", "customDescription": "" },
+        { "title": "Docs", "url": "https://example.test/docs", "favIconUrl": "", "favIconURL": "", "customTitle": "", "customDescription": "" }
+      ]
+    }
+  ]
+}
