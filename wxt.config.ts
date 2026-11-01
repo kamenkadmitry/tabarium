@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
 
-const OPTIONAL = ['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'history', 'bookmarks'] as const;
+const OPTIONAL = ['tabs', 'contextMenus', 'downloads', 'alarms', 'tabGroups', 'bookmarks'] as const;
 
 export default defineConfig({
   srcDir: 'src',

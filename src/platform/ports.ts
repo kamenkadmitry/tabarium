@@ -8,7 +8,6 @@ export type Capability =
   | 'downloads'
   | 'alarms'
   | 'tabGroups'
-  | 'history'
   | 'bookmarks';
 
 export interface OpenTab {
