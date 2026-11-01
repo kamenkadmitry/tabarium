@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ExternalLink, GripVertical, Link2, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
+import { ChevronDown, ExternalLink, GripVertical, Link2, MoreHorizontal, Palette, Pencil, Plus, RefreshCw, Sparkles, Tag as TagIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Collection, Space, Tag } from '../core/types';
 import type { BoardView } from '../core/boardTypes';
@@ -209,7 +209,7 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) clear();
       }}
       onDrop={onDrop}
-      className={`flex break-inside-avoid flex-col rounded-2xl border bg-surface ${collectionOver ? 'border-primary' : 'border-line'}`}
+      className={`flex break-inside-avoid flex-col rounded-2xl border bg-surface transition-colors duration-150 ${collectionOver ? 'border-primary' : 'border-line'}`}
     >
       <div aria-hidden className="h-1 shrink-0 rounded-t-2xl" style={{ background: collection.color ?? 'var(--border)' }} />
       <header className="group/head relative flex items-center gap-2 border-b border-line px-3 py-3">
@@ -220,7 +220,7 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
           onClick={actions.toggleExpanded}
           className="grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2"
         >
-          {expanded ? <ChevronDown size={16} aria-hidden /> : <ChevronRight size={16} aria-hidden />}
+          <ChevronDown size={16} aria-hidden className={`transition-transform duration-150 ${expanded ? '' : '-rotate-90'}`} />
         </button>
         {cards.length > 0 && (
           <input
@@ -270,7 +270,9 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
 
       {view !== 'list' && <TagChips tags={tags} className="px-4 pt-3" />}
 
-      {!expanded ? null : cards.length > 0 ? (
+      {expanded && (
+        <div className="editor-in">
+          {cards.length > 0 ? (
         <ul className={view === 'card' ? 'grid grid-cols-2 gap-2 p-3' : 'flex flex-col gap-0.5 p-2'}>
           {cards.flatMap((c, i) => {
             const rows = [<CardRow
@@ -296,15 +298,14 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
             }
             return rows;
           })}
-          {indicator === null && <li aria-hidden className="mx-1 h-0.5 rounded bg-primary" />}
+          {indicator === null && <li aria-hidden className="mx-1 h-0.5 animate-drop-ind rounded bg-primary" />}
         </ul>
-      ) : (
+          ) : (
         <div className={`px-4 py-5 text-center text-sm ${indicator === null ? 'text-primary' : 'text-muted'}`} data-empty-state>
           <Link2 size={20} aria-hidden className="mx-auto" />
           <p className="mt-1.5">{t('collection.empty')}</p>
         </div>
-      )}
-      {expanded && (
+          )}
         <footer className="border-t border-line p-2">
           {editor.adding ? (
             editor.render(null)
@@ -314,6 +315,7 @@ export function CollectionCard({ space, collection, cards, tags, actions, view, 
             </button>
           )}
         </footer>
+        </div>
       )}
     </section>
   );

@@ -20,7 +20,10 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
   const platform = usePlatform();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   const running = useRef(false);
+  // Links saved while a batch is in flight must not be dropped: they re-run the effect once it finishes.
+  const pending = useRef(false);
   const summary = (read: number, failed: number) =>
     failed === 0
       ? tr()('inbox.pagesNote', { read: tr().plural('inbox.pagesRead', read) })
@@ -29,7 +32,12 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
   // New links that were never read, as one stable key so the effect runs when the set changes, not on every render.
   const unreadKey = active && enabled ? cards.filter((c) => c.pageInfoAt === null).map((c) => c.id).sort().join(',') : '';
   useEffect(() => {
-    if (unreadKey === '' || running.current) return;
+    if (unreadKey === '') return;
+    if (running.current) {
+      pending.current = true;
+      return;
+    }
+    pending.current = false;
     let alive = true;
     running.current = true;
     void (async () => {
@@ -43,11 +51,12 @@ export function useInboxReading({ enabled, active, cards, reportError }: Options
       .finally(() => {
         running.current = false;
         if (alive) setBusy(false);
+        if (pending.current) setTick((v) => v + 1);
       });
     return () => {
       alive = false;
     };
-  }, [unreadKey, platform, reportError]);
+  }, [unreadKey, platform, reportError, tick]);
 
   /** Reads the given pages. Call it from a click: the first time it asks for access to sites. */
   const read = useCallback(

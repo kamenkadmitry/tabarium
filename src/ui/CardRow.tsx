@@ -100,7 +100,7 @@ export function CardRow({ card, dropAbove, draggable = true, density = 'default'
           actions.onEdit();
         }
       }}
-      className={`group relative rounded-lg ${editing || selected ? 'bg-surface-2 ring-1 ring-primary/60' : ''} ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:rounded before:bg-primary' : ''}`}
+      className={`group relative rounded-lg ${editing || selected ? 'bg-surface-2 ring-1 ring-primary/60' : ''} ${dropAbove ? 'before:absolute before:-top-px before:inset-x-1 before:h-0.5 before:animate-drop-ind before:rounded before:bg-primary' : ''}`}
     >
       {onSelect && (
         <label
