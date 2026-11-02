@@ -1,7 +1,6 @@
 import { Search } from 'lucide-react';
 import { useState } from 'react';
-import { db, repo } from '../../core/instance';
-import { setQuickTarget } from '../../core/quicksave';
+import { repo } from '../../core/instance';
 import type { Card, Collection, Hashtag, Space, Tag } from '../../core/types';
 import { usePlatform } from '../../platform/context';
 import { hostOf } from '../CardRow';
@@ -58,7 +57,6 @@ export function SaveTabView({ spaces, collections, cardsByCollection, tags, hash
         return;
       }
       const added = await repo.addCards(collectionId, approved);
-      await setQuickTarget(db, collectionId);
       if (autoClose && added.length > 0) await platform.tabs.closeTabs([tab.id]);
       onStatus({ tone: 'ok', text: added.length > 0 ? t('save.savedTo', { dest: dest.label }) : t('save.alreadyIn', { dest: dest.label }) });
     } catch (e) {

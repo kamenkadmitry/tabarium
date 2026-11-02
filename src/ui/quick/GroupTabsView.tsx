@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { proposeTabGroups } from '../../core/ai/tasks';
 import { db, repo } from '../../core/instance';
 import { applyGroups } from '../../core/organise';
-import { setQuickTarget } from '../../core/quicksave';
 import type { Settings } from '../../core/settings';
 import type { Card, Collection, Space } from '../../core/types';
 import { usePlatform } from '../../platform/context';
@@ -78,7 +77,6 @@ export function GroupTabsView({ spaces, collections, cardsByCollection, settings
       }
       const id = dest.kind === 'collection' ? dest.collectionId : (await repo.createCollection(dest.spaceId, dest.title)).id;
       const added = await repo.addCards(id, approved.map(toCard));
-      await setQuickTarget(db, id);
       if (settings.autoCloseTabs) await platform.tabs.closeTabs(approved.map((tab) => tab.id));
       onStatus({ tone: 'ok', text: t('gt.saved', { added: t.plural('count.tabs', added.length), total: t.plural('count.tabs', approved.length), dest: dest.label }) });
       setMode('idle');

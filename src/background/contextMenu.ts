@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { db } from '../core/instance';
-import { quickSave } from '../core/quicksave';
+import { saveToInbox } from '../core/quicksave';
 import { loadSettings } from '../core/settings';
 import { resolveLocale } from '../i18n/locale';
 import { makeT } from '../i18n/messages';
@@ -30,17 +30,17 @@ export async function syncContextMenu(): Promise<void> {
 
 export async function handleClick(info: { menuItemId: string | number; linkUrl?: string; selectionText?: string }, tab?: { url?: string; title?: string; favIconUrl?: string; windowId?: number }): Promise<void> {
   if (info.menuItemId === LINK && info.linkUrl) {
-    const added = await quickSave(db, [{ title: info.selectionText?.trim() || info.linkUrl, url: info.linkUrl }]);
+    const added = await saveToInbox(db, [{ title: info.selectionText?.trim() || info.linkUrl, url: info.linkUrl }]);
     await flashBadge(added > 0 ? '+1' : '=');
   } else if (info.menuItemId === PAGE && tab?.url) {
-    const added = await quickSave(db, [{ title: tab.title ?? tab.url, url: tab.url, favIconUrl: tab.favIconUrl ?? null }]);
+    const added = await saveToInbox(db, [{ title: tab.title ?? tab.url, url: tab.url, favIconUrl: tab.favIconUrl ?? null }]);
     await flashBadge(added > 0 ? '+1' : '=');
   } else if (info.menuItemId === ALL && tab?.windowId !== undefined) {
     const tabs = await browser.tabs.query({ windowId: tab.windowId });
     const items = tabs
       .filter((t) => t.url && /^https?:\/\//.test(t.url))
       .map((t) => ({ title: t.title ?? (t.url as string), url: t.url as string, favIconUrl: t.favIconUrl ?? null }));
-    await flashBadge(`+${await quickSave(db, items)}`);
+    await flashBadge(`+${await saveToInbox(db, items)}`);
   }
 }
 

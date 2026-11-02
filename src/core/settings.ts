@@ -29,9 +29,7 @@ export const SettingsSchema = z.object({
     })
     .default({ enabled: false, intervalMinutes: 15 }),
   lastBackupAt: z.number().int().nullable(),
-  /** Collection used by the popup, side panel and context menu. Null until the first quick save. */
-  quickSaveCollectionId: z.string().nullable().default(null),
-  contextMenu: z.boolean().default(false),
+contextMenu: z.boolean().default(false),
   /** Open collections as browser tab groups (needs the optional `tabGroups` permission). */
   tabGroups: z.boolean().default(false),
   /** What the toolbar button opens: the side panel (default) or the classic popup. */
@@ -74,7 +72,6 @@ export const DEFAULT_SETTINGS: Settings = {
   autoBackup: { enabled: false, intervalHours: 24 },
   sessionSnapshots: { enabled: false, intervalMinutes: 15 },
   lastBackupAt: null,
-  quickSaveCollectionId: null,
   contextMenu: false,
   tabGroups: false,
   quickPanel: 'side',

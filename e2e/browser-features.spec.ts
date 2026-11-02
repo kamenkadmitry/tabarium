@@ -1259,9 +1259,15 @@ test('keyboard shortcut: the command saves the focused web tab and flashes the b
   await p.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-save-current-tab' }));
   await expect.poll(() => app.worker.evaluate(() => chrome.action.getBadgeText({}))).toBe('+1');
 
-  // The link landed in whatever collection is the current quick-save target — search finds it anywhere.
-  await p.getByPlaceholder('Search all tabs').fill('key-save');
-  await expect(p.locator('main').getByText('Page key-save')).toBeVisible();
+  // The shortcut's destination is the Inbox — the card is there, not in the open space's collections.
+  await p.getByRole('navigation', { name: 'Spaces' }).getByRole('button', { name: /^Inbox(?![a-z])/ }).click();
+  await expect(p.getByRole('table', { name: 'Inbox' }).getByText('Page key-save')).toBeVisible();
+
+  // A second invocation dedupes: the badge reports '=' and the Inbox still holds one card.
+  await target.bringToFront();
+  await p.evaluate(() => chrome.runtime.sendMessage({ type: 'e2e-save-current-tab' }));
+  await expect.poll(() => app.worker.evaluate(() => chrome.action.getBadgeText({}))).toBe('=');
+  await expect(p.getByRole('table', { name: 'Inbox' }).getByText('Page key-save')).toHaveCount(1);
 
   await p.getByRole('button', { name: 'Settings' }).click();
   await expect(p.getByText('Save the current tab to Tabarium')).toBeVisible();

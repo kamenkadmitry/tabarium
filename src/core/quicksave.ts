@@ -1,6 +1,5 @@
 import type { TabariumDB } from './db';
 import { type NewCard, Repository } from './repo';
-import { loadSettings, updateSettings } from './settings';
 import { tr } from '../i18n/runtime';
 import type { Card, Collection, Space } from './types';
 
@@ -91,25 +90,4 @@ export async function moveToInbox(db: TabariumDB, cardIds: readonly string[]): P
   await new Repository(db).moveCards(cardIds, await resolveInbox(db));
 }
 
-/**
- * Resolves where quick saves (popup, side panel, context menu) go: the remembered collection if it still
- * exists, otherwise the Inbox.
- */
-export async function resolveQuickTarget(db: TabariumDB): Promise<string> {
-  const { quickSaveCollectionId } = await loadSettings(db);
-  if (quickSaveCollectionId && (await db.collections.get(quickSaveCollectionId))) return quickSaveCollectionId;
-  const collectionId = await resolveInbox(db);
-  await updateSettings(db, { quickSaveCollectionId: collectionId });
-  return collectionId;
-}
 
-/** Saves cards into the quick-save target and returns how many were new. */
-export async function quickSave(db: TabariumDB, items: readonly NewCard[]): Promise<number> {
-  const collectionId = await resolveQuickTarget(db);
-  return (await new Repository(db).addCards(collectionId, items)).length;
-}
-
-export async function setQuickTarget(db: TabariumDB, collectionId: string): Promise<void> {
-  if (!(await db.collections.get(collectionId))) throw new Error(tr()('err.collectionGone', { id: collectionId }));
-  await updateSettings(db, { quickSaveCollectionId: collectionId });
-}

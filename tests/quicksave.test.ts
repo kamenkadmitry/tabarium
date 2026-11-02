@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TabariumDB } from '../src/core/db';
-import { ensureInbox, inboxCards, inboxSpace, INBOX_COLLECTION, INBOX_ICON, INBOX_SPACE, moveToInbox, quickSave, resolveInbox, resolveQuickTarget, saveToInbox, setQuickTarget } from '../src/core/quicksave';
+import { ensureInbox, inboxCards, inboxSpace, INBOX_COLLECTION, INBOX_ICON, INBOX_SPACE, moveToInbox, resolveInbox, saveToInbox } from '../src/core/quicksave';
 import { Repository } from '../src/core/repo';
 import { loadSettings } from '../src/core/settings';
 
@@ -12,34 +12,26 @@ beforeEach(() => {
 
 describe('quick save', () => {
   it('creates an Inbox collection on first use and reuses it', async () => {
-    const first = await resolveQuickTarget(db);
-    expect(await resolveQuickTarget(db)).toBe(first);
+    const first = await resolveInbox(db);
+    expect(await resolveInbox(db)).toBe(first);
     expect((await db.spaces.toArray()).map((s) => s.name)).toEqual([INBOX_SPACE]);
     expect((await db.collections.get(first))?.title).toBe(INBOX_COLLECTION);
   });
 
   it('saves and skips duplicates', async () => {
-    expect(await quickSave(db, [{ title: 'A', url: 'https://a.dev/' }])).toBe(1);
-    expect(await quickSave(db, [{ title: 'A', url: 'https://a.dev' }, { title: 'B', url: 'https://b.dev' }])).toBe(1);
+    expect(await saveToInbox(db, [{ title: 'A', url: 'https://a.dev/' }])).toBe(1);
+    expect(await saveToInbox(db, [{ title: 'A', url: 'https://a.dev' }, { title: 'B', url: 'https://b.dev' }])).toBe(1);
     expect(await db.cards.count()).toBe(2);
   });
 
-  it('honours a chosen target and recovers if it was deleted', async () => {
+  it('lands in the default Inbox collection even when the Inbox holds extra collections', async () => {
     const repo = new Repository(db);
-    const space = await repo.createSpace('Work');
-    const col = await repo.createCollection(space.id, 'Reading');
-    await setQuickTarget(db, col.id);
-    await quickSave(db, [{ title: 'A', url: 'https://a.dev/' }]);
-    expect((await db.cards.toArray())[0]?.collectionId).toBe(col.id);
-
-    await repo.deleteCollection(col.id);
-    const fallback = await resolveQuickTarget(db);
-    expect(fallback).not.toBe(col.id);
-    expect((await loadSettings(db)).quickSaveCollectionId).toBe(fallback);
-  });
-
-  it('rejects an unknown target', async () => {
-    await expect(setQuickTarget(db, 'nope')).rejects.toThrow(/does not exist/);
+    const inbox = await resolveInbox(db);
+    const { space } = await ensureInbox(db);
+    const extra = await repo.createCollection(space.id, 'Work');
+    await saveToInbox(db, [{ title: 'A', url: 'https://a.dev/' }]);
+    expect((await db.cards.toArray())[0]?.collectionId).toBe(inbox);
+    expect(await db.cards.where('collectionId').equals(extra.id).count()).toBe(0);
   });
 });
 
@@ -57,7 +49,6 @@ describe('settings schema evolution', () => {
     const s = await loadSettings(db);
     expect(s.theme).toBe('dark');
     expect(s.contextMenu).toBe(false);
-    expect(s.quickSaveCollectionId).toBeNull();
   });
 });
 
@@ -81,12 +72,11 @@ describe('Inbox', () => {
     expect(await db.spaces.count()).toBe(1);
   });
 
-  it('stays the same collection when the quick target moves elsewhere', async () => {
+  it('keeps its default collection when other collections exist elsewhere', async () => {
     const repo = new Repository(db);
     const inbox = await resolveInbox(db);
     const space = await repo.createSpace('Work');
     const col = await repo.createCollection(space.id, 'Reading');
-    await setQuickTarget(db, col.id);
 
     expect(await resolveInbox(db)).toBe(inbox);
     expect(await saveToInbox(db, [{ title: 'A', url: 'https://a.dev/' }])).toBe(1);

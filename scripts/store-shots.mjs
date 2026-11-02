@@ -4,6 +4,7 @@
  * (Open tabs, Inbox, …) are visible without unclickable browser prompts; the UI is identical
  * to the release build. Usage: node scripts/store-shots.mjs   (needs the e2e build present)
  */
+/* global chrome -- used inside page.evaluate, which runs in the extension page's context */
 import { chromium } from '@playwright/test';
 import { mkdtempSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
